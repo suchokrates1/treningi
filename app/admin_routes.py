@@ -1,5 +1,13 @@
-from flask import session, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from functools import wraps
+from datetime import datetime
+
+from . import db
+from .forms import CoachForm, TrainingForm
+from .models import Coach, Training
+
+admin_bp = Blueprint("admin", __name__)
+
 
 def login_required(view):
     @wraps(view)
@@ -8,6 +16,7 @@ def login_required(view):
             return redirect(url_for("admin.login"))
         return view(*args, **kwargs)
     return wrapped
+
 
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
@@ -18,7 +27,8 @@ def login():
             flash("Zalogowano jako administrator.", "success")
             return redirect(url_for("admin.manage_trainers"))
         flash("Nieprawidłowe hasło.", "danger")
-    return render_template("login.html")
+    return render_template("admin/loginhtml")
+
 
 @admin_bp.route("/logout")
 def logout():
@@ -26,20 +36,10 @@ def logout():
     flash("Wylogowano.", "info")
     return redirect(url_for("admin.login"))
 
-# Wszystkie trasy admina:
+
 @admin_bp.route("/trainers", methods=["GET", "POST"])
 @login_required
 def manage_trainers():
-    # ...
-
-@admin_bp.route("/trainers/edit/<int:coach_id>", methods=["GET", "POST"])
-@login_required
-def edit_trainer(coach_id):
-    # ...
-
-@admin_bp.route("/trainings", methods=["GET", "POST"])
-@login_required
-def manage_trainings():
     form = CoachForm()
     coaches = Coach.query.order_by(Coach.last_name).all()
 
@@ -47,16 +47,18 @@ def manage_trainings():
         new_coach = Coach(
             first_name=form.first_name.data.strip(),
             last_name=form.last_name.data.strip(),
-            phone_number=form.phone_number.data.strip()
+            phone_number=form.phone_number.data.strip(),
         )
         db.session.add(new_coach)
         db.session.commit()
         flash("Dodano nowego trenera.", "success")
         return redirect(url_for("admin.manage_trainers"))
 
-    return render_template("trainers.html", form=form, coaches=coaches)
+    return render_template("admin/trainters.html", form=form, coaches=coaches)
+
 
 @admin_bp.route("/trainers/edit/<int:coach_id>", methods=["GET", "POST"])
+@login_required
 def edit_trainer(coach_id):
     coach = Coach.query.get_or_404(coach_id)
     form = CoachForm(obj=coach)
@@ -69,24 +71,32 @@ def edit_trainer(coach_id):
         flash("Zaktualizowano dane trenera.", "success")
         return redirect(url_for("admin.manage_trainers"))
 
-    return render_template("edit_trainer.html", form=form, coach=coach)
+    return render_template("admin/edit_trainer.html", form=form, coach=coach)
+
 
 @admin_bp.route("/trainings", methods=["GET", "POST"])
+@login_required
 def manage_trainings():
     form = TrainingForm()
-    form.coach_id.choices = [(c.id, f"{c.first_name} {c.last_name}") for c in Coach.query.order_by(Coach.last_name).all()]
+    form.coach_id.choices = [
+        (c.id, f"{c.first_name} {c.last_name}") for c in Coach.query.order_by(Coach.last_name).all()
+    ]
     trainings = Training.query.order_by(Training.date).all()
 
     if form.validate_on_submit():
         new_training = Training(
             date=form.date.data,
             location=form.location.data.strip(),
-            coach_id=form.coach_id.data
+            coach_id=form.coach_id.data,
         )
         db.session.add(new_training)
         db.session.commit()
         flash("Dodano nowy trening.", "success")
-        return redir
+        return redirect(url_for("admin.manage_trainings"))
+
+    return render_template("admin/trainings.html", form=form, trainings=trainings)
+
+
 @admin_bp.route("/export")
 @login_required
 def export_excel():
@@ -98,27 +108,35 @@ def export_excel():
     ws = wb.active
     ws.title = "Treningi"
 
-    # Nagłówki
-    ws.append(["Data", "Godzina", "Miejsce", "Trener", "Telefon trenera",
-               "Wolontariusz 1", "Telefon 1", "Wolontariusz 2", "Telefon 2"])
+    ws.append([
+        "Data",
+        "Godzina",
+        "Miejsce",
+        "Trener",
+        "Telefon trenera",
+        "Wolontariusz 1",
+        "Telefon 1",
+        "Wolontariusz 2",
+        "Telefon 2",
+    ])
 
     trainings = Training.query.order_by(Training.date).all()
 
     for t in trainings:
-        bookings = t.bookings[:2]  # Maksymalnie dwóch wolontariuszy
+        bookings = t.bookings[:2]
         v1 = bookings[0].volunteer if len(bookings) > 0 else None
         v2 = bookings[1].volunteer if len(bookings) > 1 else None
 
         ws.append([
-            t.date.strftime('%Y-%m-%d'),
-            t.date.strftime('%H:%M'),
+            t.date.strftime("%Y-%m-%d"),
+            t.date.strftime("%H:%M"),
             t.location,
             f"{t.coach.first_name} {t.coach.last_name}",
             t.coach.phone_number,
             f"{v1.first_name} {v1.last_name}" if v1 else "",
             v1.phone_number if v1 else "",
             f"{v2.first_name} {v2.last_name}" if v2 else "",
-            v2.phone_number if v2 else ""
+            v2.phone_number if v2 else "",
         ])
 
     output = BytesIO()
@@ -126,5 +144,9 @@ def export_excel():
     output.seek(0)
 
     filename = f"treningi_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
