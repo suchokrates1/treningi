@@ -23,7 +23,8 @@
     </div>
   </form>
 
-  <table class="table table-striped">
+  <div class="table-responsive">
+  <table class="table table-striped mb-0">
     <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th>Akcje</th></tr></thead>
     <tbody>
       {% for coach in coaches %}
@@ -37,5 +38,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

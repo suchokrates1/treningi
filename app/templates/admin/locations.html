@@ -15,7 +15,8 @@
     </div>
   </form>
 
-  <table class="table table-striped">
+  <div class="table-responsive">
+  <table class="table table-striped mb-0">
     <thead><tr><th>Nazwa</th><th>Akcje</th></tr></thead>
     <tbody>
       {% for location in locations %}
@@ -28,5 +29,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

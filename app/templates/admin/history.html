@@ -2,7 +2,8 @@
 {% block admin_content %}
 <div class="container mt-4">
   <h2>Historia treningów</h2>
-  <table class="table table-bordered table-sm mt-3">
+  <div class="table-responsive mt-3">
+  <table class="table table-bordered table-sm mb-0">
     <thead class="table-light">
       <tr>
         <th>Data</th>
@@ -28,6 +29,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 
   {% if pagination.pages > 1 %}
   <nav aria-label="Paginacja">
