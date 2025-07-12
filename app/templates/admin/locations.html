@@ -5,8 +5,13 @@
   <form method="POST" class="mb-4">
     {{ form.hidden_tag() }}
     <div class="row g-2">
-      <div class="col-md-9">{{ form.name(class="form-control", placeholder="Nazwa miejsca", **{'aria-label': 'Nazwa'}) }}</div>
-      <div class="col-md-3"><button class="btn btn-success w-100">Dodaj miejsce</button></div>
+      <div class="col-md-9">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control") }}
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-success w-100">Dodaj miejsce</button>
+      </div>
     </div>
   </form>
 
