@@ -47,6 +47,15 @@ Optional variables include `FLASK_ENV` and `FLASK_APP`.
    ```
    The application will be available on `http://localhost:8000`.
 
+### Database migrations
+
+Whenever you modify the models, generate and apply migrations:
+
+```bash
+flask db migrate -m "describe change"
+flask db upgrade
+```
+
 ### Docker
 
 Alternatively, build and run with Docker:
