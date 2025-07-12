@@ -32,9 +32,9 @@
             {% if training.bookings|length < 2 %}
               <form method="post" class="d-inline">
                 {{ form.hidden_tag() }}
-                {{ form.first_name(class="form-control mb-1", placeholder="Imię") }}
-                {{ form.last_name(class="form-control mb-1", placeholder="Nazwisko") }}
-                {{ form.phone_number(class="form-control mb-1", placeholder="Telefon") }}
+                {{ form.first_name(class="form-control mb-1", placeholder="Imię", aria_label="Imię") }}
+                {{ form.last_name(class="form-control mb-1", placeholder="Nazwisko", aria_label="Nazwisko") }}
+                {{ form.phone_number(class="form-control mb-1", placeholder="Telefon", aria_label="Telefon") }}
                 {{ form.training_id(value=training.id) }}
                 <button type="submit" class="btn btn-sm btn-primary">Zapisz się</button>
               </form>
