@@ -4,10 +4,10 @@ from flask import (
     redirect,
     url_for,
     flash,
-    request,
     session,
     current_app,
 )
+import flask
 from functools import wraps
 from datetime import datetime
 
@@ -142,10 +142,13 @@ def manage_trainings():
         for c in Coach.query.order_by(Coach.last_name).all()
     ]
     form.location_id.choices = [
-        (l.id, l.name) for l in Location.query.order_by(Location.name).all()
+        (loc.id, loc.name)
+        for loc in Location.query.order_by(Location.name).all()
     ]
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    trainings_q = Training.query.filter(Training.date >= today).order_by(Training.date)
+    trainings_q = Training.query.filter(
+        Training.date >= today
+    ).order_by(Training.date)
     trainings = trainings_q.all()
 
     trainings_by_month = {}
@@ -257,21 +260,33 @@ def import_excel():
 
             dt = datetime.combine(date_part, time_part)
 
-            coach = Coach.query.filter_by(phone_number=str(phone).strip()).first()
+            coach = Coach.query.filter_by(
+                phone_number=str(phone).strip()
+            ).first()
             if not coach:
                 first, *rest = str(trainer_name).strip().split(" ", 1)
                 last = rest[0] if rest else ""
-                coach = Coach(first_name=first, last_name=last, phone_number=str(phone).strip())
+                coach = Coach(
+                    first_name=first,
+                    last_name=last,
+                    phone_number=str(phone).strip(),
+                )
                 db.session.add(coach)
                 db.session.commit()
 
-            location = Location.query.filter_by(name=str(place).strip()).first()
+            location = Location.query.filter_by(
+                name=str(place).strip()
+            ).first()
             if not location:
                 location = Location(name=str(place).strip())
                 db.session.add(location)
                 db.session.commit()
 
-            training = Training(date=dt, coach_id=coach.id, location_id=location.id)
+            training = Training(
+                date=dt,
+                coach_id=coach.id,
+                location_id=location.id,
+            )
             db.session.add(training)
         db.session.commit()
         flash("Zaimportowano treningi.", "success")
@@ -284,7 +299,7 @@ def import_excel():
 @login_required
 def history():
     """List past trainings with volunteer sign-ups."""
-    page = request.args.get("page", 1, type=int)
+    page = flask.request.args.get("page", 1, type=int)
     trainings_q = Training.query.filter(
         Training.date < datetime.now()
     ).order_by(Training.date.desc())
