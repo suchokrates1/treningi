@@ -1,11 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from .models import Training, Booking, Volunteer, Coach
+from flask import Blueprint, render_template, redirect, url_for, flash
+from .models import Training, Booking, Volunteer
 from .forms import VolunteerForm
 from . import db
-from sqlalchemy import func
-from datetime import datetime
 
 bp = Blueprint('routes', __name__)
+
 
 @bp.route("/", methods=["GET", "POST"])
 def index():
@@ -16,8 +15,12 @@ def index():
         training_id = int(form.training_id.data)
         training = Training.query.get_or_404(training_id)
         if len(training.bookings) >= 2:
-            flash("Na ten trening nie można się już zapisać. Limit wolontariuszy został osiągnięty.", "danger")
-            return redirect(url_for('routes.index'))
+            flash(
+                "Na ten trening nie można się już zapisać. "
+                "Limit wolontariuszy został osiągnięty.",
+                "danger",
+            )
+            return redirect(url_for("routes.index"))
 
         # Sprawdzenie, czy ten sam wolontariusz się nie zapisał już wcześniej
         existing_volunteer = Volunteer.query.filter_by(
@@ -35,7 +38,10 @@ def index():
             db.session.add(existing_volunteer)
             db.session.commit()
 
-        booking = Booking(training_id=training.id, volunteer_id=existing_volunteer.id)
+        booking = Booking(
+            training_id=training.id,
+            volunteer_id=existing_volunteer.id,
+        )
         db.session.add(booking)
         db.session.commit()
         flash("Zapisano na trening!", "success")
@@ -49,4 +55,8 @@ def index():
         month_key = training.date.strftime("%Y-%m")
         trainings_by_month.setdefault(month_key, []).append(training)
 
-    return render_template("index.html", form=form, trainings_by_month=trainings_by_month)
+    return render_template(
+        "index.html",
+        form=form,
+        trainings_by_month=trainings_by_month,
+    )

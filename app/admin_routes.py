@@ -1,4 +1,13 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    request,
+    session,
+    current_app,
+)
 from functools import wraps
 from datetime import datetime
 
@@ -79,7 +88,11 @@ def edit_trainer(coach_id):
 def manage_trainings():
     form = TrainingForm()
     form.coach_id.choices = [
-        (c.id, f"{c.first_name} {c.last_name}") for c in Coach.query.order_by(Coach.last_name).all()
+        (
+            c.id,
+            f"{c.first_name} {c.last_name}",
+        )
+        for c in Coach.query.order_by(Coach.last_name).all()
     ]
     trainings = Training.query.order_by(Training.date).all()
 
@@ -94,7 +107,11 @@ def manage_trainings():
         flash("Dodano nowy trening.", "success")
         return redirect(url_for("admin.manage_trainings"))
 
-    return render_template("admin/trainings.html", form=form, trainings=trainings)
+    return render_template(
+        "admin/trainings.html",
+        form=form,
+        trainings=trainings,
+    )
 
 
 @admin_bp.route("/export")
@@ -148,5 +165,7 @@ def export_excel():
         output,
         as_attachment=True,
         download_name=filename,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        mimetype=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
     )
