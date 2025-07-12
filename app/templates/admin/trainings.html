@@ -11,9 +11,9 @@
   <form method="POST" class="mb-4">
     {{ form.hidden_tag() }}
     <div class="row g-2">
-      <div class="col-md-3">{{ form.date(class="form-control") }}</div>
-      <div class="col-md-3">{{ form.location(class="form-control", placeholder="Miejsce") }}</div>
-      <div class="col-md-3">{{ form.coach_id(class="form-select") }}</div>
+      <div class="col-md-3">{{ form.date(class="form-control", aria_label="Data i godzina treningu") }}</div>
+      <div class="col-md-3">{{ form.location(class="form-control", placeholder="Miejsce", aria_label="Miejsce") }}</div>
+      <div class="col-md-3">{{ form.coach_id(class="form-select", aria_label="Trener") }}</div>
       <div class="col-md-3"><button class="btn btn-success w-100">Dodaj trening</button></div>
     </div>
   </form>

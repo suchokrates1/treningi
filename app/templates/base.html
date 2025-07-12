@@ -25,7 +25,10 @@
           <small>na treningi blind tenisa</small>
         </div>
       </div>
-      <a href="{{ url_for('admin.manage_trainers') }}" class="btn btn-outline-light btn-sm">Panel administratora</a>
+      <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('admin.manage_trainers') }}" class="btn btn-outline-light btn-sm">Panel administratora</a>
+        <button id="theme-toggle" type="button" class="btn btn-outline-light btn-sm" aria-label="Przełącz motyw">🌓</button>
+      </div>
     </div>
   </header>
 
@@ -33,9 +36,9 @@
   <main class="flex-grow-1">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="container mt-3">
+        <div class="container mt-3" aria-live="polite">
           {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
+            <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
           {% endfor %}
         </div>
       {% endif %}
@@ -52,6 +55,22 @@
       <img src="https://vestmedia.pl/wp-content/uploads/2024/12/Vest-Media-5.png" alt="Vest Media" class="footer-logo">
     </div>
   </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const body = document.body;
+      const toggleBtn = document.getElementById('theme-toggle');
+      const stored = localStorage.getItem('theme');
+      if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        body.classList.add('dark-mode');
+      }
+      toggleBtn.addEventListener('click', function () {
+        body.classList.toggle('dark-mode');
+        const isDark = body.classList.contains('dark-mode');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+    });
+  </script>
 
 </body>
 </html>
