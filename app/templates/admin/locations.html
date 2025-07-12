@@ -1,0 +1,27 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Miejsca</h2>
+  <form method="POST" class="mb-4">
+    {{ form.hidden_tag() }}
+    <div class="row g-2">
+      <div class="col-md-9">{{ form.name(class="form-control", placeholder="Nazwa miejsca", **{'aria-label': 'Nazwa'}) }}</div>
+      <div class="col-md-3"><button class="btn btn-success w-100">Dodaj miejsce</button></div>
+    </div>
+  </form>
+
+  <table class="table table-striped">
+    <thead><tr><th>Nazwa</th><th>Akcje</th></tr></thead>
+    <tbody>
+      {% for location in locations %}
+      <tr>
+        <td>{{ location.name }}</td>
+        <td>
+          <a href="{{ url_for('admin.edit_location', location_id=location.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

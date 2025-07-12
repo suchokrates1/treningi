@@ -12,7 +12,13 @@ from functools import wraps
 from datetime import datetime
 
 from . import db
-from .forms import CoachForm, TrainingForm, LoginForm, ImportTrainingsForm
+from .forms import (
+    CoachForm,
+    TrainingForm,
+    LoginForm,
+    ImportTrainingsForm,
+    LocationForm,
+)
 from .models import Coach, Training, Location
 
 admin_bp = Blueprint("admin", __name__)
@@ -83,6 +89,45 @@ def edit_trainer(coach_id):
         return redirect(url_for("admin.manage_trainers"))
 
     return render_template("admin/edit_trainer.html", form=form, coach=coach)
+
+
+@admin_bp.route("/locations", methods=["GET", "POST"])
+@login_required
+def manage_locations():
+    form = LocationForm()
+    locations = Location.query.order_by(Location.name).all()
+
+    if form.validate_on_submit():
+        new_location = Location(name=form.name.data.strip())
+        db.session.add(new_location)
+        db.session.commit()
+        flash("Dodano nowe miejsce.", "success")
+        return redirect(url_for("admin.manage_locations"))
+
+    return render_template(
+        "admin/locations.html",
+        form=form,
+        locations=locations,
+    )
+
+
+@admin_bp.route("/locations/edit/<int:location_id>", methods=["GET", "POST"])
+@login_required
+def edit_location(location_id):
+    location = Location.query.get_or_404(location_id)
+    form = LocationForm(obj=location)
+
+    if form.validate_on_submit():
+        location.name = form.name.data.strip()
+        db.session.commit()
+        flash("Zaktualizowano miejsce.", "success")
+        return redirect(url_for("admin.manage_locations"))
+
+    return render_template(
+        "admin/edit_location.html",
+        form=form,
+        location=location,
+    )
 
 
 @admin_bp.route("/trainings", methods=["GET", "POST"])
