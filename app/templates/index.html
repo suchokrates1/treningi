@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Nadchodzące treningi</h2>
+
+  {% for month, trainings in trainings_by_month.items() %}
+    <h4 class="mt-4">{{ month|replace("-", " / ") }}</h4>
+    <table class="table table-bordered table-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Data</th>
+          <th>Miejsce</th>
+          <th>Trener</th>
+          <th>Wolontariusze</th>
+          <th>Akcja</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for training in trainings %}
+        <tr>
+          <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ training.location }}</td>
+          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small>{{ training.coach.phone_number }}</small></td>
+          <td>
+            <ul class="mb-0">
+              {% for booking in training.bookings %}
+                <li>{{ booking.volunteer.first_name }} {{ booking.volunteer.last_name }}</li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            {% if training.bookings|length < 2 %}
+              <form method="post" class="d-inline">
+                {{ form.hidden_tag() }}
+                {{ form.first_name(class="form-control mb-1", placeholder="Imię") }}
+                {{ form.last_name(class="form-control mb-1", placeholder="Nazwisko") }}
+                {{ form.phone_number(class="form-control mb-1", placeholder="Telefon") }}
+                {{ form.training_id(value=training.id) }}
+                <button type="submit" class="btn btn-sm btn-primary">Zapisz się</button>
+              </form>
+            {% else %}
+              <span class="text-muted">Brak miejsc</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endfor %}
+</div>
+{% endblock %}
