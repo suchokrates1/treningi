@@ -18,7 +18,7 @@ This project provides a simple web application for organizing blind tennis train
    source venv/bin/activate
    pip install -r requirements.txt
    ```
-2. Set environment variables (see `.env` for an example). Required variables are:
+2. Set environment variables (see `.env.example` for an example). Required variables are:
    - `SECRET_KEY` – Flask secret key.
    - `ADMIN_PASSWORD` – password for the admin panel.
    Optional variables include `FLASK_ENV` and `FLASK_APP`.
