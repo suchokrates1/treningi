@@ -7,7 +7,23 @@ app = create_app()
 if __name__ == "__main__":
     with app.app_context():
         inspector = inspect(db.engine)
-        if "alembic_version" not in inspector.get_table_names():
-            stamp()  # mark current state
+        tables = set(inspector.get_table_names())
+
+        # For databases created before Alembic was introduced we need to mark
+        # the current revision so ``upgrade()`` does not try to recreate
+        # existing tables. For a brand new database we simply run the
+        # migrations which will create all tables.
+        if "alembic_version" not in tables:
+            model_tables = {
+                "coaches",
+                "locations",
+                "volunteers",
+                "trainings",
+                "bookings",
+            }
+            if tables & model_tables:
+                stamp()  # mark existing schema as current
+
         upgrade()
+
     app.run(host="0.0.0.0", port=8000)
