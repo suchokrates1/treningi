@@ -12,7 +12,7 @@ from functools import wraps
 from datetime import datetime
 
 from . import db
-from .forms import CoachForm, TrainingForm
+from .forms import CoachForm, TrainingForm, LoginForm
 from .models import Coach, Training
 
 admin_bp = Blueprint("admin", __name__)
@@ -29,14 +29,16 @@ def login_required(view):
 
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "POST":
-        password = request.form.get("password")
-        if password == current_app.config["ADMIN_PASSWORD"]:
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        if form.password.data == current_app.config["ADMIN_PASSWORD"]:
             session["admin_logged_in"] = True
             flash("Zalogowano jako administrator.", "success")
             return redirect(url_for("admin.manage_trainers"))
         flash("Nieprawidłowe hasło.", "danger")
-    return render_template("admin/login.html")
+
+    return render_template("admin/login.html", form=form)
 
 
 @admin_bp.route("/logout")
