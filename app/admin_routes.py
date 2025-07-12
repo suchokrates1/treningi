@@ -27,7 +27,7 @@ def login():
             flash("Zalogowano jako administrator.", "success")
             return redirect(url_for("admin.manage_trainers"))
         flash("Nieprawidłowe hasło.", "danger")
-    return render_template("admin/loginhtml")
+    return render_template("admin/login.html")
 
 
 @admin_bp.route("/logout")
@@ -54,7 +54,7 @@ def manage_trainers():
         flash("Dodano nowego trenera.", "success")
         return redirect(url_for("admin.manage_trainers"))
 
-    return render_template("admin/trainters.html", form=form, coaches=coaches)
+    return render_template("admin/trainers.html", form=form, coaches=coaches)
 
 
 @admin_bp.route("/trainers/edit/<int:coach_id>", methods=["GET", "POST"])
