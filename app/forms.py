@@ -61,3 +61,10 @@ class LoginForm(FlaskForm):
 class ImportTrainingsForm(FlaskForm):
     file = FileField('Plik Excel', validators=[DataRequired()])
     submit = SubmitField('Importuj')
+
+
+class LocationForm(FlaskForm):
+    """Simple form for adding or editing locations."""
+
+    name = StringField('Nazwa', validators=[DataRequired(), Length(max=128)])
+    submit = SubmitField('Zapisz')
