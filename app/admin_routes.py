@@ -12,8 +12,8 @@ from functools import wraps
 from datetime import datetime
 
 from . import db
-from .forms import CoachForm, TrainingForm, LoginForm
-from .models import Coach, Training
+from .forms import CoachForm, TrainingForm, LoginForm, ImportTrainingsForm
+from .models import Coach, Training, Location
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -96,12 +96,15 @@ def manage_trainings():
         )
         for c in Coach.query.order_by(Coach.last_name).all()
     ]
+    form.location_id.choices = [
+        (l.id, l.name) for l in Location.query.order_by(Location.name).all()
+    ]
     trainings = Training.query.order_by(Training.date).all()
 
     if form.validate_on_submit():
         new_training = Training(
             date=form.date.data,
-            location=form.location.data.strip(),
+            location_id=form.location_id.data,
             coach_id=form.coach_id.data,
         )
         db.session.add(new_training)
@@ -149,7 +152,7 @@ def export_excel():
         ws.append([
             t.date.strftime("%Y-%m-%d"),
             t.date.strftime("%H:%M"),
-            t.location,
+            t.location.name,
             f"{t.coach.first_name} {t.coach.last_name}",
             t.coach.phone_number,
             f"{v1.first_name} {v1.last_name}" if v1 else "",
@@ -171,3 +174,55 @@ def export_excel():
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
     )
+
+
+@admin_bp.route("/import", methods=["GET", "POST"])
+@login_required
+def import_excel():
+    form = ImportTrainingsForm()
+
+    if form.validate_on_submit():
+        from openpyxl import load_workbook
+
+        file = form.file.data
+        wb = load_workbook(file)
+        ws = wb.active
+
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            date_val, time_val, trainer_name, phone, place = row[:5]
+            if not (date_val and time_val and phone and place):
+                continue
+
+            if isinstance(date_val, datetime):
+                date_part = date_val.date()
+            else:
+                date_part = datetime.strptime(str(date_val), "%Y-%m-%d").date()
+
+            if isinstance(time_val, datetime):
+                time_part = time_val.time()
+            else:
+                time_part = datetime.strptime(str(time_val), "%H:%M").time()
+
+            dt = datetime.combine(date_part, time_part)
+
+            coach = Coach.query.filter_by(phone_number=str(phone).strip()).first()
+            if not coach:
+                first, *rest = str(trainer_name).strip().split(" ", 1)
+                last = rest[0] if rest else ""
+                coach = Coach(first_name=first, last_name=last, phone_number=str(phone).strip())
+                db.session.add(coach)
+                db.session.commit()
+
+            location = Location.query.filter_by(name=str(place).strip()).first()
+            if not location:
+                location = Location(name=str(place).strip())
+                db.session.add(location)
+                db.session.commit()
+
+            training = Training(date=dt, coach_id=coach.id, location_id=location.id)
+            db.session.add(training)
+        db.session.commit()
+        flash("Zaimportowano treningi.", "success")
+        return redirect(url_for("admin.manage_trainings"))
+
+    return render_template("admin/import.html", form=form)
