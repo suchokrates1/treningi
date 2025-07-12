@@ -271,3 +271,19 @@ def import_excel():
         return redirect(url_for("admin.manage_trainings"))
 
     return render_template("admin/import.html", form=form)
+
+
+@admin_bp.route("/history")
+@login_required
+def history():
+    """List past trainings with volunteer sign-ups."""
+    page = request.args.get("page", 1, type=int)
+    trainings_q = Training.query.filter(
+        Training.date < datetime.now()
+    ).order_by(Training.date.desc())
+    pagination = db.paginate(trainings_q, page=page, per_page=10)
+    return render_template(
+        "admin/history.html",
+        trainings=pagination.items,
+        pagination=pagination,
+    )
