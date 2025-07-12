@@ -6,6 +6,7 @@ from wtforms import (
     SelectField,
     PasswordField,
 )
+from flask_wtf.file import FileField
 from wtforms.validators import DataRequired, Length
 from wtforms.fields import HiddenField
 
@@ -29,8 +30,8 @@ class TrainingForm(FlaskForm):
         format='%Y-%m-%d %H:%M',
         validators=[DataRequired()],
     )
-    location = StringField(
-        'Miejsce', validators=[DataRequired(), Length(max=128)]
+    location_id = SelectField(
+        'Miejsce', coerce=int, validators=[DataRequired()]
     )
     coach_id = SelectField(
         'Trener', coerce=int, validators=[DataRequired()]
@@ -55,3 +56,8 @@ class VolunteerForm(FlaskForm):
 class LoginForm(FlaskForm):
     password = PasswordField('Hasło', validators=[DataRequired()])
     submit = SubmitField('Zaloguj się')
+
+
+class ImportTrainingsForm(FlaskForm):
+    file = FileField('Plik Excel', validators=[DataRequired()])
+    submit = SubmitField('Importuj')
