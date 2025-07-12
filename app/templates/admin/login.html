@@ -3,11 +3,12 @@
 <div class="container mt-5" style="max-width: 500px;">
   <h2 class="mb-3">Logowanie administratora</h2>
   <form method="POST">
+    {{ form.hidden_tag() }}
     <div class="mb-3">
-      <label for="password" class="form-label">Hasło</label>
-      <input type="password" name="password" id="password" class="form-control" required>
+      {{ form.password.label(class="form-label") }}
+      {{ form.password(class="form-control", required=True) }}
     </div>
-    <button class="btn btn-primary w-100">Zaloguj się</button>
+    {{ form.submit(class="btn btn-primary w-100") }}
   </form>
 </div>
 {% endblock %}

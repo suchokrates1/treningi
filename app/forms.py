@@ -1,5 +1,11 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, DateTimeField, SelectField
+from wtforms import (
+    StringField,
+    SubmitField,
+    DateTimeField,
+    SelectField,
+    PasswordField,
+)
 from wtforms.validators import DataRequired, Length
 from wtforms.fields import HiddenField
 
@@ -44,3 +50,8 @@ class VolunteerForm(FlaskForm):
     )
     training_id = HiddenField()  # ukryte pole – ID treningu
     submit = SubmitField('Zapisz się')
+
+
+class LoginForm(FlaskForm):
+    password = PasswordField('Hasło', validators=[DataRequired()])
+    submit = SubmitField('Zaloguj się')
