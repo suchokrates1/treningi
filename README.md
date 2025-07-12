@@ -46,6 +46,8 @@ Optional variables include `FLASK_ENV` and `FLASK_APP`.
    python run.py
    ```
    The application will be available on `http://localhost:8000`.
+   When started this way, the app automatically applies any pending
+   database migrations before launching.
 
 ### Database migrations
 
@@ -64,6 +66,9 @@ Alternatively, build and run with Docker:
 docker build -t treningi .
 docker run --env-file .env -p 8000:8000 treningi
 ```
+
+The container runs `python run.py`, so any pending migrations are upgraded
+automatically when it starts.
 
 You can also use `docker-compose up` which uses the provided `docker-compose.yml`.
 
