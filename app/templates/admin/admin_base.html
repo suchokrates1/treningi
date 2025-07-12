@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if session.get('admin_logged_in') %}
+<nav class="container mt-4">
+  <ul class="nav nav-tabs">
+    <li class="nav-item">
+      <a class="nav-link {% if request.path.startswith('/admin/trainings') %}active{% endif %}" href="{{ url_for('admin.manage_trainings') }}">Treningi</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.path.startswith('/admin/trainers') %}active{% endif %}" href="{{ url_for('admin.manage_trainers') }}">Trenerzy</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.path.startswith('/admin/locations') %}active{% endif %}" href="/admin/locations">Miejsca</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.path.startswith('/admin/history') %}active{% endif %}" href="/admin/history">Historia</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+{% block admin_content %}{% endblock %}
+{% endblock %}
