@@ -27,7 +27,10 @@ def create_app():
     app.config['ADMIN_PASSWORD'] = os.environ.get("ADMIN_PASSWORD")
 
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "migrations"
+    )
+    migrate.init_app(app, db, directory=migrate_dir)
     csrf.init_app(app)
 
     with app.app_context():
