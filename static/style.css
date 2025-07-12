@@ -17,34 +17,35 @@ a {
   color: var(--link-color-light);
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: var(--bg-color-dark);
-    color: var(--text-color-dark);
-  }
+body.dark-mode {
+  background-color: var(--bg-color-dark);
+  color: var(--text-color-dark);
+}
 
-  a {
-    color: var(--link-color-dark);
-  }
+body.dark-mode a {
+  color: var(--link-color-dark);
+}
 
-  .table, .form-control, .form-select, .btn {
-    background-color: #2a2a40;
-    color: var(--text-color-dark);
-  }
+body.dark-mode .table,
+body.dark-mode .form-control,
+body.dark-mode .form-select,
+body.dark-mode .btn {
+  background-color: #2a2a40;
+  color: var(--text-color-dark);
+}
 
-  .table thead {
-    background-color: #343a40;
-  }
+body.dark-mode .table thead {
+  background-color: #343a40;
+}
 
-  .btn-outline-light {
-    border-color: #ffa500;
-    color: #ffa500;
-  }
+body.dark-mode .btn-outline-light {
+  border-color: #ffa500;
+  color: #ffa500;
+}
 
-  .btn-outline-light:hover {
-    background-color: #ffa500;
-    color: #1e1e2f;
-  }
+body.dark-mode .btn-outline-light:hover {
+  background-color: #ffa500;
+  color: #1e1e2f;
 }
 
 table a {
