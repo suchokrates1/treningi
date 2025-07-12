@@ -1,0 +1,12 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Edytuj miejsce</h2>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">{{ form.name.label }} {{ form.name(class="form-control") }}</div>
+    <button class="btn btn-primary">Zapisz zmiany</button>
+    <a href="{{ url_for('admin.manage_locations') }}" class="btn btn-secondary ms-2">Anuluj</a>
+  </form>
+</div>
+{% endblock %}
