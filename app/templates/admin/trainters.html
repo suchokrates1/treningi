@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Trenerzy</h2>
+  <form method="POST" class="mb-4">
+    {{ form.hidden_tag() }}
+    <div class="row g-2">
+      <div class="col-md-3">{{ form.first_name(class="form-control", placeholder="Imię") }}</div>
+      <div class="col-md-3">{{ form.last_name(class="form-control", placeholder="Nazwisko") }}</div>
+      <div class="col-md-3">{{ form.phone_number(class="form-control", placeholder="Telefon") }}</div>
+      <div class="col-md-3"><button class="btn btn-success w-100">Dodaj trenera</button></div>
+    </div>
+  </form>
+
+  <table class="table table-striped">
+    <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th>Akcje</th></tr></thead>
+    <tbody>
+      {% for coach in coaches %}
+      <tr>
+        <td>{{ coach.first_name }} {{ coach.last_name }}</td>
+        <td>{{ coach.phone_number }}</td>
+        <td>
+          <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

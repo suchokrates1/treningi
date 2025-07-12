@@ -1,0 +1,56 @@
+:root {
+  --bg-color-light: #f5f7fb;
+  --text-color-light: #212529;
+  --link-color-light: #ff6600;
+
+  --bg-color-dark: #1e1e2f;
+  --text-color-dark: #f0f0f0;
+  --link-color-dark: #ffa500;
+}
+
+body {
+  background-color: var(--bg-color-light);
+  color: var(--text-color-light);
+}
+
+a {
+  color: var(--link-color-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: var(--bg-color-dark);
+    color: var(--text-color-dark);
+  }
+
+  a {
+    color: var(--link-color-dark);
+  }
+
+  .table, .form-control, .form-select, .btn {
+    background-color: #2a2a40;
+    color: var(--text-color-dark);
+  }
+
+  .table thead {
+    background-color: #343a40;
+  }
+
+  .btn-outline-light {
+    border-color: #ffa500;
+    color: #ffa500;
+  }
+
+  .btn-outline-light:hover {
+    background-color: #ffa500;
+    color: #1e1e2f;
+  }
+}
+
+table a {
+  text-decoration: underline;
+}
+
+input, select, textarea {
+  border-radius: 4px;
+}
