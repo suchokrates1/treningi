@@ -37,8 +37,14 @@ class Training(db.Model):
         nullable=False,
     )
 
-    coach = db.relationship('Coach', backref=db.backref('trainings', lazy=True))
-    location = db.relationship('Location', backref=db.backref('trainings', lazy=True))
+    coach = db.relationship(
+        'Coach',
+        backref=db.backref('trainings', lazy=True),
+    )
+    location = db.relationship(
+        'Location',
+        backref=db.backref('trainings', lazy=True),
+    )
 
     def __repr__(self):
         return (
