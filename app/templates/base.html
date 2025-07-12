@@ -27,7 +27,7 @@
       </div>
       <div class="d-flex align-items-center gap-2">
         <a href="{{ url_for('admin.manage_trainers') }}" class="btn btn-outline-light btn-sm">Panel administratora</a>
-        <button id="theme-toggle" type="button" class="btn btn-outline-light btn-sm" aria-label="Przełącz motyw">🌓</button>
+        <button id="theme-toggle" type="button" class="btn btn-outline-light btn-sm" aria-label="Przełącz motyw" aria-pressed="false">🌓</button>
       </div>
     </div>
   </header>
@@ -64,9 +64,11 @@
       if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         body.classList.add('dark-mode');
       }
-      toggleBtn.addEventListener('click', function () {
+      toggleBtn.setAttribute('aria-pressed', body.classList.contains('dark-mode'));
+      toggleBtn.addEventListener('click', () => {
         body.classList.toggle('dark-mode');
         const isDark = body.classList.contains('dark-mode');
+        toggleBtn.setAttribute('aria-pressed', isDark);
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
       });
     });
