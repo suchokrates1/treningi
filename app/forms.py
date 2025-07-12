@@ -2,10 +2,10 @@ from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
     SubmitField,
-    DateTimeField,
     SelectField,
     PasswordField,
 )
+from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
 from wtforms.validators import DataRequired, Length
 from wtforms.fields import HiddenField
@@ -25,10 +25,11 @@ class CoachForm(FlaskForm):
 
 
 class TrainingForm(FlaskForm):
-    date = DateTimeField(
+    date = DateTimeLocalField(
         'Data i godzina treningu',
-        format='%Y-%m-%d %H:%M',
+        format='%Y-%m-%dT%H:%M',
         validators=[DataRequired()],
+        render_kw={"placeholder": "dd/mm/rrrr gg:mm"},
     )
     location_id = SelectField(
         'Miejsce', coerce=int, validators=[DataRequired()]
