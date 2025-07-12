@@ -11,7 +11,10 @@ csrf = CSRFProtect()
 
 
 def create_app():
-    app = Flask(__name__)
+    # Serve static files from the project-level "static" directory so that
+    # resources are available when running via ``python run.py`` as well as
+    # inside Docker containers.
+    app = Flask(__name__, static_folder="../static")
     app.config['SECRET_KEY'] = os.environ.get(
         "SECRET_KEY", "default-dev-secret"
     )
