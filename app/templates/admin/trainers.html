@@ -5,9 +5,9 @@
   <form method="POST" class="mb-4">
     {{ form.hidden_tag() }}
     <div class="row g-2">
-      <div class="col-md-3">{{ form.first_name(class="form-control", placeholder="Imię", aria_label="Imię") }}</div>
-      <div class="col-md-3">{{ form.last_name(class="form-control", placeholder="Nazwisko", aria_label="Nazwisko") }}</div>
-      <div class="col-md-3">{{ form.phone_number(class="form-control", placeholder="Telefon", aria_label="Telefon") }}</div>
+      <div class="col-md-3">{{ form.first_name(class="form-control", placeholder="Imię", **{'aria-label': 'Imię'}) }}</div>
+      <div class="col-md-3">{{ form.last_name(class="form-control", placeholder="Nazwisko", **{'aria-label': 'Nazwisko'}) }}</div>
+      <div class="col-md-3">{{ form.phone_number(class="form-control", placeholder="Telefon", **{'aria-label': 'Telefon'}) }}</div>
       <div class="col-md-3"><button class="btn btn-success w-100">Dodaj trenera</button></div>
     </div>
   </form>
