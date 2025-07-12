@@ -3,8 +3,11 @@
 <div class="container mt-4">
   <h2>Treningi</h2>
 <div class="d-flex justify-content-end mb-3">
-  <a href="{{ url_for('admin.export_excel') }}" class="btn btn-outline-primary">
+  <a href="{{ url_for('admin.export_excel') }}" class="btn btn-outline-primary me-2">
     📥 Eksportuj do Excela
+  </a>
+  <a href="{{ url_for('admin.import_excel') }}" class="btn btn-outline-success">
+    📤 Importuj z Excela
   </a>
 </div>
 
@@ -12,7 +15,7 @@
     {{ form.hidden_tag() }}
     <div class="row g-2">
       <div class="col-md-3">{{ form.date(class="form-control", **{'aria-label': 'Data i godzina treningu'}) }}</div>
-      <div class="col-md-3">{{ form.location(class="form-control", placeholder="Miejsce", **{'aria-label': 'Miejsce'}) }}</div>
+      <div class="col-md-3">{{ form.location_id(class="form-select", **{'aria-label': 'Miejsce'}) }}</div>
       <div class="col-md-3">{{ form.coach_id(class="form-select", **{'aria-label': 'Trener'}) }}</div>
       <div class="col-md-3"><button class="btn btn-success w-100">Dodaj trening</button></div>
     </div>
@@ -24,7 +27,7 @@
       {% for t in trainings %}
       <tr>
         <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
-        <td>{{ t.location }}</td>
+        <td>{{ t.location.name }}</td>
         <td>{{ t.coach.first_name }} {{ t.coach.last_name }}</td>
       </tr>
       {% endfor %}

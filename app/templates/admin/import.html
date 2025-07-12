@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4" style="max-width: 500px;">
+  <h2>Importuj treningi</h2>
+  <form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">{{ form.file.label }} {{ form.file(class="form-control") }}</div>
+    <button class="btn btn-primary">Importuj</button>
+    <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-secondary ms-2">Anuluj</a>
+  </form>
+</div>
+{% endblock %}
