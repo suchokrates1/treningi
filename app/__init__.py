@@ -20,7 +20,7 @@ def create_app():
     app.config['SECRET_KEY'] = os.environ.get(
         "SECRET_KEY", "default-dev-secret"
     )
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/db.sqlite3'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['ADMIN_PASSWORD'] = os.environ.get("ADMIN_PASSWORD")
 
