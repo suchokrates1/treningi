@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from dotenv import load_dotenv
 import os
@@ -7,6 +8,7 @@ import os
 load_dotenv()
 
 db = SQLAlchemy()
+migrate = Migrate()
 csrf = CSRFProtect()
 
 
@@ -23,12 +25,13 @@ def create_app():
     app.config['ADMIN_PASSWORD'] = os.environ.get("ADMIN_PASSWORD")
 
     db.init_app(app)
+    migrate.init_app(app, db)
     csrf.init_app(app)
 
     with app.app_context():
         from . import routes, admin_routes
         app.register_blueprint(routes.bp)
         app.register_blueprint(admin_routes.admin_bp, url_prefix='/admin')
-        db.create_all()
+        # Blueprints are registered after extensions so migrations can run
 
     return app
