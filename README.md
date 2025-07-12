@@ -10,18 +10,33 @@ This project provides a simple web application for organizing blind tennis train
 - **Excel export** – administrators can download a spreadsheet with training data and volunteer contact details.
 - **Dark mode** – a theme toggle available for convenience.
 
+## Requirements
+
+- **Python** 3.11 or newer
+- The packages listed in `requirements.txt`:
+  - Flask
+  - Flask-SQLAlchemy
+  - Flask-WTF
+  - WTForms
+  - python-dotenv
+  - openpyxl
+
+### Environment variables
+
+Create a `.env` file and define at least:
+  - `SECRET_KEY` – Flask secret key.
+  - `ADMIN_PASSWORD` – password for the admin panel.
+Optional variables include `FLASK_ENV` and `FLASK_APP`.
+
 ## Local setup
 
-1. Create a virtual environment with Python 3.11 or newer and install the dependencies:
+1. Create a virtual environment and install the dependencies:
    ```bash
    python -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
    ```
-2. Set environment variables (see `.env.example` for an example). Required variables are:
-   - `SECRET_KEY` – Flask secret key.
-   - `ADMIN_PASSWORD` – password for the admin panel.
-   Optional variables include `FLASK_ENV` and `FLASK_APP`.
+2. Copy `.env.example` to `.env` and set your environment variables.
 3. Run the development server:
    ```bash
    flask run
