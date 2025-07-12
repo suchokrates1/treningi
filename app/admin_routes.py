@@ -144,7 +144,14 @@ def manage_trainings():
     form.location_id.choices = [
         (l.id, l.name) for l in Location.query.order_by(Location.name).all()
     ]
-    trainings = Training.query.order_by(Training.date).all()
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    trainings_q = Training.query.filter(Training.date >= today).order_by(Training.date)
+    trainings = trainings_q.all()
+
+    trainings_by_month = {}
+    for t in trainings:
+        month_key = t.date.strftime("%Y-%m")
+        trainings_by_month.setdefault(month_key, []).append(t)
 
     if form.validate_on_submit():
         new_training = Training(
@@ -160,7 +167,7 @@ def manage_trainings():
     return render_template(
         "admin/trainings.html",
         form=form,
-        trainings=trainings,
+        trainings_by_month=trainings_by_month,
     )
 
 
