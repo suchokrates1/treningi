@@ -7,6 +7,8 @@ services:
     restart: unless-stopped
     volumes:
       - .:/app
+    ports:
+      - "8083:8080"
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=development
