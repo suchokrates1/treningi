@@ -46,3 +46,7 @@ def index():
     trainings_by_month = {}
 
     for training in trainings:
+        month_key = training.date.strftime("%Y-%m")
+        trainings_by_month.setdefault(month_key, []).append(training)
+
+    return render_template("index.html", form=form, trainings_by_month=trainings_by_month)
