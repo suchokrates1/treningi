@@ -16,7 +16,7 @@
       <tr>
         <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
         <td>{{ t.location.name }}</td>
-        <td>{{ t.coach.first_name }} {{ t.coach.last_name }}<br><small>{{ t.coach.phone_number }}</small></td>
+        <td>{{ t.coach.first_name }} {{ t.coach.last_name }}<br><small><a href="tel:{{ t.coach.phone_number }}">{{ t.coach.phone_number }}</a></small></td>
         <td>
           <ul class="mb-0">
             {% for b in t.bookings %}
