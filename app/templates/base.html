@@ -28,7 +28,11 @@
         </div>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <a href="{{ url_for('admin.manage_trainers') }}" class="btn btn-outline-light btn-sm">Panel administratora</a>
+        {% if request.path.startswith('/admin') %}
+          <a href="{{ url_for('routes.index') }}" class="btn btn-outline-light btn-sm">Powrót do tabeli</a>
+        {% else %}
+          <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-outline-light btn-sm">Panel administratora</a>
+        {% endif %}
         <button id="theme-toggle" type="button" class="btn btn-outline-light btn-sm" aria-label="Przełącz motyw" aria-pressed="false">🌓</button>
       </div>
     </div>
