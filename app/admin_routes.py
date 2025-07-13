@@ -33,6 +33,11 @@ def login_required(view):
     return wrapped
 
 
+@admin_bp.route("/")
+def admin_root():
+    """Redirect bare /admin to the trainings view."""
+    return redirect(url_for("admin.manage_trainings"))
+
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
@@ -41,7 +46,7 @@ def login():
         if form.password.data == current_app.config["ADMIN_PASSWORD"]:
             session["admin_logged_in"] = True
             flash("Zalogowano jako administrator.", "success")
-            return redirect(url_for("admin.manage_trainers"))
+            return redirect(url_for("admin.manage_trainings"))
         flash("Nieprawidłowe hasło.", "danger")
 
     return render_template("admin/login.html", form=form)
