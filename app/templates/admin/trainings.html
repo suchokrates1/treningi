@@ -53,7 +53,7 @@
         <td>{{ t.date.strftime('%H:%M') }}</td>
         <td>{{ t.location.name }}</td>
         <td>{{ t.coach.first_name }} {{ t.coach.last_name }}</td>
-        <td>{{ t.coach.phone_number }}</td>
+        <td><a href="tel:{{ t.coach.phone_number }}">{{ t.coach.phone_number }}</a></td>
         {% set b1 = t.bookings[0].volunteer if t.bookings|length > 0 else None %}
         {% set b2 = t.bookings[1].volunteer if t.bookings|length > 1 else None %}
         <td>

@@ -20,7 +20,7 @@
         <tr>
           <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
           <td>{{ training.location.name }}</td>
-          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small>{{ training.coach.phone_number }}</small></td>
+        <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a></small></td>
           <td>
             <ul class="mb-0">
               {% for booking in training.bookings %}
