@@ -27,13 +27,13 @@
     <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th>Akcje</th></tr></thead>
     <tbody>
       {% for coach in coaches %}
-      <tr>
-        <td>{{ coach.first_name }} {{ coach.last_name }}</td>
-        <td>{{ coach.phone_number }}</td>
-        <td>
-          <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
-        </td>
-      </tr>
+        <tr>
+          <td>{{ coach.first_name }} {{ coach.last_name }}</td>
+          <td><a href="tel:{{ coach.phone_number }}">{{ coach.phone_number }}</a></td>
+          <td>
+            <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
+          </td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
