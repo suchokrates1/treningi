@@ -28,18 +28,18 @@
               {% endfor %}
             </ul>
           </td>
-          <td>
-            {% if training.bookings|length < 2 %}
-              <button type="button" class="btn btn-sm btn-primary signup-btn" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
-                Zapisz się
-              </button>
-            {% else %}
-              <span class="text-muted">Brak miejsc</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
+        <td class="text-center">
+          {% if training.bookings|length < 2 %}
+            <button type="button" class="btn btn-sm btn-primary signup-btn" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
+              Zapisz się
+            </button>
+          {% else %}
+            <span class="text-muted">Brak miejsc</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
     </table>
     {% endfor %}
   </div>
