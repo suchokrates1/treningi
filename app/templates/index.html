@@ -5,56 +5,89 @@
 
   {% for month, trainings in trainings_by_month.items() %}
     <h4 class="mt-4">{{ month|replace("-", " / ") }}</h4>
-    <table class="table table-bordered table-sm">
+    <div class="table-responsive">
+    <table class="table table-bordered table-sm mb-0">
       <thead class="table-light">
         <tr>
-          <th>Data</th>
-          <th>Miejsce</th>
-          <th>Trener</th>
-          <th>Wolontariusze</th>
+          <th><i class="bi bi-calendar-check me-1"></i>Data</th>
+          <th><i class="bi bi-geo-alt me-1"></i>Miejsce</th>
+          <th><i class="bi bi-person me-1"></i>Trener</th>
+          <th><i class="bi bi-people me-1"></i>Wolontariusze</th>
           <th>Akcja</th>
         </tr>
       </thead>
       <tbody>
         {% for training in trainings %}
         <tr>
-          <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td>{{ training.location.name }}</td>
-          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small>{{ training.coach.phone_number }}</small></td>
-          <td>
+            <td><i class="bi bi-calendar4-event me-1"></i>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td><i class="bi bi-geo-alt-fill me-1"></i>{{ training.location.name }}</td>
+            <td><i class="bi bi-person-fill me-1"></i>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><i class="bi bi-telephone me-1"></i>{{ training.coach.phone_number }}</small></td>
+            <td>
             <ul class="mb-0">
               {% for booking in training.bookings %}
-                <li>{{ booking.volunteer.first_name }} {{ booking.volunteer.last_name }}</li>
+                <li><i class="bi bi-person-fill me-1"></i>{{ booking.volunteer.first_name }} {{ booking.volunteer.last_name }}</li>
               {% endfor %}
             </ul>
           </td>
-          <td>
-            {% if training.bookings|length < 2 %}
-              <form method="post" class="d-inline">
-                {{ form.hidden_tag() }}
-                <div class="mb-1">
-                  {{ form.first_name.label(class="form-label") }}
-                  {{ form.first_name(class="form-control") }}
-                </div>
-                <div class="mb-1">
-                  {{ form.last_name.label(class="form-label") }}
-                  {{ form.last_name(class="form-control") }}
-                </div>
-                <div class="mb-1">
-                  {{ form.phone_number.label(class="form-label") }}
-                  {{ form.phone_number(class="form-control") }}
-                </div>
-                {{ form.training_id(value=training.id) }}
-                <button type="submit" class="btn btn-sm btn-primary">Zapisz się</button>
-              </form>
-            {% else %}
-              <span class="text-muted">Brak miejsc</span>
-            {% endif %}
+          <td class="text-center">
+              {% if training.bookings|length < 2 %}
+                <button type="button" class="btn btn-sm btn-primary signup-btn" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
+                  <i class="bi bi-pencil-square me-1"></i>Zapisz się
+                </button>
+              {% else %}
+                <span class="text-muted">Brak miejsc</span>
+              {% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
-  {% endfor %}
-</div>
-{% endblock %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Modal for volunteer sign-up -->
+  <div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="post">
+          {{ form.hidden_tag() }}
+          <div class="modal-header">
+            <h5 class="modal-title">Zapisz się na trening</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              {{ form.first_name.label(class="form-label") }}
+              {{ form.first_name(class="form-control") }}
+            </div>
+            <div class="mb-3">
+              {{ form.last_name.label(class="form-label") }}
+              {{ form.last_name(class="form-control") }}
+            </div>
+            <div class="mb-3">
+              {{ form.phone_number.label(class="form-label") }}
+              {{ form.phone_number(class="form-control") }}
+            </div>
+            {{ form.training_id }}
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Zapisz się</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var signupModal = document.getElementById('signupModal');
+      signupModal.addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var trainingId = button.getAttribute('data-training-id');
+        signupModal.querySelector('input[name="training_id"]').value = trainingId;
+      });
+    });
+  </script>
+
+  {% endblock %}

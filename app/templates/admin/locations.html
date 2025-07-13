@@ -15,12 +15,13 @@
     </div>
   </form>
 
-  <table class="table table-striped">
-    <thead><tr><th>Nazwa</th><th>Akcje</th></tr></thead>
+  <div class="table-responsive">
+  <table class="table table-striped mb-0">
+    <thead><tr><th><i class="bi bi-geo-alt me-1"></i>Nazwa</th><th>Akcje</th></tr></thead>
     <tbody>
       {% for location in locations %}
       <tr>
-        <td>{{ location.name }}</td>
+        <td><i class="bi bi-geo-alt-fill me-1"></i>{{ location.name }}</td>
         <td>
           <a href="{{ url_for('admin.edit_location', location_id=location.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
         </td>
@@ -28,5 +29,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

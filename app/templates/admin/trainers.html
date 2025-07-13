@@ -23,13 +23,14 @@
     </div>
   </form>
 
-  <table class="table table-striped">
-    <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th>Akcje</th></tr></thead>
+  <div class="table-responsive">
+  <table class="table table-striped mb-0">
+    <thead><tr><th><i class="bi bi-person me-1"></i>Imię i nazwisko</th><th><i class="bi bi-telephone me-1"></i>Telefon</th><th>Akcje</th></tr></thead>
     <tbody>
       {% for coach in coaches %}
       <tr>
-        <td>{{ coach.first_name }} {{ coach.last_name }}</td>
-        <td>{{ coach.phone_number }}</td>
+        <td><i class="bi bi-person-fill me-1"></i>{{ coach.first_name }} {{ coach.last_name }}</td>
+        <td><i class="bi bi-telephone me-1"></i>{{ coach.phone_number }}</td>
         <td>
           <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
         </td>
@@ -37,5 +38,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

@@ -5,16 +5,16 @@
 <nav class="container mt-4">
   <ul class="nav nav-tabs">
     <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/trainings') %}active{% endif %}" href="{{ url_for('admin.manage_trainings') }}">Treningi</a>
+      <a class="nav-link {% if request.path.startswith('/admin/trainings') %}active{% endif %}" href="{{ url_for('admin.manage_trainings') }}"><i class="bi bi-calendar-check me-1"></i>Treningi</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/trainers') %}active{% endif %}" href="{{ url_for('admin.manage_trainers') }}">Trenerzy</a>
+      <a class="nav-link {% if request.path.startswith('/admin/trainers') %}active{% endif %}" href="{{ url_for('admin.manage_trainers') }}"><i class="bi bi-person me-1"></i>Trenerzy</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/locations') %}active{% endif %}" href="/admin/locations">Miejsca</a>
+      <a class="nav-link {% if request.path.startswith('/admin/locations') %}active{% endif %}" href="/admin/locations"><i class="bi bi-geo-alt me-1"></i>Miejsca</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/history') %}active{% endif %}" href="/admin/history">Historia</a>
+      <a class="nav-link {% if request.path.startswith('/admin/history') %}active{% endif %}" href="/admin/history"><i class="bi bi-clock-history me-1"></i>Historia</a>
     </li>
   </ul>
 </nav>
