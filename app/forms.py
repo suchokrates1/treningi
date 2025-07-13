@@ -8,7 +8,7 @@ from wtforms import (
 from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
 from wtforms.validators import DataRequired, Length
-from wtforms.fields import HiddenField
+from wtforms.fields import HiddenField, TelField
 
 
 class CoachForm(FlaskForm):
@@ -18,7 +18,7 @@ class CoachForm(FlaskForm):
     last_name = StringField(
         'Nazwisko', validators=[DataRequired(), Length(max=64)]
     )
-    phone_number = StringField(
+    phone_number = TelField(
         'Telefon', validators=[DataRequired(), Length(max=20)]
     )
     submit = SubmitField('Zapisz')
@@ -47,7 +47,7 @@ class VolunteerForm(FlaskForm):
     last_name = StringField(
         'Nazwisko', validators=[DataRequired(), Length(max=64)]
     )
-    phone_number = StringField(
+    phone_number = TelField(
         'Telefon', validators=[DataRequired(), Length(max=20)]
     )
     training_id = HiddenField()  # ukryte pole – ID treningu
