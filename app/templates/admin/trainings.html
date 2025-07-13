@@ -38,13 +38,13 @@
   <table class="table table-striped table-sm mb-0">
     <thead>
       <tr>
-        <th>Data</th>
-        <th>Godzina</th>
-        <th>Miejsce</th>
-        <th>Trener</th>
-        <th>Telefon trenera</th>
-        <th>Wolontariusz 1</th>
-        <th>Wolontariusz 2</th>
+        <th><i class="bi bi-calendar-check me-1"></i>Data</th>
+        <th><i class="bi bi-clock me-1"></i>Godzina</th>
+        <th><i class="bi bi-geo-alt me-1"></i>Miejsce</th>
+        <th><i class="bi bi-person me-1"></i>Trener</th>
+        <th><i class="bi bi-telephone me-1"></i>Telefon trenera</th>
+        <th><i class="bi bi-person-check me-1"></i>Wolontariusz 1</th>
+        <th><i class="bi bi-person-check me-1"></i>Wolontariusz 2</th>
       </tr>
     </thead>
     <tbody>
@@ -54,14 +54,14 @@
         <td>{{ t.date.strftime('%H:%M') }}</td>
         <td>{{ t.location.name }}</td>
         <td>{{ t.coach.first_name }} {{ t.coach.last_name }}</td>
-        <td>{{ t.coach.phone_number }}</td>
+        <td><i class="bi bi-telephone me-1"></i>{{ t.coach.phone_number }}</td>
         {% set b1 = t.bookings[0].volunteer if t.bookings|length > 0 else None %}
         {% set b2 = t.bookings[1].volunteer if t.bookings|length > 1 else None %}
         <td>
-          {% if b1 %}{{ b1.first_name }} {{ b1.last_name }}<br><small>{{ b1.phone_number }}</small>{% endif %}
+          {% if b1 %}{{ b1.first_name }} {{ b1.last_name }}<br><small><i class="bi bi-telephone me-1"></i>{{ b1.phone_number }}</small>{% endif %}
         </td>
         <td>
-          {% if b2 %}{{ b2.first_name }} {{ b2.last_name }}<br><small>{{ b2.phone_number }}</small>{% endif %}
+          {% if b2 %}{{ b2.first_name }} {{ b2.last_name }}<br><small><i class="bi bi-telephone me-1"></i>{{ b2.phone_number }}</small>{% endif %}
         </td>
       </tr>
       {% endfor %}
