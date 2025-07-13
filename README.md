@@ -46,8 +46,12 @@ Optional variables include `FLASK_ENV` and `FLASK_APP`.
    python run.py
    ```
    The application will be available on `http://localhost:8000`.
-   When started this way, the app automatically applies any pending
-   database migrations before launching.
+
+   Automatic migration only occurs when launching via `python run.py` or
+   Docker. If you start the server with `flask run`, run `flask db upgrade`
+   beforehand.
+
+   The SQLite database resides in `app/instance/db.sqlite3`.
 
 ### Database migrations
 
