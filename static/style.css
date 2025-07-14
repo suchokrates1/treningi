@@ -56,6 +56,23 @@ table a {
   min-width: 8rem;
 }
 
+.equal-width-5,
+.equal-width-7 {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.equal-width-5 th,
+.equal-width-5 td {
+  width: 20%;
+}
+
+.equal-width-7 th,
+.equal-width-7 td {
+  width: calc(100% / 7);
+}
+ 
+
 input, select, textarea {
   border-radius: 4px;
 }
