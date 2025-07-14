@@ -52,6 +52,10 @@ table a {
   text-decoration: underline;
 }
 
+.volunteers-col {
+  min-width: 8rem;
+}
+
 input, select, textarea {
   border-radius: 4px;
 }
@@ -59,6 +63,7 @@ input, select, textarea {
 @media (max-width: 575.98px) {
   body {
     padding-top: 120px;
+    padding-bottom: 120px;
   }
 
   header .container {

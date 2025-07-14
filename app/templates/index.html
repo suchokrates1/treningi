@@ -11,7 +11,7 @@
           <th>Data</th>
           <th>Miejsce</th>
           <th>Trener</th>
-          <th>Wolontariusze</th>
+          <th class="volunteers-col">Wolontariusze</th>
           <th>Akcja</th>
         </tr>
       </thead>
@@ -21,7 +21,7 @@
           <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
           <td>{{ training.location.name }}</td>
         <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a></small></td>
-          <td>
+          <td class="volunteers-col">
             <ul class="mb-0">
               {% for booking in training.bookings %}
                 <li>{{ booking.volunteer.first_name }} {{ booking.volunteer.last_name }}</li>
