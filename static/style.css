@@ -55,3 +55,21 @@ table a {
 input, select, textarea {
   border-radius: 4px;
 }
+
+@media (max-width: 575.98px) {
+  body {
+    padding-top: 120px;
+  }
+
+  header .container {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  footer .container {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+}
