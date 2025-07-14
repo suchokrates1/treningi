@@ -8,7 +8,7 @@
         <th>Data</th>
         <th>Miejsce</th>
         <th>Trener</th>
-        <th>Wolontariusze</th>
+        <th class="volunteers-col">Wolontariusze</th>
       </tr>
     </thead>
     <tbody>
@@ -17,7 +17,7 @@
         <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
         <td>{{ t.location.name }}</td>
         <td>{{ t.coach.first_name }} {{ t.coach.last_name }}<br><small><a href="tel:{{ t.coach.phone_number }}">{{ t.coach.phone_number }}</a></small></td>
-        <td>
+        <td class="volunteers-col">
           <ul class="mb-0">
             {% for b in t.bookings %}
               <li>{{ b.volunteer.first_name }} {{ b.volunteer.last_name }}</li>
