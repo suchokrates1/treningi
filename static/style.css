@@ -71,6 +71,7 @@ table a {
 .equal-width-7 td {
   width: calc(100% / 7);
 }
+ 
 
 input, select, textarea {
   border-radius: 4px;
