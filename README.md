@@ -84,6 +84,18 @@ automatically when it starts.
 
 You can also use `docker-compose up` which uses the provided `docker-compose.yml`.
 
+### Troubleshooting
+
+If `flask db upgrade` fails with an error like `table _alembic_tmp_volunteers already exists`,
+the migration was interrupted and left a temporary table behind. Open
+`app/instance/db.sqlite3` with any SQLite client and run:
+
+```sql
+DROP TABLE IF EXISTS _alembic_tmp_volunteers;
+```
+
+After dropping the table re-run the upgrade or start the application again.
+
 ## Admin login
 
 The admin dashboard is accessible at `/admin/login`. Sign in using the password defined in the `ADMIN_PASSWORD` environment variable. Once logged in you can add or edit coaches, create trainings and export all data to Excel.

@@ -1,6 +1,6 @@
 from app import create_app, db
 from flask_migrate import upgrade, stamp
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 app = create_app()
 
@@ -8,6 +8,14 @@ if __name__ == "__main__":
     with app.app_context():
         inspector = inspect(db.engine)
         tables = set(inspector.get_table_names())
+
+        tmp_tables = [t for t in tables if t.startswith("_alembic_tmp_")]
+        if tmp_tables:
+            with db.engine.begin() as conn:
+                for tbl in tmp_tables:
+                    conn.execute(text(f"DROP TABLE IF EXISTS {tbl}"))
+            inspector = inspect(db.engine)
+            tables = set(inspector.get_table_names())
 
         # For databases created before Alembic was introduced we need to mark
         # the current revision so ``upgrade()`` does not try to recreate
