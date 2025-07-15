@@ -6,6 +6,7 @@ from flask import (
     flash,
     session,
     current_app,
+    abort,
 )
 import flask
 from functools import wraps
@@ -155,7 +156,8 @@ def manage_trainings():
     ]
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     trainings_q = Training.query.filter(
-        Training.date >= today
+        Training.date >= today,
+        Training.is_deleted.is_(False),
     ).order_by(Training.date)
     trainings = trainings_q.all()
 
@@ -179,6 +181,35 @@ def manage_trainings():
         "admin/trainings.html",
         form=form,
         trainings_by_month=trainings_by_month,
+    )
+
+
+@admin_bp.route("/trainings/edit/<int:training_id>", methods=["GET", "POST"])
+@login_required
+def edit_training(training_id):
+    training = Training.query.get_or_404(training_id)
+    if training.is_deleted:
+        abort(404)
+    form = TrainingForm(obj=training)
+    form.coach_id.choices = [
+        (c.id, f"{c.first_name} {c.last_name}")
+        for c in Coach.query.order_by(Coach.last_name).all()
+    ]
+    form.location_id.choices = [
+        (loc.id, loc.name)
+        for loc in Location.query.order_by(Location.name).all()
+    ]
+    if form.validate_on_submit():
+        training.date = form.date.data
+        training.location_id = form.location_id.data
+        training.coach_id = form.coach_id.data
+        db.session.commit()
+        flash("Zaktualizowano trening.", "success")
+        return redirect(url_for("admin.manage_trainings"))
+    return render_template(
+        "admin/edit_training.html",
+        form=form,
+        training=training,
     )
 
 
@@ -206,6 +237,16 @@ def cancel_training(training_id):
         send_email(subject, body, recipients)
 
     flash("Trening został oznaczony jako odwołany.", "warning")
+    return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/trainings/<int:training_id>/delete", methods=["POST"])
+@login_required
+def delete_training(training_id):
+    training = Training.query.get_or_404(training_id)
+    training.is_deleted = True
+    db.session.commit()
+    flash("Trening został usunięty.", "info")
     return redirect(url_for("admin.manage_trainings"))
 
 
@@ -340,7 +381,11 @@ def history():
     """List past trainings with volunteer sign-ups."""
     page = flask.request.args.get("page", 1, type=int)
     trainings_q = Training.query.filter(
-        Training.date < datetime.now()
+        db.or_(
+            Training.date < datetime.now(),
+            Training.is_canceled.is_(True),
+            Training.is_deleted.is_(True),
+        )
     ).order_by(Training.date.desc())
     pagination = db.paginate(trainings_q, page=page, per_page=10)
     return render_template(
