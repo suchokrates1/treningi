@@ -26,7 +26,7 @@ def upgrade():
             server_default='0',
         ),
     )
-    op.alter_column('trainings', 'is_canceled', server_default=None)
+
 
 
 def downgrade():

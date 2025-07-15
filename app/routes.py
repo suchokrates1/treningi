@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from .models import Training, Booking, Volunteer
+from .models import Training, Booking, Volunteer, EmailSettings
 from .forms import VolunteerForm, CancelForm
 from . import db
+from .email_utils import send_email
 
 bp = Blueprint('routes', __name__)
 
@@ -45,6 +46,18 @@ def index():
         )
         db.session.add(booking)
         db.session.commit()
+
+        settings = EmailSettings.query.get(1)
+        if settings and settings.registration_template:
+            body = settings.registration_template.format(
+                date=training.date.strftime('%Y-%m-%d %H:%M'),
+                location=training.location.name,
+            )
+            send_email(
+                "Potwierdzenie zgłoszenia",
+                body,
+                [existing_volunteer.email],
+            )
         flash("Zapisano na trening!", "success")
         return redirect(url_for('routes.index'))
 

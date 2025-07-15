@@ -22,7 +22,7 @@ def upgrade():
         batch_op.add_column(
             sa.Column('email', sa.String(length=128), nullable=False)
         )
-        batch_op.create_unique_constraint(None, ['email'])
+        batch_op.create_unique_constraint('uq_volunteers_email', ['email'])
         batch_op.drop_column('phone_number')
 
     # ### end Alembic commands ###
@@ -34,7 +34,7 @@ def downgrade():
         batch_op.add_column(
             sa.Column('phone_number', sa.VARCHAR(length=20), nullable=False)
         )
-        batch_op.drop_constraint(None, type_='unique')
+        batch_op.drop_constraint('uq_volunteers_email', type_='unique')
         batch_op.drop_column('email')
 
     # ### end Alembic commands ###
