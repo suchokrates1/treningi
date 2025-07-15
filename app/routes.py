@@ -49,9 +49,21 @@ def index():
 
         settings = EmailSettings.query.get(1)
         if settings and settings.registration_template:
-            body = settings.registration_template.format(
-                date=training.date.strftime('%Y-%m-%d %H:%M'),
-                location=training.location.name,
+            cancel_link = url_for(
+                "routes.cancel_booking",
+                training_id=training.id,
+                _external=True,
+            )
+            training_info = (
+                f"{training.date.strftime('%Y-%m-%d %H:%M')} "
+                f"w {training.location.name}"
+            )
+            body = (
+                settings.registration_template
+                .replace("[imie]", existing_volunteer.first_name)
+                .replace("[nazwisko]", existing_volunteer.last_name)
+                .replace("[trening]", training_info)
+                .replace("[link_do_odwolania]", cancel_link)
             )
             send_email(
                 "Potwierdzenie zgłoszenia",

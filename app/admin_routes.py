@@ -363,7 +363,9 @@ def settings():
     form = SettingsForm(obj=settings)
 
     if form.validate_on_submit():
-        settings.server = form.server.data.strip() if form.server.data else None
+        settings.server = (
+            form.server.data.strip() if form.server.data else None
+        )
         settings.port = form.port.data
         settings.login = form.login.data.strip() if form.login.data else None
         settings.password = form.password.data if form.password.data else None
