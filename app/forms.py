@@ -69,3 +69,13 @@ class LocationForm(FlaskForm):
 
     name = StringField('Nazwa', validators=[DataRequired(), Length(max=128)])
     submit = SubmitField('Zapisz')
+
+
+class CancelForm(FlaskForm):
+    """Simple form for cancelling a volunteer booking."""
+
+    email = StringField(
+        'Email', validators=[DataRequired(), Email(), Length(max=128)]
+    )
+    training_id = HiddenField()
+    submit = SubmitField('Wypisz się')
