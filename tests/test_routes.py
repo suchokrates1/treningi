@@ -5,11 +5,11 @@ from app import create_app, db
 from app.models import Coach, Location, Training, Volunteer, Booking
 
 @pytest.fixture
-def app_instance():
+def app_instance(monkeypatch):
+    monkeypatch.setenv('SQLALCHEMY_DATABASE_URI', 'sqlite:///:memory:')
     app = create_app()
     app.config.update(
         TESTING=True,
-        SQLALCHEMY_DATABASE_URI='sqlite:///:memory:',
         WTF_CSRF_ENABLED=False,
     )
     with app.app_context():
@@ -56,6 +56,22 @@ def test_duplicate_booking_flash(client, app_instance):
     assert b'Jeste\xc5\x9b ju\xc5\xbc zapisany na ten trening.' in response.data
     with app_instance.app_context():
         assert Booking.query.count() == 1
+
+
+def test_deleted_training_shows_in_history(client, app_instance):
+    training_id, _, _ = setup_training(app_instance)
+
+    with app_instance.app_context():
+        training = Training.query.get(training_id)
+        training.is_deleted = True
+        db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess["admin_logged_in"] = True
+
+    response = client.get("/admin/history")
+
+    assert b"Usuni\xc4\x99ty" in response.data
 
 
 

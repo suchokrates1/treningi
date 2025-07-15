@@ -15,8 +15,8 @@ def index():
         # Sprawdzenie, czy na dany trening jest już 2 wolontariuszy
         training_id = int(form.training_id.data)
         training = Training.query.get_or_404(training_id)
-        if training.is_canceled:
-            flash("Ten trening został odwołany.", "danger")
+        if training.is_canceled or training.is_deleted:
+            flash("Ten trening został odwołany lub usunięty.", "danger")
             return redirect(url_for("routes.index"))
         if len(training.bookings) >= 2:
             flash(
@@ -83,7 +83,11 @@ def index():
         return redirect(url_for('routes.index'))
 
     # Pogrupuj treningi według miesiąca
-    trainings = Training.query.order_by(Training.date).all()
+    trainings = (
+        Training.query.filter_by(is_deleted=False)
+        .order_by(Training.date)
+        .all()
+    )
     trainings_by_month = {}
 
     for training in trainings:
