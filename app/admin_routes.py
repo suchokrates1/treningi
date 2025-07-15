@@ -38,6 +38,7 @@ def admin_root():
     """Redirect bare /admin to the trainings view."""
     return redirect(url_for("admin.manage_trainings"))
 
+
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
