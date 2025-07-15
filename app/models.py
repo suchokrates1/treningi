@@ -126,4 +126,3 @@ class EmailSettings(db.Model):
     sender = db.Column(db.String(128), nullable=True)
     registration_template = db.Column(db.Text, nullable=True)
     cancellation_template = db.Column(db.Text, nullable=True)
-
