@@ -1,0 +1,42 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Ustawienia e-mail</h2>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="row g-2">
+      <div class="col-md-4">
+        {{ form.server.label(class="form-label") }}
+        {{ form.server(class="form-control") }}
+      </div>
+      <div class="col-md-2">
+        {{ form.port.label(class="form-label") }}
+        {{ form.port(class="form-control") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.login.label(class="form-label") }}
+        {{ form.login(class="form-control") }}
+      </div>
+      <div class="col-md-3">
+        {{ form.password.label(class="form-label") }}
+        {{ form.password(class="form-control") }}
+      </div>
+    </div>
+    <div class="row g-2 mt-2">
+      <div class="col-md-6">
+        {{ form.sender.label(class="form-label") }}
+        {{ form.sender(class="form-control") }}
+      </div>
+    </div>
+    <div class="mb-3 mt-2">
+      {{ form.registration_template.label(class="form-label") }}
+      {{ form.registration_template(class="form-control", rows=4) }}
+    </div>
+    <div class="mb-3">
+      {{ form.cancellation_template.label(class="form-label") }}
+      {{ form.cancellation_template(class="form-control", rows=4) }}
+    </div>
+    <button class="btn btn-primary">Zapisz</button>
+  </form>
+</div>
+{% endblock %}
