@@ -14,6 +14,9 @@ def index():
         # Sprawdzenie, czy na dany trening jest już 2 wolontariuszy
         training_id = int(form.training_id.data)
         training = Training.query.get_or_404(training_id)
+        if training.is_canceled:
+            flash("Ten trening został odwołany.", "danger")
+            return redirect(url_for("routes.index"))
         if len(training.bookings) >= 2:
             flash(
                 "Na ten trening nie można się już zapisać. "
@@ -82,7 +85,9 @@ def cancel_booking():
                 flash("Zgłoszenie zostało usunięte.", "success")
                 return redirect(url_for("routes.index"))
         flash("Nie znaleziono zapisu na ten trening.", "warning")
-        return redirect(url_for("routes.cancel_booking", training_id=training_id))
+        return redirect(
+            url_for("routes.cancel_booking", training_id=training_id)
+        )
 
     training = None
     if training_id:
