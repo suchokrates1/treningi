@@ -26,14 +26,14 @@ def index():
         existing_volunteer = Volunteer.query.filter_by(
             first_name=form.first_name.data.strip(),
             last_name=form.last_name.data.strip(),
-            phone_number=form.phone_number.data.strip()
+            email=form.email.data.strip(),
         ).first()
 
         if not existing_volunteer:
             existing_volunteer = Volunteer(
                 first_name=form.first_name.data.strip(),
                 last_name=form.last_name.data.strip(),
-                phone_number=form.phone_number.data.strip()
+                email=form.email.data.strip(),
             )
             db.session.add(existing_volunteer)
             db.session.commit()
