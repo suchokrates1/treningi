@@ -22,10 +22,8 @@ def index():
             )
             return redirect(url_for("routes.index"))
 
-        # Sprawdzenie, czy ten sam wolontariusz się nie zapisał już wcześniej
+        # Sprawdzenie, czy podany adres e-mail jest już zarejestrowany
         existing_volunteer = Volunteer.query.filter_by(
-            first_name=form.first_name.data.strip(),
-            last_name=form.last_name.data.strip(),
             email=form.email.data.strip(),
         ).first()
 
