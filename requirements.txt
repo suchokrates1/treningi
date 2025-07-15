@@ -5,3 +5,6 @@ WTForms==3.1.1
 python-dotenv==1.0.1
 openpyxl==3.1.2
 Flask-Migrate==4.1.0
+
+pytest==7.4.0
+email_validator==2.1.1
