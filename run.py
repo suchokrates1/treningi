@@ -20,6 +20,7 @@ if __name__ == "__main__":
                 "volunteers",
                 "trainings",
                 "bookings",
+                "email_settings",
             }
             if tables & model_tables:
                 stamp()  # mark existing schema as current

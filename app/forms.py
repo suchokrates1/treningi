@@ -9,6 +9,7 @@ from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
 from wtforms.validators import DataRequired, Length, Email
 from wtforms.fields import HiddenField, TelField
+from wtforms import IntegerField, TextAreaField
 
 
 class CoachForm(FlaskForm):
@@ -79,3 +80,18 @@ class CancelForm(FlaskForm):
     )
     training_id = HiddenField()
     submit = SubmitField('Wypisz się')
+
+
+class SettingsForm(FlaskForm):
+    """Form for configuring email settings."""
+
+    server = StringField('Serwer SMTP', validators=[Length(max=128)])
+    port = IntegerField('Port', validators=[DataRequired()])
+    login = StringField('Login', validators=[Length(max=128)])
+    password = StringField('Hasło', validators=[Length(max=128)])
+    sender = StringField(
+        'Nadawca', validators=[DataRequired(), Email(), Length(max=128)]
+    )
+    registration_template = TextAreaField('Szablon maila zapisu')
+    cancellation_template = TextAreaField('Szablon maila odwołania')
+    submit = SubmitField('Zapisz')

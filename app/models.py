@@ -111,3 +111,19 @@ class Booking(db.Model):
 
     def __repr__(self):
         return f"<Booking {self.training_id} by {self.volunteer_id}>"
+
+
+class EmailSettings(db.Model):
+    """Store SMTP configuration and email templates."""
+
+    __tablename__ = "email_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    server = db.Column(db.String(128), nullable=True)
+    port = db.Column(db.Integer, nullable=True)
+    login = db.Column(db.String(128), nullable=True)
+    password = db.Column(db.String(128), nullable=True)
+    sender = db.Column(db.String(128), nullable=True)
+    registration_template = db.Column(db.Text, nullable=True)
+    cancellation_template = db.Column(db.Text, nullable=True)
+
