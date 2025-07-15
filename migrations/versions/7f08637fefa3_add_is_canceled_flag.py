@@ -28,6 +28,5 @@ def upgrade():
     )
 
 
-
 def downgrade():
     op.drop_column('trainings', 'is_canceled')
