@@ -198,9 +198,9 @@ def export_excel():
         "Trener",
         "Telefon trenera",
         "Wolontariusz 1",
-        "Telefon 1",
+        "Email 1",
         "Wolontariusz 2",
-        "Telefon 2",
+        "Email 2",
     ])
 
     trainings = Training.query.order_by(Training.date).all()
@@ -217,9 +217,9 @@ def export_excel():
             f"{t.coach.first_name} {t.coach.last_name}",
             t.coach.phone_number,
             f"{v1.first_name} {v1.last_name}" if v1 else "",
-            v1.phone_number if v1 else "",
+            v1.email if v1 else "",
             f"{v2.first_name} {v2.last_name}" if v2 else "",
-            v2.phone_number if v2 else "",
+            v2.email if v2 else "",
         ])
 
     output = BytesIO()
