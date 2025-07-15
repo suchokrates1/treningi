@@ -19,10 +19,11 @@ def create_app():
     app = Flask(__name__, static_folder="../static")
     os.makedirs(app.instance_path, exist_ok=True)
     db_file = os.path.join(app.instance_path, "db.sqlite3")
+    db_uri = os.environ.get("SQLALCHEMY_DATABASE_URI", f"sqlite:///{db_file}")
     app.config['SECRET_KEY'] = os.environ.get(
         "SECRET_KEY", "default-dev-secret"
     )
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_file}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['ADMIN_PASSWORD'] = os.environ.get("ADMIN_PASSWORD")
     app.config['SMTP_HOST'] = os.environ.get("SMTP_HOST")

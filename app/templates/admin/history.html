@@ -9,6 +9,7 @@
         <th>Miejsce</th>
         <th>Trener</th>
         <th class="volunteers-col">Wolontariusze (Email)</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody>
@@ -23,6 +24,15 @@
               <li>{{ b.volunteer.first_name }} {{ b.volunteer.last_name }} <small class="text-muted">({{ b.volunteer.email }})</small></li>
             {% endfor %}
           </ul>
+        </td>
+        <td>
+          {% if t.is_deleted %}
+            <span class="text-muted">Usunięty</span>
+          {% elif t.is_canceled %}
+            <span class="text-danger">Odwołany</span>
+          {% else %}
+            <span class="text-success">Odbył się</span>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

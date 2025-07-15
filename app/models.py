@@ -41,6 +41,11 @@ class Training(db.Model):
         nullable=False,
         default=False,
     )
+    is_deleted = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+    )
 
     coach = db.relationship(
         'Coach',
