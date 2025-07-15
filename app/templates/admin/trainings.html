@@ -42,8 +42,8 @@
         <th>Miejsce</th>
         <th>Trener</th>
         <th>Telefon trenera</th>
-        <th>Wolontariusz 1</th>
-        <th>Wolontariusz 2</th>
+        <th>Wolontariusz 1 (Email)</th>
+        <th>Wolontariusz 2 (Email)</th>
       </tr>
     </thead>
     <tbody>
@@ -57,10 +57,10 @@
         {% set b1 = t.bookings[0].volunteer if t.bookings|length > 0 else None %}
         {% set b2 = t.bookings[1].volunteer if t.bookings|length > 1 else None %}
         <td>
-          {% if b1 %}{{ b1.first_name }} {{ b1.last_name }}<br><small>{{ b1.email }}</small>{% endif %}
+          {% if b1 %}{{ b1.first_name }} {{ b1.last_name }} <small class="text-muted">({{ b1.email }})</small>{% endif %}
         </td>
         <td>
-          {% if b2 %}{{ b2.first_name }} {{ b2.last_name }}<br><small>{{ b2.email }}</small>{% endif %}
+          {% if b2 %}{{ b2.first_name }} {{ b2.last_name }} <small class="text-muted">({{ b2.email }})</small>{% endif %}
         </td>
       </tr>
       {% endfor %}
