@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from .models import Training, Booking, Volunteer
-from .forms import VolunteerForm
+from .forms import VolunteerForm, CancelForm
 from . import db
 
 bp = Blueprint('routes', __name__)
@@ -57,4 +57,39 @@ def index():
         "index.html",
         form=form,
         trainings_by_month=trainings_by_month,
+    )
+
+
+@bp.route("/cancel", methods=["GET", "POST"])
+def cancel_booking():
+    form = CancelForm()
+    training_id = request.args.get("training_id", type=int)
+    if training_id:
+        form.training_id.data = training_id
+    if form.validate_on_submit():
+        training_id = int(form.training_id.data)
+        volunteer = Volunteer.query.filter_by(
+            email=form.email.data.strip()
+        ).first()
+        if volunteer:
+            booking = Booking.query.filter_by(
+                training_id=training_id,
+                volunteer_id=volunteer.id,
+            ).first()
+            if booking:
+                db.session.delete(booking)
+                db.session.commit()
+                flash("Zgłoszenie zostało usunięte.", "success")
+                return redirect(url_for("routes.index"))
+        flash("Nie znaleziono zapisu na ten trening.", "warning")
+        return redirect(url_for("routes.cancel_booking", training_id=training_id))
+
+    training = None
+    if training_id:
+        training = Training.query.get_or_404(training_id)
+
+    return render_template(
+        "cancel.html",
+        form=form,
+        training=training,
     )

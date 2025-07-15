@@ -36,6 +36,9 @@
           {% else %}
             <span class="text-muted">Brak miejsc</span>
           {% endif %}
+          <div class="mt-1">
+            <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="btn btn-sm btn-outline-danger">Wypisz się</a>
+          </div>
         </td>
       </tr>
       {% endfor %}
