@@ -40,6 +40,15 @@ def index():
             db.session.add(existing_volunteer)
             db.session.commit()
 
+        existing_booking = Booking.query.filter_by(
+            training_id=training.id,
+            volunteer_id=existing_volunteer.id,
+        ).first()
+
+        if existing_booking:
+            flash("Jesteś już zapisany na ten trening.", "warning")
+            return redirect(url_for("routes.index"))
+
         booking = Booking(
             training_id=training.id,
             volunteer_id=existing_volunteer.id,
