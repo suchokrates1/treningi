@@ -8,6 +8,7 @@ This project provides a simple web application for organizing blind tennis train
 - **Volunteer sign‑up** – each training accepts up to two volunteers; duplicate bookings are prevented. Volunteers register and cancel using their email address.
 - **Admin panel** – password‑protected dashboard to manage coaches and trainings.
 - **Excel export** – administrators can download a spreadsheet with training data and volunteer contact details.
+- **Cancellation emails** – admins can mark a session as cancelled and all booked volunteers are notified via email.
 - **Dark mode** – a theme toggle available for convenience.
 
 ## Requirements
@@ -26,6 +27,9 @@ This project provides a simple web application for organizing blind tennis train
 Create a `.env` file and define at least:
   - `SECRET_KEY` – Flask secret key.
   - `ADMIN_PASSWORD` – password for the admin panel.
+  - `SMTP_HOST` – outgoing mail server.
+  - `SMTP_USERNAME` and `SMTP_PASSWORD` – credentials for the server.
+  - `SMTP_SENDER` – address used in the `From` header.
 Optional variables include `FLASK_ENV` and `FLASK_APP`.
 
 ## Local setup
