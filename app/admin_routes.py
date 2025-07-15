@@ -12,6 +12,7 @@ from functools import wraps
 from datetime import datetime
 
 from . import db
+from .email_utils import send_email
 from .forms import (
     CoachForm,
     TrainingForm,
@@ -178,6 +179,26 @@ def manage_trainings():
         form=form,
         trainings_by_month=trainings_by_month,
     )
+
+
+@admin_bp.route("/trainings/<int:training_id>/cancel", methods=["POST"])
+@login_required
+def cancel_training(training_id):
+    training = Training.query.get_or_404(training_id)
+    training.is_canceled = True
+    db.session.commit()
+
+    subject = "Trening odwołany"
+    body = (
+        f"Trening {training.date.strftime('%Y-%m-%d %H:%M')} "
+        f"w {training.location.name} został odwołany."
+    )
+    recipients = [b.volunteer.email for b in training.bookings]
+    if recipients:
+        send_email(subject, body, recipients)
+
+    flash("Trening został oznaczony jako odwołany.", "warning")
+    return redirect(url_for("admin.manage_trainings"))
 
 
 @admin_bp.route("/export")
