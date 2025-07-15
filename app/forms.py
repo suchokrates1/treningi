@@ -38,7 +38,7 @@ class TrainingForm(FlaskForm):
     coach_id = SelectField(
         'Trener', coerce=int, validators=[DataRequired()]
     )
-    submit = SubmitField('Dodaj trening')
+    submit = SubmitField('Zapisz')
 
 
 class VolunteerForm(FlaskForm):
