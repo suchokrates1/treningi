@@ -16,6 +16,9 @@
     <li class="nav-item">
       <a class="nav-link {% if request.path.startswith('/admin/history') %}active{% endif %}" href="/admin/history">Historia</a>
     </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.path.startswith('/admin/settings') %}active{% endif %}" href="/admin/settings">Ustawienia</a>
+    </li>
   </ul>
 </nav>
 {% endif %}

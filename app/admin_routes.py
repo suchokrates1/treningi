@@ -19,8 +19,9 @@ from .forms import (
     LoginForm,
     ImportTrainingsForm,
     LocationForm,
+    SettingsForm,
 )
-from .models import Coach, Training, Location
+from .models import Coach, Training, Location, EmailSettings
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -189,10 +190,17 @@ def cancel_training(training_id):
     db.session.commit()
 
     subject = "Trening odwołany"
-    body = (
+    default_body = (
         f"Trening {training.date.strftime('%Y-%m-%d %H:%M')} "
         f"w {training.location.name} został odwołany."
     )
+    settings = EmailSettings.query.get(1)
+    body = default_body
+    if settings and settings.cancellation_template:
+        body = settings.cancellation_template.format(
+            date=training.date.strftime('%Y-%m-%d %H:%M'),
+            location=training.location.name,
+        )
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
         send_email(subject, body, recipients)
@@ -340,3 +348,30 @@ def history():
         trainings=pagination.items,
         pagination=pagination,
     )
+
+
+@admin_bp.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    """Edit email configuration."""
+    settings = EmailSettings.query.get(1)
+    if not settings:
+        settings = EmailSettings(id=1, port=587)
+        db.session.add(settings)
+        db.session.commit()
+
+    form = SettingsForm(obj=settings)
+
+    if form.validate_on_submit():
+        settings.server = form.server.data.strip() if form.server.data else None
+        settings.port = form.port.data
+        settings.login = form.login.data.strip() if form.login.data else None
+        settings.password = form.password.data if form.password.data else None
+        settings.sender = form.sender.data.strip()
+        settings.registration_template = form.registration_template.data
+        settings.cancellation_template = form.cancellation_template.data
+        db.session.commit()
+        flash("Zapisano ustawienia.", "success")
+        return redirect(url_for("admin.settings"))
+
+    return render_template("admin/settings.html", form=form)
