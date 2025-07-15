@@ -16,11 +16,11 @@
         </tr>
       </thead>
       <tbody>
-        {% for training in trainings %}
-        <tr>
+      {% for training in trainings %}
+        <tr class="{% if training.is_canceled %}table-danger{% endif %}">
           <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
           <td>{{ training.location.name }}</td>
-        <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a></small></td>
+          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a></small></td>
           <td class="volunteers-col">
             <ul class="mb-0">
               {% for booking in training.bookings %}
@@ -29,7 +29,9 @@
             </ul>
           </td>
         <td class="text-center">
-          {% if training.bookings|length < 2 %}
+          {% if training.is_canceled %}
+            <span class="text-danger">Odwołany</span>
+          {% elif training.bookings|length < 2 %}
             <button type="button" class="btn btn-sm btn-primary signup-btn" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
               Zapisz się
             </button>

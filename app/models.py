@@ -36,6 +36,11 @@ class Training(db.Model):
         db.ForeignKey('coaches.id'),
         nullable=False,
     )
+    is_canceled = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+    )
 
     coach = db.relationship(
         'Coach',

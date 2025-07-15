@@ -25,6 +25,15 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_file}"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['ADMIN_PASSWORD'] = os.environ.get("ADMIN_PASSWORD")
+    app.config['SMTP_HOST'] = os.environ.get("SMTP_HOST")
+    app.config['SMTP_PORT'] = int(os.environ.get("SMTP_PORT", 587))
+    app.config['SMTP_USERNAME'] = os.environ.get("SMTP_USERNAME")
+    app.config['SMTP_PASSWORD'] = os.environ.get("SMTP_PASSWORD")
+    app.config['SMTP_SENDER'] = os.environ.get(
+        "SMTP_SENDER",
+        "noreply@example.com",
+    )
+    app.config['SMTP_USE_TLS'] = os.environ.get("SMTP_USE_TLS", "1") == "1"
 
     db.init_app(app)
     migrate_dir = os.path.join(
