@@ -191,7 +191,7 @@ def export_excel():
     ws = wb.active
     ws.title = "Treningi"
 
-    ws.append([
+    header = [
         "Data",
         "Godzina",
         "Miejsce",
@@ -201,7 +201,8 @@ def export_excel():
         "Email 1",
         "Wolontariusz 2",
         "Email 2",
-    ])
+    ]
+    ws.append(header)
 
     trainings = Training.query.order_by(Training.date).all()
 
@@ -210,6 +211,9 @@ def export_excel():
         v1 = bookings[0].volunteer if len(bookings) > 0 else None
         v2 = bookings[1].volunteer if len(bookings) > 1 else None
 
+        email1 = v1.email if v1 else ""
+        email2 = v2.email if v2 else ""
+
         ws.append([
             t.date.strftime("%Y-%m-%d"),
             t.date.strftime("%H:%M"),
@@ -217,9 +221,9 @@ def export_excel():
             f"{t.coach.first_name} {t.coach.last_name}",
             t.coach.phone_number,
             f"{v1.first_name} {v1.last_name}" if v1 else "",
-            v1.email if v1 else "",
+            email1,
             f"{v2.first_name} {v2.last_name}" if v2 else "",
-            v2.email if v2 else "",
+            email2,
         ])
 
     output = BytesIO()
