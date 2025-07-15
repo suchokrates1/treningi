@@ -5,7 +5,7 @@ This project provides a simple web application for organizing blind tennis train
 ## Features
 
 - **Training schedule** – list upcoming trainings grouped by month.
-- **Volunteer sign‑up** – each training accepts up to two volunteers; duplicate bookings are prevented.
+- **Volunteer sign‑up** – each training accepts up to two volunteers; duplicate bookings are prevented. Volunteers register and cancel using their email address.
 - **Admin panel** – password‑protected dashboard to manage coaches and trainings.
 - **Excel export** – administrators can download a spreadsheet with training data and volunteer contact details.
 - **Dark mode** – a theme toggle available for convenience.
@@ -61,6 +61,10 @@ Whenever you modify the models, generate and apply migrations:
 flask db migrate -m "describe change"
 flask db upgrade
 ```
+
+The repository already includes a migration that adds an `email` column to the
+`volunteers` table. Simply run `flask db upgrade` to apply it when you deploy
+this version.
 
 ### Docker
 
