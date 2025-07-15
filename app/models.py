@@ -58,7 +58,7 @@ class Volunteer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(64), nullable=False)
     last_name = db.Column(db.String(64), nullable=False)
-    phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(128), nullable=False, unique=True)
 
     def __repr__(self):
         return f"<Volunteer {self.first_name} {self.last_name}>"
