@@ -45,7 +45,7 @@ def test_deleted_training_shows_in_history(client, app_instance):
     training_id, _ = setup_training(app_instance)
 
     with app_instance.app_context():
-        training = Training.query.get(training_id)
+        training = db.session.get(Training, training_id)
         training.is_deleted = True
         db.session.commit()
 

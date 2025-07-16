@@ -222,7 +222,7 @@ def cancel_training(training_id):
     db.session.commit()
 
     subject = "Trening odwołany"
-    settings = EmailSettings.query.get(1)
+    settings = db.session.get(EmailSettings, 1)
     body_template = (
         settings.cancellation_template
         if settings and settings.cancellation_template
@@ -405,7 +405,7 @@ def history():
 @login_required
 def settings():
     """Edit email configuration."""
-    settings = EmailSettings.query.get(1)
+    settings = db.session.get(EmailSettings, 1)
     if not settings:
         settings = EmailSettings(id=1, port=587)
         db.session.add(settings)
@@ -455,7 +455,7 @@ def test_email():
 @login_required
 @csrf.exempt
 def preview_template(template):
-    settings = EmailSettings.query.get(1)
+    settings = db.session.get(EmailSettings, 1)
     if not settings:
         abort(404)
 
