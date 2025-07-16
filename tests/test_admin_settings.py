@@ -29,3 +29,33 @@ def test_admin_settings_update(client, app_instance):
         assert settings.sender == 'admin@example.com'
         assert settings.registration_template == 'Hello {first_name}'
         assert settings.cancellation_template == 'Bye {first_name}'
+
+
+def test_admin_send_test_email(client, app_instance, monkeypatch):
+    login = client.post('/admin/login', data={'password': 'secret'}, follow_redirects=True)
+    assert b'Zalogowano' in login.data
+
+    form_data = {
+        'server': 'smtp.test.com',
+        'port': '2525',
+        'login': 'user',
+        'password': 'pass',
+        'sender': 'admin@example.com',
+        'registration_template': 'Hello',
+        'cancellation_template': 'Bye',
+    }
+
+    client.post('/admin/settings', data=form_data, follow_redirects=True)
+
+    captured = {}
+
+    def fake_send(subject, body, recipients, **kwargs):
+        captured['args'] = (subject, body, recipients)
+
+    monkeypatch.setattr('app.admin_routes.send_email', fake_send)
+
+    form_data['test_recipient'] = 'dest@example.com'
+
+    resp = client.post('/admin/settings/test-email', data=form_data, follow_redirects=True)
+    assert resp.status_code == 200
+    assert captured['args'][2] == ['dest@example.com']
