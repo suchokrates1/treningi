@@ -12,7 +12,7 @@ import flask
 from functools import wraps
 from datetime import datetime
 
-from . import db
+from . import db, csrf
 from .email_utils import send_email
 from .template_utils import render_template_string
 from .forms import (
@@ -430,19 +430,23 @@ def settings():
     return render_template("admin/settings.html", form=form)
 
 
-@admin_bp.route("/settings/preview/<template>")
+@admin_bp.route("/settings/preview/<template>", methods=["GET", "POST"])
 @login_required
+@csrf.exempt
 def preview_template(template):
     settings = EmailSettings.query.get(1)
     if not settings:
         abort(404)
 
-    if template == "registration":
-        tpl = settings.registration_template or ""
-    elif template == "cancellation":
-        tpl = settings.cancellation_template or ""
+    if flask.request.method == "POST" and "content" in flask.request.form:
+        tpl = flask.request.form.get("content", "")
     else:
-        abort(404)
+        if template == "registration":
+            tpl = settings.registration_template or ""
+        elif template == "cancellation":
+            tpl = settings.cancellation_template or ""
+        else:
+            abort(404)
 
     data = {
         "first_name": "Jan",
