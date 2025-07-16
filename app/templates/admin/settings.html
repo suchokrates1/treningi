@@ -30,11 +30,25 @@
     </div>
     <div class="mb-3 mt-2">
       {{ form.registration_template.label(class="form-label") }}
-      {{ form.registration_template(class="form-control", rows=4) }}
+      {{ form.registration_template(id="registration_template") }}
+      <div id="registration_editor" class="form-control" style="height:200px;"></div>
+      <div class="mt-2">
+        {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}'] %}
+        <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
+        {% endfor %}
+        <a href="{{ url_for('admin.preview_template', template='registration') }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">Podgląd</a>
+      </div>
     </div>
     <div class="mb-3">
       {{ form.cancellation_template.label(class="form-label") }}
-      {{ form.cancellation_template(class="form-control", rows=4) }}
+      {{ form.cancellation_template(id="cancellation_template") }}
+      <div id="cancellation_editor" class="form-control" style="height:200px;"></div>
+      <div class="mt-2">
+        {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}'] %}
+        <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
+        {% endfor %}
+        <a href="{{ url_for('admin.preview_template', template='cancellation') }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">Podgląd</a>
+      </div>
     </div>
     <button class="btn btn-primary">Zapisz</button>
   </form>

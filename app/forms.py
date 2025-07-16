@@ -92,6 +92,6 @@ class SettingsForm(FlaskForm):
     sender = StringField(
         'Nadawca', validators=[DataRequired(), Email(), Length(max=128)]
     )
-    registration_template = TextAreaField('Szablon maila zapisu')
-    cancellation_template = TextAreaField('Szablon maila odwołania')
+    registration_template = HiddenField('Szablon maila zapisu')
+    cancellation_template = HiddenField('Szablon maila odwołania')
     submit = SubmitField('Zapisz')

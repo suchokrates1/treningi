@@ -100,3 +100,7 @@ After dropping the table re-run the upgrade or start the application again.
 
 The admin dashboard is accessible at `/admin/login`. Sign in using the password defined in the `ADMIN_PASSWORD` environment variable. Once logged in you can add or edit coaches, create trainings and export all data to Excel.
 
+### Editing email templates
+
+Visit `/admin/settings` to configure SMTP details and edit the messages sent to volunteers. The WYSIWYG editor lets you insert variables such as `{first_name}`, `{last_name}`, `{training}`, `{cancel_link}`, `{date}` and `{location}`. Use the **Podgląd** button to preview a template with example data before saving.
+
