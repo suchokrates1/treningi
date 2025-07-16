@@ -4,7 +4,16 @@ window.addEventListener('DOMContentLoaded', () => {
   function init(fieldId, editorId) {
     const field = document.getElementById(fieldId);
     if (!field) return;
-    const quill = new Quill('#' + editorId, { theme: 'snow' });
+    const quill = new Quill('#' + editorId, {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          ['bold', 'italic', 'underline'],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          ['link']
+        ]
+      }
+    });
     quill.root.innerHTML = field.value || '';
     editors[editorId] = quill;
     field.closest('form').addEventListener('submit', () => {
