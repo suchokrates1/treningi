@@ -74,3 +74,18 @@ def test_preview_endpoint_allows_posting_html(client, app_instance):
     resp = client.post('/admin/settings/preview/registration', data={'content': html})
     assert resp.status_code == 200
     assert b'Custom Preview' in resp.data
+
+
+def test_preview_endpoint_allows_posting_specific_html(client, app_instance):
+    """Posting HTML renders that exact HTML snippet."""
+    with client.session_transaction() as sess:
+        sess['admin_logged_in'] = True
+    with app_instance.app_context():
+        settings = EmailSettings(id=1, port=587, sender='a@b.com')
+        db.session.add(settings)
+        db.session.commit()
+
+    html = '<p>X</p>'
+    resp = client.post('/admin/settings/preview/registration', data={'content': html})
+    assert resp.status_code == 200
+    assert b'<p>X</p>' in resp.data
