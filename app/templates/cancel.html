@@ -10,7 +10,7 @@
     </p>
   {% endif %}
   <form method="POST">
-    {{ form.hidden_tag() }}
+    {{ form.csrf_token }}
     {{ form.training_id }}
     <div class="mb-3">
       {{ form.email.label(class="form-label") }}

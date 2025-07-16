@@ -54,7 +54,7 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <form method="post">
-          {{ form.hidden_tag() }}
+          {{ form.csrf_token }}
           <div class="modal-header">
             <h5 class="modal-title">Zapisz się na trening</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
