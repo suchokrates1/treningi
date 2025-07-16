@@ -1,5 +1,7 @@
 {% extends "base.html" %}
+{% block extra_head %}
 <link href="{{ url_for('static', filename='vendor/quill/quill.snow.css') }}" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
 {% if session.get('admin_logged_in') %}
