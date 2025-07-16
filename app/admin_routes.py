@@ -34,6 +34,7 @@ def login_required(view):
         if not session.get("admin_logged_in"):
             return redirect(url_for("admin.login"))
         return view(*args, **kwargs)
+
     return wrapped
 
 
@@ -152,8 +153,7 @@ def manage_trainings():
         for c in Coach.query.order_by(Coach.last_name).all()
     ]
     form.location_id.choices = [
-        (loc.id, loc.name)
-        for loc in Location.query.order_by(Location.name).all()
+        (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
     ]
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     trainings_q = Training.query.filter(
@@ -197,8 +197,7 @@ def edit_training(training_id):
         for c in Coach.query.order_by(Coach.last_name).all()
     ]
     form.location_id.choices = [
-        (loc.id, loc.name)
-        for loc in Location.query.order_by(Location.name).all()
+        (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
     ]
     if form.validate_on_submit():
         training.date = form.date.data
@@ -235,9 +234,7 @@ def cancel_training(training_id):
     if body_template:
         html_body = render_template_string(body_template, data)
     else:
-        html_body = (
-            f"Trening {data['date']} w {data['location']} został odwołany."
-        )
+        html_body = f"Trening {data['date']} w {data['location']} został odwołany."
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
         send_email(subject, None, recipients, html_body=html_body)
@@ -290,17 +287,19 @@ def export_excel():
         email1 = v1.email if v1 else ""
         email2 = v2.email if v2 else ""
 
-        ws.append([
-            t.date.strftime("%Y-%m-%d"),
-            t.date.strftime("%H:%M"),
-            t.location.name,
-            f"{t.coach.first_name} {t.coach.last_name}",
-            t.coach.phone_number,
-            f"{v1.first_name} {v1.last_name}" if v1 else "",
-            email1,
-            f"{v2.first_name} {v2.last_name}" if v2 else "",
-            email2,
-        ])
+        ws.append(
+            [
+                t.date.strftime("%Y-%m-%d"),
+                t.date.strftime("%H:%M"),
+                t.location.name,
+                f"{t.coach.first_name} {t.coach.last_name}",
+                t.coach.phone_number,
+                f"{v1.first_name} {v1.last_name}" if v1 else "",
+                email1,
+                f"{v2.first_name} {v2.last_name}" if v2 else "",
+                email2,
+            ]
+        )
 
     output = BytesIO()
     wb.save(output)
@@ -311,9 +310,7 @@ def export_excel():
         output,
         as_attachment=True,
         download_name=filename,
-        mimetype=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
+        mimetype=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     )
 
 
@@ -346,9 +343,7 @@ def import_excel():
 
             dt = datetime.combine(date_part, time_part)
 
-            coach = Coach.query.filter_by(
-                phone_number=str(phone).strip()
-            ).first()
+            coach = Coach.query.filter_by(phone_number=str(phone).strip()).first()
             if not coach:
                 first, *rest = str(trainer_name).strip().split(" ", 1)
                 last = rest[0] if rest else ""
@@ -360,9 +355,7 @@ def import_excel():
                 db.session.add(coach)
                 db.session.commit()
 
-            location = Location.query.filter_by(
-                name=str(place).strip()
-            ).first()
+            location = Location.query.filter_by(name=str(place).strip()).first()
             if not location:
                 location = Location(name=str(place).strip())
                 db.session.add(location)
@@ -414,9 +407,7 @@ def settings():
     form = SettingsForm(obj=settings)
 
     if form.validate_on_submit():
-        settings.server = (
-            form.server.data.strip() if form.server.data else None
-        )
+        settings.server = form.server.data.strip() if form.server.data else None
         settings.port = form.port.data
         settings.login = form.login.data.strip() if form.login.data else None
         settings.password = form.password.data if form.password.data else None
@@ -433,7 +424,7 @@ def settings():
 @admin_bp.route("/settings/test-email", methods=["POST"])
 @login_required
 def test_email():
-    """Send a test email using current settings."""
+    """Send a test email using provided settings without saving."""
     form = SettingsForm()
     if form.validate_on_submit():
         recipient = form.test_recipient.data.strip()
@@ -442,13 +433,19 @@ def test_email():
                 "Test konfiguracji",
                 "To jest testowa wiadomość.",
                 [recipient],
+                host=form.server.data or None,
+                port=form.port.data,
+                username=form.login.data or None,
+                password=form.password.data or None,
+                sender=form.sender.data or None,
             )
             flash("Wysłano wiadomość testową.", "success")
         except Exception:  # pragma: no cover - safety net
+            current_app.logger.exception("Failed to send test email")
             flash("Nie udało się wysłać wiadomości testowej.", "danger")
     else:
         flash("Nie udało się wysłać wiadomości testowej.", "danger")
-    return redirect(url_for("admin.settings"))
+    return render_template("admin/settings.html", form=form)
 
 
 @admin_bp.route("/settings/preview/<template>", methods=["GET", "POST"])
