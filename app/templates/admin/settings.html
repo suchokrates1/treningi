@@ -32,22 +32,26 @@
       {{ form.registration_template.label(class="form-label") }}
       {{ form.registration_template(id="registration_template") }}
       <div id="registration_editor" class="quill-wrapper" style="height:200px;"></div>
+      <textarea id="registration_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
       <div class="mt-2">
         {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}'] %}
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
         <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="registration" data-editor="registration_editor">Podgląd</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 html-toggle" data-editor="registration_editor">Edit HTML</button>
       </div>
     </div>
     <div class="mb-3">
       {{ form.cancellation_template.label(class="form-label") }}
       {{ form.cancellation_template(id="cancellation_template") }}
       <div id="cancellation_editor" class="quill-wrapper" style="height:200px;"></div>
+      <textarea id="cancellation_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
       <div class="mt-2">
         {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}'] %}
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
         <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="cancellation" data-editor="cancellation_editor">Podgląd</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 html-toggle" data-editor="cancellation_editor">Edit HTML</button>
       </div>
     </div>
     <button class="btn btn-primary">Zapisz</button>

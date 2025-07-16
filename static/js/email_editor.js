@@ -16,8 +16,35 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     quill.root.innerHTML = field.value || '';
     editors[editorId] = quill;
+
+    const textarea = document.getElementById(editorId + '_textarea');
+    const toggleBtn = document.querySelector(
+      '.html-toggle[data-editor="' + editorId + '"]'
+    );
+    const container = document.getElementById(editorId);
+
+    if (toggleBtn && textarea) {
+      toggleBtn.addEventListener('click', () => {
+        if (textarea.classList.contains('d-none')) {
+          textarea.value = quill.root.innerHTML;
+          textarea.classList.remove('d-none');
+          container.classList.add('d-none');
+          toggleBtn.textContent = 'Visual Editor';
+        } else {
+          quill.clipboard.dangerouslyPasteHTML(textarea.value);
+          textarea.classList.add('d-none');
+          container.classList.remove('d-none');
+          toggleBtn.textContent = 'Edit HTML';
+        }
+      });
+    }
+
     field.closest('form').addEventListener('submit', () => {
-      field.value = quill.root.innerHTML;
+      if (textarea && !textarea.classList.contains('d-none')) {
+        field.value = textarea.value;
+      } else {
+        field.value = quill.root.innerHTML;
+      }
     });
   }
 
@@ -26,21 +53,34 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.insert-var').forEach(btn => {
     btn.addEventListener('click', () => {
-      const editor = editors[btn.dataset.editor];
+      const editorId = btn.dataset.editor;
+      const editor = editors[editorId];
       if (!editor) return;
       const val = btn.dataset.value || '';
-      const range = editor.getSelection(true);
-      const index = range ? range.index : editor.getLength();
-      editor.insertText(index, val);
-      editor.setSelection(index + val.length);
+      const textarea = document.getElementById(editorId + '_textarea');
+      if (textarea && !textarea.classList.contains('d-none')) {
+        const start = textarea.selectionStart || textarea.value.length;
+        const end = textarea.selectionEnd || start;
+        textarea.setRangeText(val, start, end, 'end');
+        textarea.focus();
+      } else {
+        const range = editor.getSelection(true);
+        const index = range ? range.index : editor.getLength();
+        editor.insertText(index, val);
+        editor.setSelection(index + val.length);
+      }
     });
   });
 
   document.querySelectorAll('.preview-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const editor = editors[btn.dataset.editor];
+      const editorId = btn.dataset.editor;
+      const editor = editors[editorId];
       if (!editor) return;
-      const content = editor.root.innerHTML;
+      const textarea = document.getElementById(editorId + '_textarea');
+      const content = textarea && !textarea.classList.contains('d-none')
+        ? textarea.value
+        : editor.root.innerHTML;
       fetch(`/admin/settings/preview/${btn.dataset.template}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
