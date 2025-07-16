@@ -12,39 +12,57 @@ def send_email(
     recipients: list[str],
     *,
     html_body: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
+    username: str | None = None,
+    password: str | None = None,
+    sender: str | None = None,
+    use_tls: bool | None = None,
 ) -> None:
     """Send an email using stored SMTP settings."""
     settings = db.session.get(EmailSettings, 1)
-    host = (
+    host = host or (
         settings.server
         if settings and settings.server
         else current_app.config.get("SMTP_HOST")
     )
-    username = (
+    username = username or (
         settings.login
         if settings and settings.login
         else current_app.config.get("SMTP_USERNAME")
     )
-    password = (
+    password = password or (
         settings.password
         if settings and settings.password
         else current_app.config.get("SMTP_PASSWORD")
     )
-    sender = (
+    sender = sender or (
         settings.sender
         if settings and settings.sender
         else current_app.config.get("SMTP_SENDER")
     )
-    port = (
+    port = port or (
         settings.port
         if settings and settings.port
         else current_app.config.get("SMTP_PORT", 587)
     )
-    use_tls = current_app.config.get("SMTP_USE_TLS", True)
+    use_tls = (
+        use_tls if use_tls is not None else current_app.config.get("SMTP_USE_TLS", True)
+    )
 
     if not host:
         current_app.logger.warning("SMTP_HOST not configured; skipping email")
         return
+
+    current_app.logger.info(
+        "Sending email via %s:%s from %s to %s",
+        host,
+        port,
+        sender,
+        ", ".join(recipients),
+    )
+    if username:
+        current_app.logger.debug("SMTP login: %s", username)
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -59,9 +77,14 @@ def send_email(
     if html_body:
         msg.add_alternative(html_body, subtype="html")
 
-    with smtplib.SMTP(host, port) as smtp:
-        if use_tls:
-            smtp.starttls()
-        if username and password:
-            smtp.login(username, password)
-        smtp.send_message(msg)
+    try:
+        with smtplib.SMTP(host, port) as smtp:
+            if use_tls:
+                smtp.starttls()
+            if username and password:
+                smtp.login(username, password)
+            smtp.send_message(msg)
+        current_app.logger.info("Email sent successfully")
+    except Exception:
+        current_app.logger.exception("Email sending failed")
+        raise
