@@ -104,3 +104,4 @@ def test_preview_endpoint_returns_modal_html(client, app_instance):
     assert resp.status_code == 200
     assert b'<div class="border p-3">' in resp.data
     assert b'Modal Test' in resp.data
+    assert b'<html' not in resp.data
