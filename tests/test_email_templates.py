@@ -60,3 +60,17 @@ def test_preview_endpoint_renders(client, app_instance):
     resp = client.get('/admin/settings/preview/registration')
     assert resp.status_code == 200
     assert b'Hi Jan' in resp.data
+
+
+def test_preview_endpoint_allows_posting_html(client, app_instance):
+    """Posting custom HTML should be rendered without saving it."""
+    with client.session_transaction() as sess:
+        sess['admin_logged_in'] = True
+    with app_instance.app_context():
+        settings = EmailSettings(id=1, port=587, sender='a@b.com')
+        db.session.add(settings)
+        db.session.commit()
+    html = '<p>Custom Preview</p>'
+    resp = client.post('/admin/settings/preview/registration', data={'content': html})
+    assert resp.status_code == 200
+    assert b'Custom Preview' in resp.data
