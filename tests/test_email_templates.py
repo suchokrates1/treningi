@@ -89,3 +89,18 @@ def test_preview_endpoint_allows_posting_specific_html(client, app_instance):
     resp = client.post('/admin/settings/preview/registration', data={'content': html})
     assert resp.status_code == 200
     assert b'<p>X</p>' in resp.data
+
+
+def test_preview_endpoint_returns_modal_html(client, app_instance):
+    with client.session_transaction() as sess:
+        sess['admin_logged_in'] = True
+    with app_instance.app_context():
+        settings = EmailSettings(id=1, port=587, sender='a@b.com')
+        db.session.add(settings)
+        db.session.commit()
+
+    html = '<p>Modal Test</p>'
+    resp = client.post('/admin/settings/preview/registration', data={'content': html})
+    assert resp.status_code == 200
+    assert b'<div class="border p-3">' in resp.data
+    assert b'Modal Test' in resp.data
