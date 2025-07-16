@@ -61,3 +61,12 @@ def test_admin_send_test_email(client, app_instance, monkeypatch):
     assert resp.status_code == 200
     assert captured['args'][2] == ['dest@example.com']
     assert b'Wys\xc5\x82ano wiadomo\xc5\x9b\xc4\x87 testow\xc4\x85.' in resp.data
+
+
+def test_settings_page_has_html_switch(client):
+    login = client.post('/admin/login', data={'password': 'secret'}, follow_redirects=True)
+    assert b'Zalogowano' in login.data
+
+    resp = client.get('/admin/settings')
+    assert b'html-toggle-switch' in resp.data
+    assert b'Tryb HTML' in resp.data

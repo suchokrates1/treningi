@@ -18,25 +18,26 @@ window.addEventListener('DOMContentLoaded', () => {
     editors[editorId] = quill;
 
     const textarea = document.getElementById(editorId + '_textarea');
-    const toggleBtn = document.querySelector(
-      '.html-toggle[data-editor="' + editorId + '"]'
+    const toggleSwitch = document.querySelector(
+      '.html-toggle-switch[data-editor="' + editorId + '"]'
     );
     const container = document.getElementById(editorId);
 
-    if (toggleBtn && textarea) {
-      toggleBtn.addEventListener('click', () => {
-        if (textarea.classList.contains('d-none')) {
-          textarea.value = quill.root.innerHTML;
-          textarea.classList.remove('d-none');
-          container.classList.add('d-none');
-          toggleBtn.textContent = 'Visual Editor';
-        } else {
-          quill.clipboard.dangerouslyPasteHTML(textarea.value);
-          textarea.classList.add('d-none');
-          container.classList.remove('d-none');
-          toggleBtn.textContent = 'Edit HTML';
-        }
-      });
+    function updateMode() {
+      if (toggleSwitch.checked) {
+        textarea.value = quill.root.innerHTML;
+        textarea.classList.remove('d-none');
+        container.classList.add('d-none');
+      } else {
+        quill.clipboard.dangerouslyPasteHTML(textarea.value);
+        textarea.classList.add('d-none');
+        container.classList.remove('d-none');
+      }
+    }
+
+    if (toggleSwitch && textarea) {
+      toggleSwitch.addEventListener('change', updateMode);
+      updateMode();
     }
 
     field.closest('form').addEventListener('submit', () => {

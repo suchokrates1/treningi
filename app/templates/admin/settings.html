@@ -44,7 +44,8 @@
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
         <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="registration" data-editor="registration_editor">Podgląd</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 html-toggle" data-editor="registration_editor">Edit HTML</button>
+        <input type="checkbox" class="form-check-input html-toggle-switch" data-editor="registration_editor" id="registration_html_switch">
+        <label class="form-check-label ms-1" for="registration_html_switch">Tryb HTML</label>
       </div>
     </div>
     <div class="mb-3">
@@ -57,7 +58,8 @@
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
         <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="cancellation" data-editor="cancellation_editor">Podgląd</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 html-toggle" data-editor="cancellation_editor">Edit HTML</button>
+        <input type="checkbox" class="form-check-input html-toggle-switch" data-editor="cancellation_editor" id="cancellation_html_switch">
+        <label class="form-check-label ms-1" for="cancellation_html_switch">Tryb HTML</label>
       </div>
     </div>
   {{ form.submit(class="btn btn-primary") }}
