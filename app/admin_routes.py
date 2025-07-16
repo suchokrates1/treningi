@@ -430,6 +430,27 @@ def settings():
     return render_template("admin/settings.html", form=form)
 
 
+@admin_bp.route("/settings/test-email", methods=["POST"])
+@login_required
+def test_email():
+    """Send a test email using current settings."""
+    form = SettingsForm()
+    if form.validate_on_submit():
+        recipient = form.test_recipient.data.strip()
+        try:
+            send_email(
+                "Test konfiguracji",
+                "To jest testowa wiadomość.",
+                [recipient],
+            )
+            flash("Wysłano wiadomość testową.", "success")
+        except Exception:  # pragma: no cover - safety net
+            flash("Nie udało się wysłać wiadomości testowej.", "danger")
+    else:
+        flash("Nie udało się wysłać wiadomości testowej.", "danger")
+    return redirect(url_for("admin.settings"))
+
+
 @admin_bp.route("/settings/preview/<template>", methods=["GET", "POST"])
 @login_required
 @csrf.exempt

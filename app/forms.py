@@ -7,7 +7,7 @@ from wtforms import (
 )
 from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
-from wtforms.validators import DataRequired, Length, Email
+from wtforms.validators import DataRequired, Length, Email, Optional
 from wtforms.fields import HiddenField, TelField
 from wtforms import IntegerField, TextAreaField
 
@@ -94,4 +94,8 @@ class SettingsForm(FlaskForm):
     )
     registration_template = HiddenField('Szablon maila zapisu')
     cancellation_template = HiddenField('Szablon maila odwołania')
+    test_recipient = StringField(
+        'Adres testowy', validators=[Optional(), Email(), Length(max=128)]
+    )
     submit = SubmitField('Zapisz')
+    send_test = SubmitField('Wyślij test')
