@@ -31,6 +31,8 @@ Create a `.env` file and define at least:
   - `SMTP_USERNAME` and `SMTP_PASSWORD` – credentials for the server.
   - `SMTP_SENDER` – address used in the `From` header.
 Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.
+`LOG_LEVEL` controls the verbosity of both the Flask logger and the
+root Python logger.
 
 ## Local setup
 
