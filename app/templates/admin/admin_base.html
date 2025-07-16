@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='vendor/quill/quill.snow.css') }}" rel="stylesheet">
 
 {% block content %}
 {% if session.get('admin_logged_in') %}
@@ -24,6 +24,6 @@
 </nav>
 {% endif %}
 {% block admin_content %}{% endblock %}
-<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/quill/quill.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/email_editor.js') }}"></script>
 {% endblock %}
