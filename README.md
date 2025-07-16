@@ -32,7 +32,9 @@ Create a `.env` file and define at least:
   - `SMTP_SENDER` – address used in the `From` header.
 Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.
 `LOG_LEVEL` controls the verbosity of both the Flask logger and the
-root Python logger.
+root Python logger. If `LOG_LEVEL` is not set and the environment is
+development (`FLASK_ENV=development` or debug mode), the Flask logger
+defaults to the `INFO` level.
 
 ## Local setup
 
