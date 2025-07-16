@@ -14,6 +14,7 @@ from datetime import datetime
 
 from . import db
 from .email_utils import send_email
+from .template_utils import render_template_string
 from .forms import (
     CoachForm,
     TrainingForm,
@@ -221,20 +222,25 @@ def cancel_training(training_id):
     db.session.commit()
 
     subject = "Trening odwołany"
-    default_body = (
-        f"Trening {training.date.strftime('%Y-%m-%d %H:%M')} "
-        f"w {training.location.name} został odwołany."
-    )
     settings = EmailSettings.query.get(1)
-    body = default_body
-    if settings and settings.cancellation_template:
-        body = settings.cancellation_template.format(
-            date=training.date.strftime('%Y-%m-%d %H:%M'),
-            location=training.location.name,
+    body_template = (
+        settings.cancellation_template
+        if settings and settings.cancellation_template
+        else None
+    )
+    data = {
+        "date": training.date.strftime("%Y-%m-%d %H:%M"),
+        "location": training.location.name,
+    }
+    if body_template:
+        html_body = render_template_string(body_template, data)
+    else:
+        html_body = (
+            f"Trening {data['date']} w {data['location']} został odwołany."
         )
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
-        send_email(subject, body, recipients)
+        send_email(subject, None, recipients, html_body=html_body)
 
     flash("Trening został oznaczony jako odwołany.", "warning")
     return redirect(url_for("admin.manage_trainings"))
@@ -422,3 +428,29 @@ def settings():
         return redirect(url_for("admin.settings"))
 
     return render_template("admin/settings.html", form=form)
+
+
+@admin_bp.route("/settings/preview/<template>")
+@login_required
+def preview_template(template):
+    settings = EmailSettings.query.get(1)
+    if not settings:
+        abort(404)
+
+    if template == "registration":
+        tpl = settings.registration_template or ""
+    elif template == "cancellation":
+        tpl = settings.cancellation_template or ""
+    else:
+        abort(404)
+
+    data = {
+        "first_name": "Jan",
+        "last_name": "Kowalski",
+        "training": "2024-01-01 10:00 w Warszawie",
+        "cancel_link": "https://example.com/cancel",
+        "date": "2024-01-01 10:00",
+        "location": "Warszawa",
+    }
+    html = render_template_string(tpl, data)
+    return render_template("admin/preview_email.html", html=html)
