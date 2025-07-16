@@ -42,6 +42,7 @@ def create_app():
         level_value = getattr(logging, log_level.upper(), None)
         if isinstance(level_value, int):
             app.logger.setLevel(level_value)
+            logging.getLogger().setLevel(level_value)
         else:
             app.logger.warning("Invalid LOG_LEVEL: %s", log_level)
 
