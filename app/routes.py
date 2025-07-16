@@ -3,6 +3,7 @@ from .models import Training, Booking, Volunteer, EmailSettings
 from .forms import VolunteerForm, CancelForm
 from . import db
 from .email_utils import send_email
+from .template_utils import render_template_string
 
 bp = Blueprint('routes', __name__)
 
@@ -67,17 +68,22 @@ def index():
                 f"{training.date.strftime('%Y-%m-%d %H:%M')} "
                 f"w {training.location.name}"
             )
-            body = (
-                settings.registration_template
-                .replace("[imie]", existing_volunteer.first_name)
-                .replace("[nazwisko]", existing_volunteer.last_name)
-                .replace("[trening]", training_info)
-                .replace("[link_do_odwolania]", cancel_link)
+            data = {
+                "first_name": existing_volunteer.first_name,
+                "last_name": existing_volunteer.last_name,
+                "training": training_info,
+                "cancel_link": cancel_link,
+                "date": training.date.strftime("%Y-%m-%d %H:%M"),
+                "location": training.location.name,
+            }
+            html_body = render_template_string(
+                settings.registration_template, data
             )
             send_email(
                 "Potwierdzenie zgłoszenia",
-                body,
+                None,
                 [existing_volunteer.email],
+                html_body=html_body,
             )
         flash("Zapisano na trening!", "success")
         return redirect(url_for('routes.index'))
