@@ -1,5 +1,6 @@
 from flask import current_app
 from .models import EmailSettings
+from . import db
 import smtplib
 from email.message import EmailMessage
 import re
@@ -13,7 +14,7 @@ def send_email(
     html_body: str | None = None,
 ) -> None:
     """Send an email using stored SMTP settings."""
-    settings = EmailSettings.query.get(1)
+    settings = db.session.get(EmailSettings, 1)
     host = (
         settings.server
         if settings and settings.server

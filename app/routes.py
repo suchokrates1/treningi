@@ -57,7 +57,7 @@ def index():
         db.session.add(booking)
         db.session.commit()
 
-        settings = EmailSettings.query.get(1)
+        settings = db.session.get(EmailSettings, 1)
         if settings and settings.registration_template:
             cancel_link = url_for(
                 "routes.cancel_booking",
