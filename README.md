@@ -57,7 +57,7 @@ Optional variables include `FLASK_ENV` and `FLASK_APP`.
 
    The SQLite database resides in `app/instance/db.sqlite3`.
 
-   Quill editor assets are bundled in `static/vendor/quill` so they are served locally.
+  Quill editor assets (version 2.0.3) are bundled in `static/vendor/quill` so they are served locally.
 
 ### Database migrations
 
