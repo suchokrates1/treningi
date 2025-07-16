@@ -36,7 +36,7 @@
         {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}'] %}
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
-        <a href="{{ url_for('admin.preview_template', template='registration') }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">Podgląd</a>
+        <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="registration" data-editor="registration_editor">Podgląd</button>
       </div>
     </div>
     <div class="mb-3">
@@ -47,7 +47,7 @@
         {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}'] %}
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
-        <a href="{{ url_for('admin.preview_template', template='cancellation') }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">Podgląd</a>
+        <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="cancellation" data-editor="cancellation_editor">Podgląd</button>
       </div>
     </div>
     <button class="btn btn-primary">Zapisz</button>
