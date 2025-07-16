@@ -30,7 +30,7 @@ Create a `.env` file and define at least:
   - `SMTP_HOST` – outgoing mail server.
   - `SMTP_USERNAME` and `SMTP_PASSWORD` – credentials for the server.
   - `SMTP_SENDER` – address used in the `From` header.
-Optional variables include `FLASK_ENV` and `FLASK_APP`.
+Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.
 
 ## Local setup
 
