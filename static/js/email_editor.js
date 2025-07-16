@@ -35,4 +35,25 @@ window.addEventListener('DOMContentLoaded', () => {
       editor.setSelection(index + val.length);
     });
   });
+
+  document.querySelectorAll('.preview-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const editor = editors[btn.dataset.editor];
+      if (!editor) return;
+      const content = editor.root.innerHTML;
+      fetch(`/admin/settings/preview/${btn.dataset.template}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ content })
+      })
+        .then(resp => resp.text())
+        .then(html => {
+          const w = window.open('', '_blank');
+          if (w) {
+            w.document.write(html);
+            w.document.close();
+          }
+        });
+    });
+  });
 });
