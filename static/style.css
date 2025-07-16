@@ -29,7 +29,8 @@ body.dark-mode a {
 body.dark-mode .table,
 body.dark-mode .form-control,
 body.dark-mode .form-select,
-body.dark-mode .btn {
+body.dark-mode .btn,
+body.dark-mode .quill-wrapper {
   background-color: #2a2a40;
   color: var(--text-color-dark);
 }
@@ -75,6 +76,11 @@ table a {
 
 input, select, textarea {
   border-radius: 4px;
+}
+
+.quill-wrapper {
+  border: 1px solid #ced4da;
+  border-radius: .25rem;
 }
 
 @media (max-width: 575.98px) {
