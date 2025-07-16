@@ -87,10 +87,10 @@ window.addEventListener('DOMContentLoaded', () => {
         body: new URLSearchParams({ content })
       })
         .then(resp => resp.text())
-        .then(html => {
+        .then(snippet => {
           const modal = document.getElementById('previewModal');
           if (!modal) return;
-          modal.querySelector('.modal-body').innerHTML = html;
+          modal.querySelector('.modal-body').innerHTML = snippet;
           new bootstrap.Modal(modal).show();
         });
     });
