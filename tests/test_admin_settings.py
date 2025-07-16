@@ -18,7 +18,7 @@ def test_admin_settings_update(client, app_instance):
     }
 
     resp = client.post('/admin/settings', data=form_data, follow_redirects=True)
-    assert b'Zapisano ustawienia' in resp.data
+    assert b'Zapisano ustawienia.' in resp.data
 
     with app_instance.app_context():
         settings = EmailSettings.query.get(1)
@@ -59,3 +59,4 @@ def test_admin_send_test_email(client, app_instance, monkeypatch):
     resp = client.post('/admin/settings/test-email', data=form_data, follow_redirects=True)
     assert resp.status_code == 200
     assert captured['args'][2] == ['dest@example.com']
+    assert b'Wys\xc5\x82ano wiadomo\xc5\x9b\xc4\x87 testow\xc4\x85.' in resp.data
