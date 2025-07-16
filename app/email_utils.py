@@ -2,10 +2,17 @@ from flask import current_app
 from .models import EmailSettings
 import smtplib
 from email.message import EmailMessage
+import re
 
 
-def send_email(subject: str, body: str, recipients: list[str]) -> None:
-    """Send a plain text email using stored SMTP settings."""
+def send_email(
+    subject: str,
+    body: str | None,
+    recipients: list[str],
+    *,
+    html_body: str | None = None,
+) -> None:
+    """Send an email using stored SMTP settings."""
     settings = EmailSettings.query.get(1)
     host = (
         settings.server
@@ -42,7 +49,14 @@ def send_email(subject: str, body: str, recipients: list[str]) -> None:
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
-    msg.set_content(body)
+
+    if not body and html_body:
+        body = re.sub(r"<[^>]+>", "", html_body)
+
+    msg.set_content(body or "")
+
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
 
     with smtplib.SMTP(host, port) as smtp:
         if use_tls:
