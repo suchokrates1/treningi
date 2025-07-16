@@ -88,11 +88,10 @@ window.addEventListener('DOMContentLoaded', () => {
       })
         .then(resp => resp.text())
         .then(html => {
-          const w = window.open('', '_blank');
-          if (w) {
-            w.document.write(html);
-            w.document.close();
-          }
+          const modal = document.getElementById('previewModal');
+          if (!modal) return;
+          modal.querySelector('.modal-body').innerHTML = html;
+          new bootstrap.Modal(modal).show();
         });
     });
   });
