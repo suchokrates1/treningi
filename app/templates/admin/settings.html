@@ -3,7 +3,7 @@
 <div class="container mt-4">
   <h2>Ustawienia e-mail</h2>
   <form method="POST">
-    {{ form.hidden_tag() }}
+    {{ form.csrf_token }}
     <div class="row g-2">
       <div class="col-md-4">
         {{ form.server.label(class="form-label") }}
