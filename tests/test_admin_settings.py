@@ -1,4 +1,5 @@
 import pytest
+from app import db
 from app.models import EmailSettings
 
 
@@ -21,7 +22,7 @@ def test_admin_settings_update(client, app_instance):
     assert b'Zapisano ustawienia.' in resp.data
 
     with app_instance.app_context():
-        settings = EmailSettings.query.get(1)
+        settings = db.session.get(EmailSettings, 1)
         assert settings.server == 'smtp.test.com'
         assert settings.port == 2525
         assert settings.login == 'user'
