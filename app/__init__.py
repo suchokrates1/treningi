@@ -45,6 +45,8 @@ def create_app():
             logging.getLogger().setLevel(level_value)
         else:
             app.logger.warning("Invalid LOG_LEVEL: %s", log_level)
+    elif os.environ.get("FLASK_ENV") == "development" or app.debug:
+        app.logger.setLevel(logging.INFO)
 
     db.init_app(app)
     migrate_dir = os.path.join(
