@@ -13,6 +13,21 @@ migrate = Migrate()
 csrf = CSRFProtect()
 
 
+def _resolve_log_level(value):
+    """Return an integer log level or ``None`` if invalid."""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    str_val = str(value)
+    if str_val.isdigit():
+        return int(str_val)
+    resolved = logging.getLevelName(str_val.upper())
+    if isinstance(resolved, int):
+        return resolved
+    return None
+
+
 def create_app():
     # Serve static files from the project-level "static" directory so that
     # resources are available when running via ``python run.py`` as well as
@@ -39,14 +54,14 @@ def create_app():
 
     log_level = os.environ.get("LOG_LEVEL")
     if log_level:
-        level_value = getattr(logging, log_level.upper(), None)
+        level_value = _resolve_log_level(log_level)
         if isinstance(level_value, int):
             app.logger.setLevel(level_value)
             app.logger.info("Logging level set to %s", log_level.upper())
             # Ensure the root logger matches the application log level
             logging.getLogger().setLevel(level_value)
         else:
-            app.logger.warning("Invalid LOG_LEVEL: %s", log_level)
+            app.logger.warning("Invalid LOG_LEVEL value: %s", log_level)
     elif os.environ.get("FLASK_ENV") == "development" or app.debug:
         app.logger.setLevel(logging.INFO)
 
