@@ -1,6 +1,7 @@
 import pytest
 from app import db
 from app.models import EmailSettings
+import app
 
 
 def test_admin_settings_update(client, app_instance):
@@ -91,3 +92,40 @@ def test_test_email_preserves_form_data(client, monkeypatch):
     resp = client.post("/admin/settings/test-email", data=form_data)
     assert resp.status_code == 200
     assert b"smtp.example.com" in resp.data
+
+
+def test_settings_validation_passes(client, app_instance, monkeypatch):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    form_data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "sender": "admin@example.com",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    captured = {}
+    orig_validate = app.admin_routes.SettingsForm.validate_on_submit
+
+    def capture(self, *a, **kw):
+        result = orig_validate(self, *a, **kw)
+        if "result" not in captured:
+            captured["result"] = result
+        return result
+
+    monkeypatch.setattr(app.admin_routes.SettingsForm, "validate_on_submit", capture)
+
+    resp = client.post("/admin/settings", data=form_data, follow_redirects=True)
+    assert resp.status_code == 200
+    assert captured.get("result") is True
+    assert b"Zapisano ustawienia." in resp.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings.sender == "admin@example.com"
