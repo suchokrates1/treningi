@@ -42,7 +42,11 @@ def create_app():
         level_value = getattr(logging, log_level.upper(), None)
         if isinstance(level_value, int):
             app.logger.setLevel(level_value)
+            # Ensure the root logger matches the application log level
             logging.getLogger().setLevel(level_value)
+            app.logger.info(
+                "Logging level set to %s", logging.getLevelName(level_value)
+            )
         else:
             app.logger.warning("Invalid LOG_LEVEL: %s", log_level)
     elif os.environ.get("FLASK_ENV") == "development" or app.debug:
