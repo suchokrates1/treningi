@@ -32,13 +32,16 @@ Create a `.env` file and define at least:
   - `SMTP_SENDER` – address used in the `From` header.
 Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.
 `LOG_LEVEL` controls the verbosity of both the Flask logger and the
-root Python logger. When not set Flask uses the `WARNING` level, which
-suppresses informational messages. In a development environment
+root Python logger. Valid values follow the standard Python logging
+levels: `DEBUG`, `INFO`, `WARNING`, `ERROR` and `CRITICAL`. When this
+variable is not defined Flask defaults to `WARNING`, which suppresses
+informational messages. In a development environment
 (`FLASK_ENV=development` or debug mode) Flask automatically switches to
 `INFO`.
 
 To see messages about sending emails and SMTP login, explicitly set
-`LOG_LEVEL=INFO` (or `DEBUG`).
+`LOG_LEVEL=INFO`. This enables the informational log lines describing
+email delivery.
 
 ## Local setup
 
