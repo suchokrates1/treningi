@@ -90,7 +90,9 @@ class SettingsForm(FlaskForm):
     login = StringField('Login', validators=[Length(max=128)])
     password = StringField('Hasło', validators=[Length(max=128)])
     sender = StringField(
-        'Nadawca', validators=[DataRequired(), Email(), Length(max=128)]
+        'Nazwa nadawcy',
+        validators=[DataRequired(), Length(max=128)],
+        description='Tekst pokazywany w polu From; adres jest pobierany z SMTP_SENDER.',
     )
     registration_template = HiddenField('Szablon maila zapisu')
     cancellation_template = HiddenField('Szablon maila odwołania')
