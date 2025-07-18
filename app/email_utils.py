@@ -36,11 +36,8 @@ def send_email(
         if settings and settings.password
         else current_app.config.get("SMTP_PASSWORD")
     )
-    sender = sender or (
-        settings.sender
-        if settings and settings.sender
-        else current_app.config.get("SMTP_SENDER")
-    )
+    display_name = sender or (settings.sender if settings and settings.sender else None)
+    address = current_app.config.get("SMTP_SENDER")
     port = port or (
         settings.port
         if settings and settings.port
@@ -54,11 +51,18 @@ def send_email(
         current_app.logger.warning("SMTP_HOST not configured; skipping email")
         return
 
+    if display_name and ("@" in display_name or "<" in display_name):
+        sender_header = display_name
+    elif address:
+        sender_header = f"{display_name} <{address}>" if display_name else address
+    else:
+        sender_header = display_name or ""
+
     current_app.logger.info(
         "Sending email via %s:%s from %s to %s",
         host,
         port,
-        sender,
+        sender_header,
         ", ".join(recipients),
     )
     if username:
@@ -66,7 +70,7 @@ def send_email(
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = sender
+    msg["From"] = sender_header
     msg["To"] = ", ".join(recipients)
 
     if not body and html_body:
