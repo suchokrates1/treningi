@@ -69,6 +69,40 @@ def test_admin_send_test_email(client, app_instance, monkeypatch):
     assert b"Wys\xc5\x82ano wiadomo\xc5\x9b\xc4\x87 testow\xc4\x85." in resp.data
 
 
+def test_admin_send_test_email_error(client, monkeypatch):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    form_data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "sender": "admin@example.com",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    from app.admin_routes import EmailSendError
+
+    def fail_send(*args, **kwargs):
+        raise EmailSendError("smtp fail")
+
+    monkeypatch.setattr("app.admin_routes.send_email", fail_send)
+
+    form_data["test_recipient"] = "dest@example.com"
+
+    resp = client.post(
+        "/admin/settings/test-email", data=form_data, follow_redirects=True
+    )
+
+    assert resp.status_code == 200
+    assert b"smtp fail" in resp.data
+    assert b"Nie uda\xc5\x82o" in resp.data
+
+
 def test_test_email_preserves_form_data(client, monkeypatch):
     login = client.post(
         "/admin/login", data={"password": "secret"}, follow_redirects=True
