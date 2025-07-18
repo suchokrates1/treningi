@@ -105,7 +105,7 @@ def test_test_email_preserves_form_data(client, monkeypatch):
         "test_recipient": "dest@example.com",
     }
 
-    monkeypatch.setattr("app.admin_routes.send_email", lambda *a, **k: None)
+    monkeypatch.setattr("app.admin_routes.send_email", lambda *a, **k: True)
 
     resp = client.post("/admin/settings/test-email", data=form_data)
     assert resp.status_code == 200
