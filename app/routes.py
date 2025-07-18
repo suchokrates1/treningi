@@ -79,12 +79,14 @@ def index():
             html_body = render_template_string(
                 settings.registration_template, data
             )
-            send_email(
+            success = send_email(
                 "Potwierdzenie zgłoszenia",
                 None,
                 [existing_volunteer.email],
                 html_body=html_body,
             )
+            if not success:
+                flash("Nie udało się wysłać potwierdzenia", "danger")
         flash("Zapisano na trening!", "success")
         return redirect(url_for('routes.index'))
 
