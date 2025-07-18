@@ -18,25 +18,27 @@ window.addEventListener('DOMContentLoaded', () => {
     editors[editorId] = quill;
 
     const textarea = document.getElementById(editorId + '_textarea');
-    const toggleBtn = document.querySelector(
+    const toggleSwitch = document.querySelector(
       '.html-toggle[data-editor="' + editorId + '"]'
     );
     const container = document.getElementById(editorId);
 
-    if (toggleBtn && textarea) {
-      toggleBtn.addEventListener('click', () => {
-        if (textarea.classList.contains('d-none')) {
+    if (toggleSwitch && textarea) {
+      const update = () => {
+        if (toggleSwitch.checked) {
           textarea.value = quill.root.innerHTML;
           textarea.classList.remove('d-none');
           container.classList.add('d-none');
-          toggleBtn.textContent = 'Visual Editor';
         } else {
           quill.clipboard.dangerouslyPasteHTML(textarea.value);
           textarea.classList.add('d-none');
           container.classList.remove('d-none');
-          toggleBtn.textContent = 'Edit HTML';
         }
-      });
+      };
+      toggleSwitch.addEventListener('change', update);
+      if (toggleSwitch.checked) {
+        update();
+      }
     }
 
     field.closest('form').addEventListener('submit', () => {
