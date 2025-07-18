@@ -42,7 +42,12 @@ informational messages. In a development environment
 
 To see messages about sending emails and SMTP login, explicitly set
 `LOG_LEVEL=INFO`. This enables the informational log lines describing
-email delivery.
+email delivery. When an email is sent you should see log entries like:
+
+```text
+INFO:app:Sending email via smtp.example.com:25 from Admin <noreply@example.com> to user@example.com
+INFO:app:Email sent successfully
+```
 
 ## Local setup
 

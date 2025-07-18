@@ -3,10 +3,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from dotenv import load_dotenv
+from pathlib import Path
 import logging
 import os
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -57,9 +58,8 @@ def create_app():
         level_value = _resolve_log_level(log_level)
         if isinstance(level_value, int):
             app.logger.setLevel(level_value)
+            logging.basicConfig(level=level_value)
             app.logger.info("Logging level set to %s", log_level.upper())
-            # Ensure the root logger matches the application log level
-            logging.getLogger().setLevel(level_value)
         else:
             app.logger.warning("Invalid LOG_LEVEL value: %s", log_level)
     elif os.environ.get("FLASK_ENV") == "development" or app.debug:
