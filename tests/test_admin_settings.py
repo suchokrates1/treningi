@@ -3,6 +3,11 @@ from app import db
 from app.models import EmailSettings
 import app
 
+# allow send_email to run in this module
+@pytest.fixture(autouse=True)
+def no_email():
+    yield
+
 
 def test_admin_settings_update(client, app_instance):
     # log in as admin
@@ -16,7 +21,7 @@ def test_admin_settings_update(client, app_instance):
         "port": "2525",
         "login": "user",
         "password": "pass",
-        "sender": "admin@example.com",
+        "sender": "Admin",
         "registration_template": "Hello {first_name}",
         "cancellation_template": "Bye {first_name}",
     }
@@ -30,7 +35,7 @@ def test_admin_settings_update(client, app_instance):
         assert settings.port == 2525
         assert settings.login == "user"
         assert settings.password == "pass"
-        assert settings.sender == "admin@example.com"
+        assert settings.sender == "Admin"
         assert settings.registration_template == "Hello {first_name}"
         assert settings.cancellation_template == "Bye {first_name}"
 
@@ -46,7 +51,7 @@ def test_admin_send_test_email(client, app_instance, monkeypatch):
         "port": "2525",
         "login": "user",
         "password": "pass",
-        "sender": "admin@example.com",
+        "sender": "Admin",
         "registration_template": "Hello",
         "cancellation_template": "Bye",
     }
@@ -55,10 +60,22 @@ def test_admin_send_test_email(client, app_instance, monkeypatch):
 
     captured = {}
 
-    def fake_send(subject, body, recipients, **kwargs):
-        captured["args"] = (subject, body, recipients)
+    class DummySMTP:
+        def __init__(self, host, port):
+            captured['host'] = host
+            captured['port'] = port
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc, tb):
+            pass
+        def starttls(self):
+            captured['tls'] = True
+        def login(self, username, password):
+            captured['login'] = (username, password)
+        def send_message(self, msg):
+            captured['message'] = msg
 
-    monkeypatch.setattr("app.admin_routes.send_email", fake_send)
+    monkeypatch.setattr(app.email_utils.smtplib, "SMTP", DummySMTP)
 
     form_data["test_recipient"] = "dest@example.com"
 
@@ -66,7 +83,8 @@ def test_admin_send_test_email(client, app_instance, monkeypatch):
         "/admin/settings/test-email", data=form_data, follow_redirects=True
     )
     assert resp.status_code == 200
-    assert captured["args"][2] == ["dest@example.com"]
+    assert captured["message"]["From"] == "Admin <noreply@example.com>"
+    assert captured["message"]["To"] == "dest@example.com"
     assert b"Wys\xc5\x82ano wiadomo\xc5\x9b\xc4\x87 testow\xc4\x85." in resp.data
 
 
@@ -81,7 +99,7 @@ def test_test_email_preserves_form_data(client, monkeypatch):
         "port": "2500",
         "login": "foo",
         "password": "bar",
-        "sender": "sender@example.com",
+        "sender": "Sender Name",
         "registration_template": "Hi",
         "cancellation_template": "Bye",
         "test_recipient": "dest@example.com",
@@ -105,7 +123,7 @@ def test_settings_validation_passes(client, app_instance, monkeypatch):
         "port": "2525",
         "login": "user",
         "password": "pass",
-        "sender": "admin@example.com",
+        "sender": "Admin",
         "registration_template": "Hello",
         "cancellation_template": "Bye",
     }
@@ -128,4 +146,4 @@ def test_settings_validation_passes(client, app_instance, monkeypatch):
 
     with app_instance.app_context():
         settings = db.session.get(EmailSettings, 1)
-        assert settings.sender == "admin@example.com"
+        assert settings.sender == "Admin"
