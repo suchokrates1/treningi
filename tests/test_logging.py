@@ -1,5 +1,14 @@
 import logging
+import smtplib
+import pytest
+
 from app import create_app
+from app.email_utils import send_email
+
+
+@pytest.fixture(autouse=True)
+def no_email():
+    yield
 
 
 def test_default_log_level(monkeypatch):
@@ -32,3 +41,46 @@ def test_invalid_log_level(monkeypatch, caplog):
         app = create_app()
     assert any("Invalid LOG_LEVEL" in r.getMessage() for r in caplog.records)
     assert app.logger.level == logging.NOTSET
+
+
+def test_send_email_emits_info(monkeypatch, caplog):
+    logging.getLogger("app").setLevel(logging.NOTSET)
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret")
+    app = create_app()
+
+    class DummySMTP:
+        def __init__(self, host, port):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            pass
+
+        def starttls(self):
+            pass
+
+        def login(self, username, password):
+            pass
+
+        def send_message(self, msg):
+            pass
+
+    monkeypatch.setattr(smtplib, "SMTP", DummySMTP)
+
+    with app.app_context(), caplog.at_level(logging.INFO):
+        from app import db
+        db.create_all()
+        send_email(
+            "Subject",
+            "Body",
+            ["to@example.com"],
+            host="smtp.example.com",
+            port=25,
+            sender="Admin",
+        )
+
+    assert any("Email sent successfully" in r.getMessage() for r in caplog.records)
