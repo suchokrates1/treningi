@@ -18,7 +18,7 @@ def send_email(
     password: str | None = None,
     sender: str | None = None,
     use_tls: bool | None = None,
-) -> None:
+) -> bool:
     """Send an email using stored SMTP settings."""
     settings = db.session.get(EmailSettings, 1)
     host = host or (
@@ -49,7 +49,7 @@ def send_email(
 
     if not host:
         current_app.logger.warning("SMTP_HOST not configured; skipping email")
-        return
+        return True
 
     if display_name and ("@" in display_name or "<" in display_name):
         sender_header = display_name
@@ -89,6 +89,7 @@ def send_email(
                 smtp.login(username, password)
             smtp.send_message(msg)
         current_app.logger.info("Email sent successfully")
-    except Exception:
+        return True
+    except (smtplib.SMTPException, OSError):
         current_app.logger.exception("Email sending failed")
-        raise
+        return False

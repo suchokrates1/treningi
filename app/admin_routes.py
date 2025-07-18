@@ -237,7 +237,9 @@ def cancel_training(training_id):
         html_body = f"Trening {data['date']} w {data['location']} został odwołany."
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
-        send_email(subject, None, recipients, html_body=html_body)
+        success = send_email(subject, None, recipients, html_body=html_body)
+        if not success:
+            flash("Nie udało się wysłać e-maila", "danger")
 
     flash("Trening został oznaczony jako odwołany.", "warning")
     return redirect(url_for("admin.manage_trainings"))
@@ -429,7 +431,7 @@ def test_email():
     if form.validate_on_submit():
         recipient = form.test_recipient.data.strip()
         try:
-            send_email(
+            success = send_email(
                 "Test konfiguracji",
                 "To jest testowa wiadomość.",
                 [recipient],
@@ -439,7 +441,10 @@ def test_email():
                 password=form.password.data or None,
                 sender=form.sender.data or None,
             )
-            flash("Wysłano wiadomość testową.", "success")
+            if success:
+                flash("Wysłano wiadomość testową.", "success")
+            else:
+                flash("Nie udało się wysłać wiadomości testowej.", "danger")
         except Exception:  # pragma: no cover - safety net
             current_app.logger.exception("Failed to send test email")
             flash("Nie udało się wysłać wiadomości testowej.", "danger")
