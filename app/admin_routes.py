@@ -13,7 +13,7 @@ from functools import wraps
 from datetime import datetime
 
 from . import db, csrf
-from .email_utils import send_email
+from .email_utils import send_email, EmailSendError
 from .template_utils import render_template_string
 from .forms import (
     CoachForm,
@@ -237,7 +237,11 @@ def cancel_training(training_id):
         html_body = f"Trening {data['date']} w {data['location']} został odwołany."
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
-        send_email(subject, None, recipients, html_body=html_body)
+        try:
+            send_email(subject, None, recipients, html_body=html_body)
+        except EmailSendError as exc:
+            current_app.logger.error("Failed to send cancellation email: %s", exc)
+            flash(f"Błąd wysyłki e-mail: {exc}", "danger")
 
     flash("Trening został oznaczony jako odwołany.", "warning")
     return redirect(url_for("admin.manage_trainings"))
@@ -440,6 +444,9 @@ def test_email():
                 sender=form.sender.data or None,
             )
             flash("Wysłano wiadomość testową.", "success")
+        except EmailSendError as exc:
+            current_app.logger.error("Failed to send test email: %s", exc)
+            flash(f"Nie udało się wysłać wiadomości testowej: {exc}", "danger")
         except Exception:  # pragma: no cover - safety net
             current_app.logger.exception("Failed to send test email")
             flash("Nie udało się wysłać wiadomości testowej.", "danger")

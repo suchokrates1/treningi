@@ -6,6 +6,11 @@ from email.message import EmailMessage
 import re
 
 
+class EmailSendError(Exception):
+    """Raised when sending an email fails."""
+
+
+
 def send_email(
     subject: str,
     body: str | None,
@@ -85,6 +90,6 @@ def send_email(
                 smtp.login(username, password)
             smtp.send_message(msg)
         current_app.logger.info("Email sent successfully")
-    except Exception:
+    except Exception as exc:
         current_app.logger.exception("Email sending failed")
-        raise
+        raise EmailSendError(str(exc)) from exc

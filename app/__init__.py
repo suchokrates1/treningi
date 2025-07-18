@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from dotenv import load_dotenv
+import logging
 import os
 
 load_dotenv()
@@ -35,6 +36,14 @@ def create_app():
         "noreply@example.com",
     )
     app.config['SMTP_USE_TLS'] = os.environ.get("SMTP_USE_TLS", "1") == "1"
+
+    log_level = os.environ.get("LOG_LEVEL")
+    if log_level:
+        level_value = getattr(logging, log_level.upper(), None)
+        if isinstance(level_value, int):
+            app.logger.setLevel(level_value)
+        else:
+            app.logger.warning("Invalid LOG_LEVEL: %s", log_level)
 
     db.init_app(app)
     migrate_dir = os.path.join(

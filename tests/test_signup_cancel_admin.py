@@ -59,3 +59,27 @@ def test_admin_create_training(client, app_instance, sample_data):
     assert b'Dodano nowy trening.' in response.data
     with app_instance.app_context():
         assert Training.query.count() == 2
+
+
+def test_cancel_training_email_error(client, app_instance, sample_data, monkeypatch):
+    training_id, volunteer_id, _, _ = sample_data
+
+    login = client.post('/admin/login', data={'password': 'secret'}, follow_redirects=True)
+    assert b'Zalogowano' in login.data
+
+    with app_instance.app_context():
+        db.session.add(Booking(training_id=training_id, volunteer_id=volunteer_id))
+        db.session.commit()
+
+    from app.admin_routes import EmailSendError
+
+    def fail_send(*args, **kwargs):
+        raise EmailSendError('smtp boom')
+
+    monkeypatch.setattr('app.admin_routes.send_email', fail_send)
+
+    resp = client.post(f'/admin/trainings/{training_id}/cancel', follow_redirects=True)
+
+    assert resp.status_code == 200
+    assert b'Trening zosta\xc5\x82 oznaczony jako odwo\xc5\x82any.' in resp.data
+    assert b'smtp boom' in resp.data
