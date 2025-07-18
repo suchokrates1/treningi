@@ -146,4 +146,8 @@ def test_settings_validation_passes(client, app_instance, monkeypatch):
 
     with app_instance.app_context():
         settings = db.session.get(EmailSettings, 1)
+        assert settings.server == "smtp.test.com"
+        assert settings.port == 2525
+        assert settings.login == "user"
+        assert settings.password == "pass"
         assert settings.sender == "Admin"
