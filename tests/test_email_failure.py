@@ -25,8 +25,9 @@ def test_send_email_failure_returns_false(app_instance, monkeypatch):
 
     monkeypatch.setattr(smtplib, "SMTP", FailingSMTP)
     with app_instance.app_context():
-        result = send_email("Sub", "Body", ["to@example.com"], host="h", port=25)
-        assert result is False
+        success, error = send_email("Sub", "Body", ["to@example.com"], host="h", port=25)
+        assert success is False
+        assert error == "boom"
 
 
 def test_admin_flash_on_email_failure(client, app_instance, monkeypatch):
@@ -66,5 +67,6 @@ def test_admin_flash_on_email_failure(client, app_instance, monkeypatch):
     resp = client.post(
         "/admin/settings/test-email", data=form_data, follow_redirects=True
     )
-    assert b"Nie uda\xc5\x82o si\xc4\x99 wys\xc5\x82a\xc4\x87 wiadomo\xc5\x9bci testowej." in resp.data
+    assert b"Nie uda\xc5\x82o si\xc4\x99 wys\xc5\x82a\xc4\x87 wiadomo\xc5\x9bci testowej" in resp.data
+    assert b"boom" in resp.data
 

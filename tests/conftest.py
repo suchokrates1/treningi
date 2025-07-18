@@ -27,7 +27,7 @@ def client(app_instance):
 
 @pytest.fixture(autouse=True)
 def no_email(monkeypatch):
-    monkeypatch.setattr("app.email_utils.send_email", lambda *a, **k: True)
+    monkeypatch.setattr("app.email_utils.send_email", lambda *a, **k: (True, None))
 
 
 @pytest.fixture
