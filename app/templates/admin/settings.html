@@ -45,7 +45,10 @@
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
         <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="registration" data-editor="registration_editor">Podgląd</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 html-toggle" data-editor="registration_editor">Edit HTML</button>
+        <div class="form-check form-switch d-inline-block ms-2">
+          <input class="form-check-input html-toggle" type="checkbox" role="switch" id="registration_html_toggle" data-editor="registration_editor">
+          <label class="form-check-label" for="registration_html_toggle">Edytuj HTML</label>
+        </div>
       </div>
     </div>
     <div class="mb-3">
@@ -58,7 +61,10 @@
         <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
         {% endfor %}
         <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="cancellation" data-editor="cancellation_editor">Podgląd</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary ms-2 html-toggle" data-editor="cancellation_editor">Edit HTML</button>
+        <div class="form-check form-switch d-inline-block ms-2">
+          <input class="form-check-input html-toggle" type="checkbox" role="switch" id="cancellation_html_toggle" data-editor="cancellation_editor">
+          <label class="form-check-label" for="cancellation_html_toggle">Edytuj HTML</label>
+        </div>
       </div>
     </div>
   {{ form.submit(class="btn btn-primary") }}
