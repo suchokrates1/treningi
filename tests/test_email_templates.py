@@ -106,3 +106,14 @@ def test_preview_endpoint_returns_modal_html(client, app_instance):
     assert b'<div class="border p-3">' in resp.data
     assert b'Modal Test' in resp.data
     assert b'<html' not in resp.data
+
+
+def test_preview_without_settings_record(client, app_instance):
+    """Preview should work when no EmailSettings exist."""
+    with client.session_transaction() as sess:
+        sess['admin_logged_in'] = True
+
+    html = '<p>No settings</p>'
+    resp = client.post('/admin/settings/preview/registration', data={'content': html})
+    assert resp.status_code == 200
+    assert b'No settings' in resp.data

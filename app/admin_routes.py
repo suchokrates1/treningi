@@ -453,18 +453,19 @@ def test_email():
 @csrf.exempt
 def preview_template(template):
     settings = db.session.get(EmailSettings, 1)
-    if not settings:
-        abort(404)
 
     if flask.request.method == "POST" and "content" in flask.request.form:
         tpl = flask.request.form.get("content", "")
     else:
-        if template == "registration":
-            tpl = settings.registration_template or ""
-        elif template == "cancellation":
-            tpl = settings.cancellation_template or ""
-        else:
+        if template not in ("registration", "cancellation"):
             abort(404)
+        if settings:
+            if template == "registration":
+                tpl = settings.registration_template or ""
+            else:  # template == "cancellation"
+                tpl = settings.cancellation_template or ""
+        else:
+            tpl = ""
 
     data = {
         "first_name": "Jan",
