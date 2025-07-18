@@ -18,8 +18,12 @@ def send_email(
     password: str | None = None,
     sender: str | None = None,
     use_tls: bool | None = None,
-) -> bool:
-    """Send an email using stored SMTP settings."""
+) -> tuple[bool, str | None]:
+    """Send an email using stored SMTP settings.
+
+    Returns a tuple ``(success, error)`` where ``success`` is ``True`` when the
+    message was sent and ``error`` contains the exception message on failure.
+    """
     settings = db.session.get(EmailSettings, 1)
     host = host or (
         settings.server
@@ -49,7 +53,7 @@ def send_email(
 
     if not host:
         current_app.logger.warning("SMTP_HOST not configured; skipping email")
-        return True
+        return True, None
 
     if display_name and ("@" in display_name or "<" in display_name):
         sender_header = display_name
@@ -89,7 +93,7 @@ def send_email(
                 smtp.login(username, password)
             smtp.send_message(msg)
         current_app.logger.info("Email sent successfully")
-        return True
-    except (smtplib.SMTPException, OSError):
+        return True, None
+    except (smtplib.SMTPException, OSError) as exc:
         current_app.logger.exception("Email sending failed")
-        return False
+        return False, str(exc)
