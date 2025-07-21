@@ -14,7 +14,12 @@ def index():
 
     if form.validate_on_submit():
         # Sprawdzenie, czy na dany trening jest już 2 wolontariuszy
-        training_id = int(form.training_id.data)
+        try:
+            training_id = int(form.training_id.data)
+        except (TypeError, ValueError):
+            flash("Niepoprawny ID treningu", "danger")
+            return redirect(url_for("routes.index"))
+
         training = Training.query.get_or_404(training_id)
         if training.is_canceled or training.is_deleted:
             flash("Ten trening został odwołany lub usunięty.", "danger")
@@ -119,7 +124,12 @@ def cancel_booking():
     if training_id:
         form.training_id.data = training_id
     if form.validate_on_submit():
-        training_id = int(form.training_id.data)
+        try:
+            training_id = int(form.training_id.data)
+        except (TypeError, ValueError):
+            flash("Niepoprawny ID treningu", "danger")
+            return redirect(url_for("routes.cancel_booking"))
+
         volunteer = Volunteer.query.filter_by(
             email=form.email.data.strip()
         ).first()
