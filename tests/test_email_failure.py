@@ -58,6 +58,7 @@ def test_admin_flash_on_email_failure(client, app_instance, monkeypatch):
         "port": "2525",
         "login": "user",
         "password": "pass",
+        "encryption": "tls",
         "sender": "Admin",
         "registration_template": "Hi",
         "cancellation_template": "Bye",

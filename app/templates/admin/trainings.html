@@ -64,18 +64,24 @@
           {% if b2 %}{{ b2.first_name }} {{ b2.last_name }} <small class="text-muted">({{ b2.email }})</small>{% endif %}
         </td>
         <td>
-          <a href="{{ url_for('admin.edit_training', training_id=t.id) }}" class="btn btn-sm btn-outline-primary me-1">Edytuj</a>
+          <a href="{{ url_for('admin.edit_training', training_id=t.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edytuj">
+            <i class="bi bi-pencil"></i>
+          </a>
           {% if t.is_canceled %}
             <span class="text-danger me-1">Odwołany</span>
           {% else %}
             <form method="post" action="{{ url_for('admin.cancel_training', training_id=t.id) }}" class="d-inline me-1">
               {{ csrf_token() }}
-              <button class="btn btn-sm btn-outline-danger">Odwołaj</button>
+              <button class="btn btn-sm btn-outline-danger" title="Odwołaj">
+                <i class="bi bi-calendar-x"></i>
+              </button>
             </form>
           {% endif %}
           <form method="post" action="{{ url_for('admin.delete_training', training_id=t.id) }}" class="d-inline">
             {{ csrf_token() }}
-            <button class="btn btn-sm btn-outline-secondary">Usuń</button>
+            <button class="btn btn-sm btn-outline-secondary" title="Usuń">
+              <i class="bi bi-trash"></i>
+            </button>
           </form>
         </td>
       </tr>
