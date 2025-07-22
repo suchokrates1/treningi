@@ -39,7 +39,7 @@ def test_send_email_includes_plain_and_html(app_instance, monkeypatch):
     monkeypatch.setattr(smtplib, "SMTP", DummySMTP)
 
     with app_instance.app_context():
-        settings = EmailSettings(id=1, server="smtp.example.com", port=25, sender="Admin")
+        settings = EmailSettings(id=1, server="smtp.example.com", port=25, sender="Admin", encryption="tls")
         db.session.add(settings)
         db.session.commit()
         send_email("Subject", None, ["to@example.com"], html_body="<p>Hello</p>")
@@ -55,7 +55,7 @@ def test_preview_endpoint_renders(client, app_instance):
     with client.session_transaction() as sess:
         sess['admin_logged_in'] = True
     with app_instance.app_context():
-        settings = EmailSettings(id=1, port=587, sender='Admin', registration_template='Hi {first_name}', cancellation_template='')
+        settings = EmailSettings(id=1, port=587, sender='Admin', encryption='tls', registration_template='Hi {first_name}', cancellation_template='')
         db.session.add(settings)
         db.session.commit()
     resp = client.get('/admin/settings/preview/registration')
@@ -68,7 +68,7 @@ def test_preview_endpoint_allows_posting_html(client, app_instance):
     with client.session_transaction() as sess:
         sess['admin_logged_in'] = True
     with app_instance.app_context():
-        settings = EmailSettings(id=1, port=587, sender='Admin')
+        settings = EmailSettings(id=1, port=587, sender='Admin', encryption='tls')
         db.session.add(settings)
         db.session.commit()
     html = '<p>Custom Preview</p>'
@@ -82,7 +82,7 @@ def test_preview_endpoint_allows_posting_specific_html(client, app_instance):
     with client.session_transaction() as sess:
         sess['admin_logged_in'] = True
     with app_instance.app_context():
-        settings = EmailSettings(id=1, port=587, sender='Admin')
+        settings = EmailSettings(id=1, port=587, sender='Admin', encryption='tls')
         db.session.add(settings)
         db.session.commit()
 

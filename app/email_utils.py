@@ -17,6 +17,7 @@ def send_email(
     username: str | None = None,
     password: str | None = None,
     sender: str | None = None,
+    encryption: str | None = None,
     use_tls: bool | None = None,
 ) -> tuple[bool, str | None]:
     """Send an email using stored SMTP settings.
@@ -47,9 +48,21 @@ def send_email(
         if settings and settings.port
         else current_app.config.get("SMTP_PORT", 587)
     )
-    use_tls = (
-        use_tls if use_tls is not None else current_app.config.get("SMTP_USE_TLS", True)
-    )
+    if encryption is None:
+        if use_tls is not None:
+            encryption = "tls" if use_tls else "none"
+        else:
+            encryption = (
+                settings.encryption
+                if settings and settings.encryption
+                else current_app.config.get("SMTP_ENCRYPTION")
+            )
+    if not encryption:
+        enc_env = current_app.config.get("SMTP_ENCRYPTION")
+        if enc_env:
+            encryption = enc_env
+        else:
+            encryption = "tls" if current_app.config.get("SMTP_USE_TLS", True) else "none"
 
     if not host:
         current_app.logger.warning("SMTP_HOST not configured; skipping email")
@@ -86,8 +99,9 @@ def send_email(
         msg.add_alternative(html_body, subtype="html")
 
     try:
-        with smtplib.SMTP(host, port) as smtp:
-            if use_tls:
+        smtp_cls = smtplib.SMTP_SSL if encryption == "ssl" else smtplib.SMTP
+        with smtp_cls(host, port) as smtp:
+            if encryption == "tls":
                 smtp.starttls()
             if username and password:
                 smtp.login(username, password)

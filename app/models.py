@@ -129,5 +129,6 @@ class EmailSettings(db.Model):
     login = db.Column(db.String(128), nullable=True)
     password = db.Column(db.String(128), nullable=True)
     sender = db.Column(db.String(128), nullable=True)
+    encryption = db.Column(db.String(10), nullable=True)
     registration_template = db.Column(db.Text, nullable=True)
     cancellation_template = db.Column(db.Text, nullable=True)

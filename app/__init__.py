@@ -51,7 +51,10 @@ def create_app():
         "SMTP_SENDER",
         "noreply@example.com",
     )
-    app.config['SMTP_USE_TLS'] = os.environ.get("SMTP_USE_TLS", "1") == "1"
+    app.config['SMTP_ENCRYPTION'] = (
+        os.environ.get('SMTP_ENCRYPTION')
+        or ("tls" if os.environ.get("SMTP_USE_TLS", "1") == "1" else "none")
+    )
 
     log_level = os.environ.get("LOG_LEVEL")
     if log_level:
