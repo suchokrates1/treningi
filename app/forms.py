@@ -87,6 +87,11 @@ class SettingsForm(FlaskForm):
 
     server = StringField('Serwer SMTP', validators=[Length(max=128)])
     port = IntegerField('Port', validators=[DataRequired()])
+    encryption = SelectField(
+        'Szyfrowanie',
+        choices=[('tls', 'STARTTLS'), ('ssl', 'SSL'), ('none', 'Brak')],
+        validators=[DataRequired()],
+    )
     login = StringField('Login', validators=[Length(max=128)])
     password = StringField('Hasło', validators=[Length(max=128)])
     sender = StringField(
