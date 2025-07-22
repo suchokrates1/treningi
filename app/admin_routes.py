@@ -405,7 +405,7 @@ def settings():
     """Edit email configuration."""
     settings = db.session.get(EmailSettings, 1)
     if not settings:
-        settings = EmailSettings(id=1, port=587)
+        settings = EmailSettings(id=1, port=587, encryption="tls")
         db.session.add(settings)
         db.session.commit()
 
@@ -414,6 +414,7 @@ def settings():
     if form.validate_on_submit():
         settings.server = form.server.data.strip() if form.server.data else None
         settings.port = form.port.data
+        settings.encryption = form.encryption.data
         settings.login = form.login.data.strip() if form.login.data else None
         settings.password = form.password.data if form.password.data else None
         settings.sender = form.sender.data.strip()
@@ -442,6 +443,7 @@ def test_email():
                 port=form.port.data,
                 username=form.login.data or None,
                 password=form.password.data or None,
+                encryption=form.encryption.data,
                 sender=form.sender.data or None,
             )
             if success:
