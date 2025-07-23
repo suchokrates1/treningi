@@ -33,15 +33,16 @@ def index():
             return redirect(url_for("routes.index"))
 
         # Sprawdzenie, czy podany adres e-mail jest już zarejestrowany
+        email = form.email.data.strip().lower()
         existing_volunteer = Volunteer.query.filter_by(
-            email=form.email.data.strip(),
+            email=email,
         ).first()
 
         if not existing_volunteer:
             existing_volunteer = Volunteer(
                 first_name=form.first_name.data.strip(),
                 last_name=form.last_name.data.strip(),
-                email=form.email.data.strip(),
+                email=email,
             )
             db.session.add(existing_volunteer)
             db.session.commit()
@@ -130,8 +131,9 @@ def cancel_booking():
             flash("Niepoprawny ID treningu", "danger")
             return redirect(url_for("routes.cancel_booking"))
 
+        email = form.email.data.strip().lower()
         volunteer = Volunteer.query.filter_by(
-            email=form.email.data.strip()
+            email=email
         ).first()
         if volunteer:
             booking = Booking.query.filter_by(
