@@ -17,9 +17,9 @@ depends_on = None
 def upgrade():
     op.add_column(
         'email_settings',
-        sa.Column('encryption', sa.String(length=10), nullable=True, server_default='tls'),
+        sa.Column('encryption', sa.String(length=10), nullable=True),
     )
-    op.alter_column('email_settings', 'encryption', server_default=None)
+    op.execute("UPDATE email_settings SET encryption='tls' WHERE encryption IS NULL")
 
 
 def downgrade():
