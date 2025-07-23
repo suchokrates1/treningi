@@ -26,7 +26,8 @@ This project provides a simple web application for organizing blind tennis train
 
 Create a `.env` file and define at least:
   - `SECRET_KEY` – Flask secret key.
-  - `ADMIN_PASSWORD` – password for the admin panel.
+  - `ADMIN_PASSWORD_HASH` – hashed password for the admin panel.
+    Generate a hash with `python generate_password_hash.py <password>`.
   - `SMTP_HOST` – outgoing mail server.
   - `SMTP_USERNAME` and `SMTP_PASSWORD` – credentials for the server.
   - `SMTP_SENDER` – email address used for outgoing mail.
@@ -118,7 +119,7 @@ After dropping the table re-run the upgrade or start the application again.
 
 ## Admin login
 
-The admin dashboard is accessible at `/admin/login`. Sign in using the password defined in the `ADMIN_PASSWORD` environment variable. Once logged in you can add or edit coaches, create trainings and export all data to Excel.
+The admin dashboard is accessible at `/admin/login`. Sign in using the password you hashed for the `ADMIN_PASSWORD_HASH` variable. Once logged in you can add or edit coaches, create trainings and export all data to Excel.
 
 ### Editing email templates
 
