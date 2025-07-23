@@ -82,6 +82,7 @@ def index():
                 "cancel_link": cancel_link,
                 "date": training.date.strftime("%Y-%m-%d %H:%M"),
                 "location": training.location.name,
+                "logo": url_for("static", filename="logo.png", _external=True),
             }
             html_body = render_template_string(
                 settings.registration_template, data

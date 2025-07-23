@@ -123,5 +123,5 @@ The admin dashboard is accessible at `/admin/login`. Sign in using the password 
 
 ### Editing email templates
 
-Visit `/admin/settings` to configure SMTP details, set the sender display name and edit the messages sent to volunteers. The WYSIWYG editor lets you insert variables such as `{first_name}`, `{last_name}`, `{training}`, `{cancel_link}`, `{date}` and `{location}`. Use the **Podgląd** button to preview a template with example data before saving. Clicking the button posts the current editor content to `/admin/settings/preview/<template>` so you can check the result without modifying the stored template.
+Visit `/admin/settings` to configure SMTP details, set the sender display name and edit the messages sent to volunteers. The WYSIWYG editor lets you insert variables such as `{first_name}`, `{last_name}`, `{training}`, `{cancel_link}`, `{date}`, `{location}` and `{logo}`. The `{logo}` placeholder expands to the absolute URL of `static/logo.png`. Use the **Podgląd** button to preview a template with example data before saving. Clicking the button posts the current editor content to `/admin/settings/preview/<template>` so you can check the result without modifying the stored template.
 

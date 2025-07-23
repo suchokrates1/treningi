@@ -55,12 +55,14 @@ def test_preview_endpoint_renders(client, app_instance):
     with client.session_transaction() as sess:
         sess['admin_logged_in'] = True
     with app_instance.app_context():
-        settings = EmailSettings(id=1, port=587, sender='Admin', encryption='tls', registration_template='Hi {first_name}', cancellation_template='')
+        settings = EmailSettings(id=1, port=587, sender='Admin', encryption='tls',
+                                 registration_template='Hi {first_name} {logo}', cancellation_template='')
         db.session.add(settings)
         db.session.commit()
     resp = client.get('/admin/settings/preview/registration')
     assert resp.status_code == 200
     assert b'Hi Jan' in resp.data
+    assert b'static/logo.png' in resp.data
 
 
 def test_preview_endpoint_allows_posting_html(client, app_instance):
