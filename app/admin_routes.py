@@ -11,6 +11,7 @@ from flask import (
 import flask
 from functools import wraps
 from datetime import datetime
+from werkzeug.security import check_password_hash
 
 from . import db, csrf
 from .email_utils import send_email
@@ -49,7 +50,8 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
-        if form.password.data == current_app.config["ADMIN_PASSWORD"]:
+        stored_hash = current_app.config.get("ADMIN_PASSWORD_HASH")
+        if stored_hash and check_password_hash(stored_hash, form.password.data):
             session["admin_logged_in"] = True
             flash("Zalogowano jako administrator.", "success")
             return redirect(url_for("admin.manage_trainings"))
