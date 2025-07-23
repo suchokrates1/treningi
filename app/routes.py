@@ -142,8 +142,41 @@ def cancel_booking():
                 volunteer_id=volunteer.id,
             ).first()
             if booking:
+                training = booking.training
                 db.session.delete(booking)
                 db.session.commit()
+
+                settings = db.session.get(EmailSettings, 1)
+                template = (
+                    settings.cancellation_template
+                    if settings and settings.cancellation_template
+                    else "Twoje zgłoszenie na trening {training} zostało anulowane."
+                )
+                training_info = (
+                    f"{training.date.strftime('%Y-%m-%d %H:%M')} "
+                    f"w {training.location.name}"
+                )
+                data = {
+                    "first_name": volunteer.first_name,
+                    "last_name": volunteer.last_name,
+                    "training": training_info,
+                    "date": training.date.strftime("%Y-%m-%d %H:%M"),
+                    "location": training.location.name,
+                    "logo": url_for("static", filename="logo.png", _external=True),
+                }
+                html_body = render_template_string(template, data)
+                success, error = send_email(
+                    "Rezygnacja z treningu",
+                    None,
+                    [volunteer.email],
+                    html_body=html_body,
+                )
+                if not success:
+                    msg = "Nie udało się wysłać potwierdzenia"
+                    if error:
+                        msg += f": {error}"
+                    flash(msg, "danger")
+
                 flash("Zgłoszenie zostało usunięte.", "success")
                 return redirect(url_for("routes.index"))
         flash("Nie znaleziono zapisu na ten trening.", "warning")

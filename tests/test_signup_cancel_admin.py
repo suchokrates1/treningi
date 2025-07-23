@@ -61,3 +61,31 @@ def test_admin_create_training(client, app_instance, sample_data):
     assert b'Dodano nowy trening.' in response.data
     with app_instance.app_context():
         assert Training.query.count() == 2
+
+
+def test_cancel_booking_sends_email(client, app_instance, sample_data, monkeypatch):
+    training_id, _, _, _ = sample_data
+    volunteer = {
+        "first_name": "Ann",
+        "last_name": "Smith",
+        "email": "ann@example.com",
+    }
+
+    sign_up(client, volunteer, training_id)
+
+    called = {}
+
+    def fake_send_email(*args, **kwargs):
+        called["args"] = args
+        called["kwargs"] = kwargs
+        return True, None
+
+    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+
+    client.post(
+        f"/cancel?training_id={training_id}",
+        data={"email": volunteer["email"], "training_id": training_id},
+        follow_redirects=True,
+    )
+
+    assert "args" in called
