@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app import db
 from app.models import Coach, Location, Training, Volunteer, Booking
@@ -10,7 +10,11 @@ def setup_training(app):
     with app.app_context():
         coach = Coach(first_name='John', last_name='Doe', phone_number='123')
         location = Location(name='Court')
-        training = Training(date=datetime.utcnow(), coach=coach, location=location)
+        training = Training(
+            date=datetime.now(timezone.utc),
+            coach=coach,
+            location=location,
+        )
         volunteer = Volunteer(first_name='Ann', last_name='Smith', email='ann@example.com')
         db.session.add_all([coach, location, volunteer, training])
         db.session.commit()
