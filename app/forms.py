@@ -9,7 +9,7 @@ from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
 from wtforms.validators import DataRequired, Length, Email, Optional
 from wtforms.fields import HiddenField, TelField
-from wtforms import IntegerField, TextAreaField
+from wtforms import IntegerField
 
 
 class CoachForm(FlaskForm):
