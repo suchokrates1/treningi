@@ -17,8 +17,10 @@ def test_preview_logged_in(client, app_instance):
     with client.session_transaction() as sess:
         sess['admin_logged_in'] = True
     with app_instance.app_context():
-        settings = EmailSettings(id=1, port=587, sender='Admin', registration_template='Hello {first_name}', cancellation_template='')
+        settings = EmailSettings(id=1, port=587, sender='Admin',
+                                 registration_template='Hello {first_name} {logo}', cancellation_template='')
         db.session.add(settings)
         db.session.commit()
     resp = client.get('/admin/settings/preview/registration')
     assert b'Hello' in resp.data
+    assert b'static/logo.png' in resp.data
