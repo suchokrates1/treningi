@@ -16,7 +16,9 @@ depends_on = None
 
 def upgrade():
     bind = op.get_bind()
-    if not bind.dialect.has_column(bind, 'email_settings', 'encryption'):
+    inspector = sa.inspect(bind)
+    columns = [c['name'] for c in inspector.get_columns('email_settings')]
+    if 'encryption' not in columns:
         op.add_column(
             'email_settings',
             sa.Column('encryption', sa.String(length=10), nullable=True),
