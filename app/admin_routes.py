@@ -232,6 +232,7 @@ def cancel_training(training_id):
     data = {
         "date": training.date.strftime("%Y-%m-%d %H:%M"),
         "location": training.location.name,
+        "logo": url_for("static", filename="logo.png", _external=True),
     }
     if body_template:
         html_body = render_template_string(body_template, data)
@@ -489,6 +490,7 @@ def preview_template(template):
         "cancel_link": "https://example.com/cancel",
         "date": "2024-01-01 10:00",
         "location": "Warszawa",
+        "logo": url_for("static", filename="logo.png", _external=True),
     }
     html = render_template_string(tpl, data)
     return render_template("admin/preview_email.html", html=html)
