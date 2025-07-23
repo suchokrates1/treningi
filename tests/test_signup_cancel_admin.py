@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app import db
 from app.models import Booking, Training, Volunteer, Coach, Location
@@ -50,7 +50,9 @@ def test_admin_create_training(client, app_instance, sample_data):
     _, _, coach_id, location_id = sample_data
     login = client.post('/admin/login', data={'password': 'secret'}, follow_redirects=True)
     assert b'Zalogowano jako administrator.' in login.data
-    new_dt = (datetime.utcnow() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
+    new_dt = (
+        datetime.now(timezone.utc) + timedelta(days=1)
+    ).strftime('%Y-%m-%dT%H:%M')
     response = client.post(
         '/admin/trainings',
         data={'date': new_dt, 'location_id': location_id, 'coach_id': coach_id},

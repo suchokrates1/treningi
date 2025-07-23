@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -39,7 +39,11 @@ def sample_data(app_instance):
         volunteer = Volunteer(
             first_name="Ann", last_name="Smith", email="ann@example.com"
         )
-        training = Training(date=datetime.utcnow(), coach=coach, location=location)
+        training = Training(
+            date=datetime.now(timezone.utc),
+            coach=coach,
+            location=location,
+        )
         db.session.add_all([coach, location, volunteer, training])
         db.session.commit()
         return training.id, volunteer.id, coach.id, location.id

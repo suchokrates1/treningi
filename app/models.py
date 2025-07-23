@@ -1,5 +1,5 @@
 from . import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Coach(db.Model):
@@ -25,7 +25,7 @@ class Location(db.Model):
 class Training(db.Model):
     __tablename__ = 'trainings'
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.DateTime, nullable=False)
+    date = db.Column(db.DateTime(timezone=True), nullable=False)
     location_id = db.Column(
         db.Integer,
         db.ForeignKey('locations.id'),
@@ -87,7 +87,10 @@ class Booking(db.Model):
         db.ForeignKey('volunteers.id'),
         nullable=False,
     )
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     training = db.relationship(
         'Training',
