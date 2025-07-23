@@ -46,6 +46,12 @@ class Training(db.Model):
         nullable=False,
         default=False,
     )
+    max_volunteers = db.Column(
+        db.Integer,
+        nullable=False,
+        default=2,
+        server_default="2",
+    )
 
     coach = db.relationship(
         'Coach',

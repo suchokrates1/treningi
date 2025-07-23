@@ -13,7 +13,7 @@ def index():
     form = VolunteerForm()
 
     if form.validate_on_submit():
-        # Sprawdzenie, czy na dany trening jest już 2 wolontariuszy
+        # Sprawdzenie, czy liczba wolontariuszy nie przekracza limitu
         try:
             training_id = int(form.training_id.data)
         except (TypeError, ValueError):
@@ -24,7 +24,8 @@ def index():
         if training.is_canceled or training.is_deleted:
             flash("Ten trening został odwołany lub usunięty.", "danger")
             return redirect(url_for("routes.index"))
-        if len(training.bookings) >= 2:
+        current_count = Booking.query.filter_by(training_id=training.id).count()
+        if current_count >= training.max_volunteers:
             flash(
                 "Na ten trening nie można się już zapisać. "
                 "Limit wolontariuszy został osiągnięty.",
