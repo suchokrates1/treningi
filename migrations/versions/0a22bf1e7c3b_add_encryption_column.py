@@ -15,11 +15,16 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        'email_settings',
-        sa.Column('encryption', sa.String(length=10), nullable=True),
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_column('email_settings', 'encryption'):
+        op.add_column(
+            'email_settings',
+            sa.Column('encryption', sa.String(length=10), nullable=True),
+        )
+    op.execute(
+        "UPDATE email_settings SET encryption='tls' WHERE encryption IS NULL"
     )
-    op.execute("UPDATE email_settings SET encryption='tls' WHERE encryption IS NULL")
 
 
 def downgrade():
