@@ -22,7 +22,9 @@
       <tr>
         <td>{{ location.name }}</td>
         <td>
-          <a href="{{ url_for('admin.edit_location', location_id=location.id) }}" class="btn btn-sm btn-primary">Edytuj</a>
+          <a href="{{ url_for('admin.edit_location', location_id=location.id) }}" class="btn btn-sm btn-outline-primary" title="Edytuj">
+            <i class="bi bi-pencil"></i>
+          </a>
         </td>
       </tr>
       {% endfor %}

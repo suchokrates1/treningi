@@ -71,14 +71,14 @@
             <span class="text-danger me-1">Odwołany</span>
           {% else %}
             <form method="post" action="{{ url_for('admin.cancel_training', training_id=t.id) }}" class="d-inline me-1">
-              {{ csrf_token() }}
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-danger" title="Odwołaj">
                 <i class="bi bi-calendar-x"></i>
               </button>
             </form>
           {% endif %}
           <form method="post" action="{{ url_for('admin.delete_training', training_id=t.id) }}" class="d-inline">
-            {{ csrf_token() }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-secondary" title="Usuń">
               <i class="bi bi-trash"></i>
             </button>
