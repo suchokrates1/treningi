@@ -59,3 +59,25 @@ def test_deleted_training_shows_in_history(client, app_instance):
     response = client.get('/admin/history')
 
     assert b'Usuni' in response.data
+
+
+def test_remove_training_deletes_record(client, app_instance):
+    training_id, volunteer_id = setup_training(app_instance)
+
+    with app_instance.app_context():
+        booking = Booking(training_id=training_id, volunteer_id=volunteer_id)
+        db.session.add(booking)
+        db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess['admin_logged_in'] = True
+
+    response = client.post(
+        f'/admin/history/{training_id}/remove',
+        follow_redirects=True,
+    )
+
+    assert b'trwale usuni' in response.data
+    with app_instance.app_context():
+        assert db.session.get(Training, training_id) is None
+        assert Booking.query.count() == 0

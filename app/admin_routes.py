@@ -402,6 +402,17 @@ def history():
     )
 
 
+@admin_bp.route("/history/<int:training_id>/remove", methods=["POST"])
+@login_required
+def remove_training(training_id):
+    """Permanently delete a training and its bookings."""
+    training = Training.query.get_or_404(training_id)
+    db.session.delete(training)
+    db.session.commit()
+    flash("Trening został trwale usunięty.", "info")
+    return redirect(url_for("admin.history"))
+
+
 @admin_bp.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings():
