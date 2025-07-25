@@ -10,7 +10,7 @@ from flask import (
 )
 import flask
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import check_password_hash
 
 from . import db, csrf
@@ -389,7 +389,7 @@ def history():
     page = flask.request.args.get("page", 1, type=int)
     trainings_q = Training.query.filter(
         db.or_(
-            Training.date < datetime.now(),
+            Training.date < datetime.now(timezone.utc),
             Training.is_canceled.is_(True),
             Training.is_deleted.is_(True),
         )
