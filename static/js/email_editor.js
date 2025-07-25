@@ -24,9 +24,14 @@ window.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById(editorId);
 
     if (toggleSwitch && textarea) {
+      let initialized = false;
       const update = () => {
         if (toggleSwitch.checked) {
-          textarea.value = quill.root.innerHTML;
+          if (initialized) {
+            textarea.value = quill.root.innerHTML;
+          } else {
+            textarea.value = field.value;
+          }
           textarea.classList.remove('d-none');
           container.classList.add('d-none');
         } else {
@@ -34,6 +39,7 @@ window.addEventListener('DOMContentLoaded', () => {
           textarea.classList.add('d-none');
           container.classList.remove('d-none');
         }
+        initialized = true;
       };
       toggleSwitch.addEventListener('change', update);
       if (toggleSwitch.checked) {
