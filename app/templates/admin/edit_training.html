@@ -17,6 +17,10 @@
         {{ form.coach_id.label(class="form-label") }}
         {{ form.coach_id(class="form-select") }}
       </div>
+      <div class="col-auto col-lg-2">
+        {{ form.max_volunteers.label(class="form-label") }}
+        {{ form.max_volunteers(class="form-control") }}
+      </div>
       <div class="col-auto">
         <button class="btn btn-primary">Zapisz zmiany</button>
         <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-secondary ms-2">Anuluj</a>

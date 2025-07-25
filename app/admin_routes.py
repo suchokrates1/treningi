@@ -174,6 +174,7 @@ def manage_trainings():
             date=form.date.data,
             location_id=form.location_id.data,
             coach_id=form.coach_id.data,
+            max_volunteers=form.max_volunteers.data,
         )
         db.session.add(new_training)
         db.session.commit()
@@ -205,6 +206,7 @@ def edit_training(training_id):
         training.date = form.date.data
         training.location_id = form.location_id.data
         training.coach_id = form.coach_id.data
+        training.max_volunteers = form.max_volunteers.data
         db.session.commit()
         flash("Zaktualizowano trening.", "success")
         return redirect(url_for("admin.manage_trainings"))

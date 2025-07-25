@@ -7,7 +7,7 @@ from wtforms import (
 )
 from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
-from wtforms.validators import DataRequired, Length, Email, Optional
+from wtforms.validators import DataRequired, Length, Email, Optional, NumberRange
 from wtforms.fields import HiddenField, TelField
 from wtforms import IntegerField
 
@@ -37,6 +37,11 @@ class TrainingForm(FlaskForm):
     )
     coach_id = SelectField(
         'Trener', coerce=int, validators=[DataRequired()]
+    )
+    max_volunteers = IntegerField(
+        'Liczba miejsc',
+        default=2,
+        validators=[DataRequired(), NumberRange(min=1, max=20)],
     )
     submit = SubmitField('Zapisz')
 
