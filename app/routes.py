@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
+from datetime import datetime, timezone
 from .models import Training, Booking, Volunteer, EmailSettings
 from .forms import VolunteerForm, CancelForm
 from . import db
@@ -104,6 +105,7 @@ def index():
     # Pogrupuj treningi według miesiąca
     trainings = (
         Training.query.filter_by(is_deleted=False)
+        .filter(Training.date >= datetime.now(timezone.utc))
         .order_by(Training.date)
         .all()
     )
