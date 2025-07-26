@@ -1,5 +1,6 @@
 from . import db
 from datetime import datetime, timezone
+from sqlalchemy import CheckConstraint, event
 
 
 class Coach(db.Model):
@@ -51,6 +52,14 @@ class Training(db.Model):
         nullable=False,
         default=2,
         server_default="2",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(SELECT COUNT(*) FROM bookings WHERE bookings.training_id = id) <= max_volunteers",
+            name="booking_limit",
+            info={"skip_sqlite": True},
+        ),
     )
 
     coach = db.relationship(
@@ -141,3 +150,15 @@ class EmailSettings(db.Model):
     encryption = db.Column(db.String(10), nullable=True)
     registration_template = db.Column(db.Text, nullable=True)
     cancellation_template = db.Column(db.Text, nullable=True)
+
+
+@event.listens_for(Training.__table__, "before_create")
+def _skip_sqlite_check(table, connection, **kw):
+    if connection.dialect.name == "sqlite":
+        to_remove = [
+            c
+            for c in list(table.constraints)
+            if isinstance(c, CheckConstraint) and c.info.get("skip_sqlite")
+        ]
+        for c in to_remove:
+            table.constraints.remove(c)
