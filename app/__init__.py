@@ -42,7 +42,7 @@ def create_app():
     )
     app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['ADMIN_PASSWORD_HASH'] = os.environ.get("ADMIN_PASSWORD_HASH")
+    app.config['ADMIN_PASSWORD'] = os.environ.get("ADMIN_PASSWORD")
     app.config['SMTP_HOST'] = os.environ.get("SMTP_HOST")
     app.config['SMTP_PORT'] = int(os.environ.get("SMTP_PORT", 587))
     app.config['SMTP_USERNAME'] = os.environ.get("SMTP_USERNAME")
