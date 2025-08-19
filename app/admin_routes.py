@@ -162,6 +162,19 @@ def edit_location(location_id):
     )
 
 
+@admin_bp.route("/locations/<int:location_id>/delete", methods=["POST"])
+@login_required
+def delete_location(location_id):
+    location = Location.query.get_or_404(location_id)
+    if location.trainings:
+        flash("Nie można usunąć miejsca, ponieważ jest używane.", "warning")
+        return redirect(url_for("admin.manage_locations"))
+    db.session.delete(location)
+    db.session.commit()
+    flash("Miejsce zostało usunięte.", "info")
+    return redirect(url_for("admin.manage_locations"))
+
+
 @admin_bp.route("/trainings", methods=["GET", "POST"])
 @login_required
 def manage_trainings():
