@@ -34,6 +34,12 @@
             <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-outline-primary" title="Edytuj">
               <i class="bi bi-pencil"></i>
             </a>
+            <form method="POST" action="{{ url_for('admin.delete_trainer', coach_id=coach.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-secondary" title="Usuń">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
           </td>
         </tr>
       {% endfor %}
