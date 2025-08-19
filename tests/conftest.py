@@ -9,12 +9,8 @@ from app.models import Coach, Location, Training, Volunteer
 
 @pytest.fixture
 def app_instance(monkeypatch):
-    from werkzeug.security import generate_password_hash
-
     monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
-    monkeypatch.setenv(
-        "ADMIN_PASSWORD_HASH", generate_password_hash("secret")
-    )
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret")
     app = create_app()
     app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     with app.app_context():
