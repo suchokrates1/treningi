@@ -35,6 +35,9 @@
         {% else %}
           <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-outline-light btn-sm">Panel administratora</a>
         {% endif %}
+        {% if session.get('admin_logged_in') %}
+          <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-light btn-sm">Wyloguj</a>
+        {% endif %}
         <button id="theme-toggle" type="button" class="btn btn-outline-light btn-sm" aria-label="Przełącz motyw" aria-pressed="false">🌓</button>
       </div>
     </div>

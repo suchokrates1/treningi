@@ -11,7 +11,6 @@ from flask import (
 import flask
 from functools import wraps
 from datetime import datetime, timezone
-from werkzeug.security import check_password_hash
 
 from . import db, csrf
 from .email_utils import send_email
@@ -50,12 +49,15 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
-        stored_hash = current_app.config.get("ADMIN_PASSWORD_HASH")
-        if stored_hash and check_password_hash(stored_hash, form.password.data):
+        stored_password = current_app.config.get("ADMIN_PASSWORD")
+        if not stored_password:
+            flash("Hasło administratora nie jest skonfigurowane.", "danger")
+        elif form.password.data == stored_password:
             session["admin_logged_in"] = True
             flash("Zalogowano jako administrator.", "success")
             return redirect(url_for("admin.manage_trainings"))
-        flash("Nieprawidłowe hasło.", "danger")
+        else:
+            flash("Nieprawidłowe hasło.", "danger")
 
     return render_template("admin/login.html", form=form)
 
