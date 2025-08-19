@@ -106,6 +106,23 @@ def edit_trainer(coach_id):
     return render_template("admin/edit_trainer.html", form=form, coach=coach)
 
 
+@admin_bp.route("/trainers/<int:coach_id>/delete", methods=["POST"])
+@login_required
+def delete_trainer(coach_id):
+    coach = Coach.query.get_or_404(coach_id)
+    if coach.trainings:
+        flash(
+            "Nie można usunąć trenera powiązanego z treningami.",
+            "warning",
+        )
+        return redirect(url_for("admin.manage_trainers"))
+
+    db.session.delete(coach)
+    db.session.commit()
+    flash("Trener został usunięty.", "info")
+    return redirect(url_for("admin.manage_trainers"))
+
+
 @admin_bp.route("/locations", methods=["GET", "POST"])
 @login_required
 def manage_locations():
