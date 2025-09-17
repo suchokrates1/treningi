@@ -2,7 +2,7 @@ import pytest
 from io import BytesIO
 from pathlib import Path
 from app import db
-from app.models import EmailSettings
+from app.models import EmailSettings, StoredFile
 import app
 
 # allow send_email to run in this module
@@ -41,6 +41,62 @@ def test_admin_settings_update(client, app_instance):
         assert settings.sender == "Admin"
         assert settings.registration_template == "Hello {first_name}"
         assert settings.cancellation_template == "Bye {first_name}"
+
+
+def test_admin_settings_handles_legacy_metadata(client, app_instance):
+    with app_instance.app_context():
+        stored = StoredFile(
+            filename="legacy.txt",
+            content_type="text/plain",
+            data=b"legacy",
+        )
+        db.session.add(stored)
+        db.session.flush()
+        stored_id = stored.id
+        settings = EmailSettings(
+            id=1,
+            server="smtp.legacy",  # ensure existing configuration is present
+            port=2525,
+            login="user",
+            password="old",
+            sender="Admin",
+            encryption="tls",
+            registration_template="Hi",
+            cancellation_template="Bye",
+            registration_files_adult=[stored_id],
+            registration_files_minor=[{"stored_file_id": stored_id}],
+        )
+        db.session.merge(settings)
+        db.session.commit()
+
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    page = client.get("/admin/settings")
+    assert page.status_code == 200
+
+    form_data = {
+        "server": "smtp.legacy",
+        "port": "2525",
+        "login": "user",
+        "password": "newpass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hi",
+        "cancellation_template": "Bye",
+    }
+
+    resp = client.post("/admin/settings", data=form_data, follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Zapisano ustawienia." in resp.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings.password == "newpass"
+        assert settings.registration_files_adult == [stored_id]
+        assert settings.registration_files_minor == [{"stored_file_id": stored_id}]
 
 
 def test_admin_settings_manage_attachments(client, app_instance):

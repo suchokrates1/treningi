@@ -1,8 +1,18 @@
 import pytest
 from datetime import datetime, timezone
+from pathlib import Path
+import base64
 
 from app import db
-from app.models import Coach, Location, Training, Volunteer, Booking
+from app.models import (
+    Coach,
+    Location,
+    Training,
+    Volunteer,
+    Booking,
+    EmailSettings,
+    StoredFile,
+)
 
 
 def setup_training(app):
@@ -89,3 +99,150 @@ def test_remove_training_deletes_record(client, app_instance):
     with app_instance.app_context():
         assert db.session.get(Training, training_id) is None
         assert Booking.query.count() == 0
+
+
+def test_signup_handles_attachment_metadata(
+    client, app_instance, sample_data, monkeypatch
+):
+    training_id, _, _, _ = sample_data
+    attachments_dir = Path(app_instance.instance_path) / "attachments"
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    stored_name = "test_file.txt"
+    (attachments_dir / stored_name).write_text("Important info", encoding="utf-8")
+
+    with app_instance.app_context():
+        settings = EmailSettings(
+            id=1,
+            registration_template="Hello {first_name}",
+            registration_files_adult=[
+                {
+                    "stored_name": stored_name,
+                    "original_name": "info.txt",
+                    "content_type": "text/plain",
+                }
+            ],
+        )
+        db.session.add(settings)
+        db.session.commit()
+
+    captured: dict[str, list[tuple[str, str, bytes]] | None] = {"attachments": None}
+
+    def fake_send_email(subject, body, recipients, **kwargs):
+        captured["attachments"] = kwargs.get("attachments")
+        return True, None
+
+    monkeypatch.setattr("app.email_utils.send_email", fake_send_email)
+    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+
+    response = client.post(
+        "/",
+        data={
+            "first_name": "New",
+            "last_name": "Volunteer",
+            "email": "new_volunteer@example.com",
+            "training_id": str(training_id),
+            "is_adult": "true",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Zapisano na trening!" in response.data
+    attachments = captured["attachments"]
+    assert attachments is not None and len(attachments) == 1
+    filename, content_type, data = attachments[0]
+    assert filename == "info.txt"
+    assert content_type == "text/plain"
+    assert data == b"Important info"
+
+
+def test_signup_handles_string_ids(client, app_instance, sample_data, monkeypatch):
+    training_id, _, _, _ = sample_data
+
+    with app_instance.app_context():
+        stored = StoredFile(
+            filename="legacy.pdf",
+            content_type="application/pdf",
+            data=b"legacy",
+        )
+        db.session.add(stored)
+        db.session.flush()
+        settings = EmailSettings(
+            id=1,
+            registration_template="Hi",
+            registration_files_adult=[str(stored.id)],
+        )
+        db.session.merge(settings)
+        db.session.commit()
+
+    captured: dict[str, list[tuple[str, str, bytes]] | None] = {"attachments": None}
+
+    def fake_send_email(*_, **kwargs):
+        captured["attachments"] = kwargs.get("attachments")
+        return True, None
+
+    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+
+    response = client.post(
+        "/",
+        data={
+            "first_name": "Legacy",
+            "last_name": "User",
+            "email": "legacy@example.com",
+            "training_id": str(training_id),
+            "is_adult": "true",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    attachments = captured["attachments"]
+    assert attachments and attachments[0][0] == "legacy.pdf"
+    assert attachments[0][1] == "application/pdf"
+    assert attachments[0][2] == b"legacy"
+
+
+def test_signup_handles_inline_payload(client, app_instance, sample_data, monkeypatch):
+    training_id, _, _, _ = sample_data
+    payload = base64.b64encode(b"Inline").decode("ascii")
+
+    with app_instance.app_context():
+        settings = EmailSettings(
+            id=1,
+            registration_template="Hi",
+            registration_files_adult=[
+                {
+                    "filename": "inline.txt",
+                    "content_type": "text/plain",
+                    "data": payload,
+                }
+            ],
+        )
+        db.session.merge(settings)
+        db.session.commit()
+
+    captured: dict[str, list[tuple[str, str, bytes]] | None] = {"attachments": None}
+
+    def fake_send_email(*_, **kwargs):
+        captured["attachments"] = kwargs.get("attachments")
+        return True, None
+
+    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+
+    response = client.post(
+        "/",
+        data={
+            "first_name": "Inline",
+            "last_name": "User",
+            "email": "inline@example.com",
+            "training_id": str(training_id),
+            "is_adult": "true",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    attachments = captured["attachments"]
+    assert attachments and attachments[0][0] == "inline.txt"
+    assert attachments[0][1] == "text/plain"
+    assert attachments[0][2] == b"Inline"

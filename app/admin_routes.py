@@ -470,19 +470,42 @@ def settings():
     existing_adult = list(settings.registration_files_adult or [])
     existing_minor = list(settings.registration_files_minor or [])
 
-    def _choice_label(meta):
-        return meta.get("original_name") or meta.get("filename") or meta.get("stored_name")
+    def _stored_name(meta):
+        if isinstance(meta, dict):
+            stored = meta.get("stored_name")
+            return str(stored) if stored else None
+        return None
 
-    form.remove_adult_files.choices = [
-        (meta.get("stored_name"), _choice_label(meta))
-        for meta in existing_adult
-        if meta.get("stored_name")
-    ]
-    form.remove_minor_files.choices = [
-        (meta.get("stored_name"), _choice_label(meta))
-        for meta in existing_minor
-        if meta.get("stored_name")
-    ]
+    def _choice_label(meta):
+        if isinstance(meta, dict):
+            label = (
+                meta.get("original_name")
+                or meta.get("filename")
+                or meta.get("stored_name")
+            )
+            if label:
+                return label
+            stored_id = meta.get("stored_file_id") or meta.get("id")
+            if stored_id is not None:
+                return f"Załącznik #{stored_id}"
+            return "Załącznik"
+        if meta is None:
+            return "Załącznik"
+        return f"Załącznik #{meta}" if isinstance(meta, int) else f"Załącznik {meta}"
+
+    adult_choices = []
+    for meta in existing_adult:
+        stored_name = _stored_name(meta)
+        if stored_name:
+            adult_choices.append((stored_name, _choice_label(meta)))
+    form.remove_adult_files.choices = adult_choices
+
+    minor_choices = []
+    for meta in existing_minor:
+        stored_name = _stored_name(meta)
+        if stored_name:
+            minor_choices.append((stored_name, _choice_label(meta)))
+    form.remove_minor_files.choices = minor_choices
 
     if form.validate_on_submit():
         settings.server = form.server.data.strip() if form.server.data else None
@@ -498,11 +521,12 @@ def settings():
         attachments_dir.mkdir(parents=True, exist_ok=True)
 
         def _process_files(uploaded, existing, removals):
-            updated = [
-                meta
-                for meta in existing
-                if meta.get("stored_name") and meta.get("stored_name") not in removals
-            ]
+            updated = []
+            for meta in existing:
+                stored_name = _stored_name(meta)
+                if stored_name and stored_name in removals:
+                    continue
+                updated.append(meta)
             for stored_name in removals:
                 if not stored_name:
                     continue
