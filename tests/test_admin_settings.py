@@ -108,6 +108,69 @@ def test_admin_settings_manage_attachments(client, app_instance):
         assert not (attachments_dir / minor_meta["stored_name"]).exists()
 
 
+def test_admin_settings_edit_keeps_existing_files(client, app_instance):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    base_data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    create_resp = client.post(
+        "/admin/settings",
+        data={
+            **base_data,
+            "registration_files_adult": [(BytesIO(b"adult"), "adult.txt")],
+            "registration_files_minor": [(BytesIO(b"minor"), "minor.pdf")],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert create_resp.status_code == 200
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        adult_meta = settings.registration_files_adult[0]
+        minor_meta = settings.registration_files_minor[0]
+
+    edit_data = {
+        **base_data,
+        "server": "smtp.edited.com",
+        "port": "2626",
+        "sender": "Edited Admin",
+    }
+
+    edit_resp = client.post(
+        "/admin/settings",
+        data=edit_data,
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert edit_resp.status_code == 200
+    assert b"Zapisano ustawienia." in edit_resp.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings.server == "smtp.edited.com"
+        assert settings.port == 2626
+        assert settings.sender == "Edited Admin"
+        assert settings.registration_files_adult[0]["stored_name"] == adult_meta["stored_name"]
+        assert settings.registration_files_minor[0]["stored_name"] == minor_meta["stored_name"]
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert (attachments_dir / adult_meta["stored_name"]).read_bytes() == b"adult"
+        assert (attachments_dir / minor_meta["stored_name"]).read_bytes() == b"minor"
+
+
 def test_admin_settings_migrates_legacy_file_ids(client, app_instance):
     login = client.post(
         "/admin/login", data={"password": "secret"}, follow_redirects=True
