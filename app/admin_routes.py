@@ -490,7 +490,14 @@ def settings():
 
     attachments_dir = Path(current_app.instance_path) / "attachments"
 
+    attachment_error_message = (
+        "Nie udało się zmodyfikować załączników. Zmiany nie zostały zapisane."
+    )
+
+    error_occurred = False
+
     def _normalize_file_entries(entries):
+        nonlocal error_occurred
         normalized = []
         for entry in entries:
             if isinstance(entry, dict):
@@ -508,7 +515,22 @@ def settings():
                 if not safe_name:
                     safe_name = f"file_{entry}"
                 stored_name = f"legacy_{entry}_{safe_name}"
-                attachments_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    attachments_dir.mkdir(parents=True, exist_ok=True)
+                except OSError:
+                    current_app.logger.exception(
+                        "Failed to create attachments directory %s", attachments_dir
+                    )
+                    flash(attachment_error_message, "danger")
+                    error_occurred = True
+                    normalized.append(
+                        {
+                            "stored_name": stored_name,
+                            "original_name": stored_file.filename,
+                            "content_type": stored_file.content_type,
+                        }
+                    )
+                    continue
                 target_path = attachments_dir / stored_name
                 if not target_path.exists():
                     try:
@@ -558,20 +580,43 @@ def settings():
         settings.registration_template = form.registration_template.data
         settings.cancellation_template = form.cancellation_template.data
 
-        attachments_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            attachments_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            current_app.logger.exception(
+                "Failed to create attachments directory %s", attachments_dir
+            )
+            flash(attachment_error_message, "danger")
+            error_occurred = True
 
         def _process_files(uploaded, existing, removals):
-            updated = [
-                meta
-                for meta in existing
-                if meta.get("stored_name") and meta.get("stored_name") not in removals
-            ]
+            nonlocal error_occurred
+            if error_occurred:
+                return existing
+
+            updated = list(existing)
+
             for stored_name in removals:
                 if not stored_name:
                     continue
                 file_path = attachments_dir / stored_name
                 if file_path.exists():
-                    file_path.unlink()
+                    try:
+                        file_path.unlink()
+                    except OSError:
+                        current_app.logger.exception(
+                            "Failed to delete attachment %s", file_path
+                        )
+                        flash(attachment_error_message, "danger")
+                        error_occurred = True
+                        return existing
+                updated = [
+                    meta
+                    for meta in updated
+                    if meta.get("stored_name") != stored_name
+                ]
+
+            created_files = []
 
             for storage in uploaded:
                 if not storage or not storage.filename:
@@ -582,7 +627,26 @@ def settings():
                     continue
                 stored_name = f"{uuid4().hex}_{secure_name}"
                 target_path = attachments_dir / stored_name
-                storage.save(target_path)
+                try:
+                    storage.save(target_path)
+                except OSError:
+                    current_app.logger.exception(
+                        "Failed to save attachment %s", target_path
+                    )
+                    flash(attachment_error_message, "danger")
+                    error_occurred = True
+                    for created in created_files:
+                        cleanup_path = attachments_dir / created
+                        try:
+                            if cleanup_path.exists():
+                                cleanup_path.unlink()
+                        except OSError:
+                            current_app.logger.warning(
+                                "Failed to clean up attachment %s after error",
+                                cleanup_path,
+                            )
+                    return existing
+                created_files.append(stored_name)
                 content_type = (
                     storage.mimetype
                     or mimetypes.guess_type(original_name)[0]
@@ -597,19 +661,24 @@ def settings():
                 )
             return updated
 
-        adult_removals = set(form.remove_adult_files.data or [])
-        minor_removals = set(form.remove_minor_files.data or [])
+        if not error_occurred:
+            adult_removals = set(form.remove_adult_files.data or [])
+            minor_removals = set(form.remove_minor_files.data or [])
 
-        updated_adult = _process_files(
-            form.registration_files_adult.data or [],
-            existing_adult,
-            adult_removals,
-        )
-        updated_minor = _process_files(
-            form.registration_files_minor.data or [],
-            existing_minor,
-            minor_removals,
-        )
+            updated_adult = _process_files(
+                form.registration_files_adult.data or [],
+                existing_adult,
+                adult_removals,
+            )
+            updated_minor = _process_files(
+                form.registration_files_minor.data or [],
+                existing_minor,
+                minor_removals,
+            )
+
+        if error_occurred:
+            db.session.rollback()
+            return render_template("admin/settings.html", form=form)
 
         settings.registration_files_adult = updated_adult
         settings.registration_files_minor = updated_minor
