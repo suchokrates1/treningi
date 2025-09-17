@@ -28,7 +28,7 @@ from .forms import (
     LocationForm,
     SettingsForm,
 )
-from .models import Coach, Training, Location, EmailSettings
+from .models import Coach, Training, Location, EmailSettings, StoredFile
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -487,8 +487,52 @@ def settings():
         form.registration_files_adult.data = []
     if not flask.request.files.getlist("registration_files_minor"):
         form.registration_files_minor.data = []
-    existing_adult = list(settings.registration_files_adult or [])
-    existing_minor = list(settings.registration_files_minor or [])
+
+    attachments_dir = Path(current_app.instance_path) / "attachments"
+
+    def _normalize_file_entries(entries):
+        normalized = []
+        for entry in entries:
+            if isinstance(entry, dict):
+                normalized.append(entry)
+                continue
+            if isinstance(entry, int):
+                stored_file = db.session.get(StoredFile, entry)
+                if not stored_file:
+                    current_app.logger.warning(
+                        "Stored file with id %s referenced in settings but missing",
+                        entry,
+                    )
+                    continue
+                safe_name = secure_filename(stored_file.filename or "")
+                if not safe_name:
+                    safe_name = f"file_{entry}"
+                stored_name = f"legacy_{entry}_{safe_name}"
+                attachments_dir.mkdir(parents=True, exist_ok=True)
+                target_path = attachments_dir / stored_name
+                if not target_path.exists():
+                    try:
+                        target_path.write_bytes(stored_file.data)
+                    except OSError:
+                        current_app.logger.warning(
+                            "Failed to materialize legacy stored file %s", target_path
+                        )
+                        continue
+                normalized.append(
+                    {
+                        "stored_name": stored_name,
+                        "original_name": stored_file.filename,
+                        "content_type": stored_file.content_type,
+                    }
+                )
+                continue
+            current_app.logger.warning(
+                "Unexpected attachment metadata entry in settings: %r", entry
+            )
+        return normalized
+
+    existing_adult = _normalize_file_entries(list(settings.registration_files_adult or []))
+    existing_minor = _normalize_file_entries(list(settings.registration_files_minor or []))
 
     def _choice_label(meta):
         return meta.get("original_name") or meta.get("filename") or meta.get("stored_name")
@@ -514,7 +558,6 @@ def settings():
         settings.registration_template = form.registration_template.data
         settings.cancellation_template = form.cancellation_template.data
 
-        attachments_dir = Path(current_app.instance_path) / "attachments"
         attachments_dir.mkdir(parents=True, exist_ok=True)
 
         def _process_files(uploaded, existing, removals):
