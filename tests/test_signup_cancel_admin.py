@@ -12,6 +12,7 @@ def sign_up(client, volunteer_data, training_id):
             'last_name': volunteer_data['last_name'],
             'email': volunteer_data['email'],
             'training_id': str(training_id),
+            'is_adult': 'true' if volunteer_data.get('is_adult', True) else 'false',
         },
         follow_redirects=True,
     )
@@ -23,18 +24,29 @@ def test_volunteer_sign_up(client, app_instance, sample_data):
         'first_name': 'Ann',
         'last_name': 'Smith',
         'email': 'ann@example.com',
+        'is_adult': True,
     }
     response = sign_up(client, volunteer, training_id)
     assert b'Zapisano na trening!' in response.data
     with app_instance.app_context():
         booking = Booking.query.filter_by(training_id=training_id, volunteer_id=volunteer_id).first()
         assert booking is not None
+        assert booking.volunteer.is_adult is True
 
 
 def test_cancel_booking(client, app_instance, sample_data):
     training_id, volunteer_id, _, _ = sample_data
-    volunteer = {'first_name': 'Ann', 'last_name': 'Smith', 'email': 'ann@example.com'}
+    volunteer = {
+        'first_name': 'Ann',
+        'last_name': 'Smith',
+        'email': 'ann@example.com',
+        'is_adult': False,
+    }
     sign_up(client, volunteer, training_id)
+    with app_instance.app_context():
+        stored_volunteer = Volunteer.query.filter_by(email=volunteer['email']).first()
+        assert stored_volunteer is not None
+        assert stored_volunteer.is_adult is False
 
     response = client.post(
         f'/cancel?training_id={training_id}',
@@ -69,9 +81,14 @@ def test_cancel_booking_sends_email(client, app_instance, sample_data, monkeypat
         "first_name": "Ann",
         "last_name": "Smith",
         "email": "ann@example.com",
+        "is_adult": True,
     }
 
     sign_up(client, volunteer, training_id)
+    with app_instance.app_context():
+        stored_volunteer = Volunteer.query.filter_by(email=volunteer["email"]).first()
+        assert stored_volunteer is not None
+        assert stored_volunteer.is_adult is True
 
     called = {}
 
