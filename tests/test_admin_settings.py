@@ -1,4 +1,6 @@
 import pytest
+from io import BytesIO
+from pathlib import Path
 from app import db
 from app.models import EmailSettings
 import app
@@ -39,6 +41,71 @@ def test_admin_settings_update(client, app_instance):
         assert settings.sender == "Admin"
         assert settings.registration_template == "Hello {first_name}"
         assert settings.cancellation_template == "Bye {first_name}"
+
+
+def test_admin_settings_manage_attachments(client, app_instance):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "registration_files_adult": [(BytesIO(b"adult"), "adult.txt")],
+            "registration_files_minor": [(BytesIO(b"minor"), "minor.pdf")],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Zapisano ustawienia." in response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert len(settings.registration_files_adult) == 1
+        assert len(settings.registration_files_minor) == 1
+        adult_meta = settings.registration_files_adult[0]
+        minor_meta = settings.registration_files_minor[0]
+        assert adult_meta["original_name"] == "adult.txt"
+        assert minor_meta["original_name"] == "minor.pdf"
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert (attachments_dir / adult_meta["stored_name"]).read_bytes() == b"adult"
+        assert (attachments_dir / minor_meta["stored_name"]).read_bytes() == b"minor"
+
+    remove_response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "remove_adult_files": [adult_meta["stored_name"]],
+            "remove_minor_files": [minor_meta["stored_name"]],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert remove_response.status_code == 200
+    assert b"Zapisano ustawienia." in remove_response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings.registration_files_adult == []
+        assert settings.registration_files_minor == []
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert attachments_dir.exists()
+        assert not (attachments_dir / adult_meta["stored_name"]).exists()
+        assert not (attachments_dir / minor_meta["stored_name"]).exists()
 
 
 def test_admin_send_test_email(client, app_instance, monkeypatch):
