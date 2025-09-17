@@ -97,7 +97,9 @@ def manage_trainers():
 @admin_bp.route("/trainers/edit/<int:coach_id>", methods=["GET", "POST"])
 @login_required
 def edit_trainer(coach_id):
-    coach = Coach.query.get_or_404(coach_id)
+    coach = db.session.get(Coach, coach_id)
+    if coach is None:
+        abort(404)
     form = CoachForm(obj=coach)
 
     if form.validate_on_submit():
@@ -114,7 +116,9 @@ def edit_trainer(coach_id):
 @admin_bp.route("/trainers/<int:coach_id>/delete", methods=["POST"])
 @login_required
 def delete_trainer(coach_id):
-    coach = Coach.query.get_or_404(coach_id)
+    coach = db.session.get(Coach, coach_id)
+    if coach is None:
+        abort(404)
     if coach.trainings:
         flash(
             "Nie można usunąć trenera powiązanego z treningami.",
@@ -151,7 +155,9 @@ def manage_locations():
 @admin_bp.route("/locations/edit/<int:location_id>", methods=["GET", "POST"])
 @login_required
 def edit_location(location_id):
-    location = Location.query.get_or_404(location_id)
+    location = db.session.get(Location, location_id)
+    if location is None:
+        abort(404)
     form = LocationForm(obj=location)
 
     if form.validate_on_submit():
@@ -170,7 +176,9 @@ def edit_location(location_id):
 @admin_bp.route("/locations/<int:location_id>/delete", methods=["POST"])
 @login_required
 def delete_location(location_id):
-    location = Location.query.get_or_404(location_id)
+    location = db.session.get(Location, location_id)
+    if location is None:
+        abort(404)
     if location.trainings:
         flash("Nie można usunąć miejsca, ponieważ jest używane.", "warning")
         return redirect(url_for("admin.manage_locations"))
@@ -228,7 +236,9 @@ def manage_trainings():
 @admin_bp.route("/trainings/edit/<int:training_id>", methods=["GET", "POST"])
 @login_required
 def edit_training(training_id):
-    training = Training.query.get_or_404(training_id)
+    training = db.session.get(Training, training_id)
+    if training is None:
+        abort(404)
     if training.is_deleted:
         abort(404)
     form = TrainingForm(obj=training)
@@ -257,7 +267,9 @@ def edit_training(training_id):
 @admin_bp.route("/trainings/<int:training_id>/cancel", methods=["POST"])
 @login_required
 def cancel_training(training_id):
-    training = Training.query.get_or_404(training_id)
+    training = db.session.get(Training, training_id)
+    if training is None:
+        abort(404)
     training.is_canceled = True
     db.session.commit()
 
@@ -293,7 +305,9 @@ def cancel_training(training_id):
 @admin_bp.route("/trainings/<int:training_id>/delete", methods=["POST"])
 @login_required
 def delete_training(training_id):
-    training = Training.query.get_or_404(training_id)
+    training = db.session.get(Training, training_id)
+    if training is None:
+        abort(404)
     training.is_deleted = True
     db.session.commit()
     flash("Trening został usunięty.", "info")
@@ -426,14 +440,18 @@ def import_excel():
 def history():
     """List past trainings with volunteer sign-ups."""
     page = flask.request.args.get("page", 1, type=int)
-    trainings_q = Training.query.filter(
-        db.or_(
-            Training.date < datetime.now(timezone.utc),
-            Training.is_canceled.is_(True),
-            Training.is_deleted.is_(True),
+    stmt = (
+        db.select(Training)
+        .where(
+            db.or_(
+                Training.date < datetime.now(timezone.utc),
+                Training.is_canceled.is_(True),
+                Training.is_deleted.is_(True),
+            )
         )
-    ).order_by(Training.date.desc())
-    pagination = db.paginate(trainings_q, page=page, per_page=10)
+        .order_by(Training.date.desc())
+    )
+    pagination = db.paginate(stmt, page=page, per_page=10)
     return render_template(
         "admin/history.html",
         trainings=pagination.items,
@@ -445,7 +463,9 @@ def history():
 @login_required
 def remove_training(training_id):
     """Permanently delete a training and its bookings."""
-    training = Training.query.get_or_404(training_id)
+    training = db.session.get(Training, training_id)
+    if training is None:
+        abort(404)
     db.session.delete(training)
     db.session.commit()
     flash("Trening został trwale usunięty.", "info")
