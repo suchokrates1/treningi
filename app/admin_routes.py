@@ -16,6 +16,7 @@ from uuid import uuid4
 import mimetypes
 
 from werkzeug.utils import secure_filename
+from sqlalchemy import select, or_
 
 from . import db, csrf
 from .email_utils import send_email
@@ -29,6 +30,13 @@ from .forms import (
     SettingsForm,
 )
 from .models import Coach, Training, Location, EmailSettings
+
+
+def _get_or_404(model, ident):
+    instance = db.session.get(model, ident)
+    if instance is None:
+        abort(404)
+    return instance
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -97,7 +105,7 @@ def manage_trainers():
 @admin_bp.route("/trainers/edit/<int:coach_id>", methods=["GET", "POST"])
 @login_required
 def edit_trainer(coach_id):
-    coach = Coach.query.get_or_404(coach_id)
+    coach = _get_or_404(Coach, coach_id)
     form = CoachForm(obj=coach)
 
     if form.validate_on_submit():
@@ -114,7 +122,7 @@ def edit_trainer(coach_id):
 @admin_bp.route("/trainers/<int:coach_id>/delete", methods=["POST"])
 @login_required
 def delete_trainer(coach_id):
-    coach = Coach.query.get_or_404(coach_id)
+    coach = _get_or_404(Coach, coach_id)
     if coach.trainings:
         flash(
             "Nie można usunąć trenera powiązanego z treningami.",
@@ -151,7 +159,7 @@ def manage_locations():
 @admin_bp.route("/locations/edit/<int:location_id>", methods=["GET", "POST"])
 @login_required
 def edit_location(location_id):
-    location = Location.query.get_or_404(location_id)
+    location = _get_or_404(Location, location_id)
     form = LocationForm(obj=location)
 
     if form.validate_on_submit():
@@ -170,7 +178,7 @@ def edit_location(location_id):
 @admin_bp.route("/locations/<int:location_id>/delete", methods=["POST"])
 @login_required
 def delete_location(location_id):
-    location = Location.query.get_or_404(location_id)
+    location = _get_or_404(Location, location_id)
     if location.trainings:
         flash("Nie można usunąć miejsca, ponieważ jest używane.", "warning")
         return redirect(url_for("admin.manage_locations"))
@@ -228,7 +236,7 @@ def manage_trainings():
 @admin_bp.route("/trainings/edit/<int:training_id>", methods=["GET", "POST"])
 @login_required
 def edit_training(training_id):
-    training = Training.query.get_or_404(training_id)
+    training = _get_or_404(Training, training_id)
     if training.is_deleted:
         abort(404)
     form = TrainingForm(obj=training)
@@ -257,7 +265,7 @@ def edit_training(training_id):
 @admin_bp.route("/trainings/<int:training_id>/cancel", methods=["POST"])
 @login_required
 def cancel_training(training_id):
-    training = Training.query.get_or_404(training_id)
+    training = _get_or_404(Training, training_id)
     training.is_canceled = True
     db.session.commit()
 
@@ -293,7 +301,7 @@ def cancel_training(training_id):
 @admin_bp.route("/trainings/<int:training_id>/delete", methods=["POST"])
 @login_required
 def delete_training(training_id):
-    training = Training.query.get_or_404(training_id)
+    training = _get_or_404(Training, training_id)
     training.is_deleted = True
     db.session.commit()
     flash("Trening został usunięty.", "info")
@@ -426,14 +434,17 @@ def import_excel():
 def history():
     """List past trainings with volunteer sign-ups."""
     page = flask.request.args.get("page", 1, type=int)
-    trainings_q = Training.query.filter(
-        db.or_(
-            Training.date < datetime.now(timezone.utc),
-            Training.is_canceled.is_(True),
-            Training.is_deleted.is_(True),
-        )
-    ).order_by(Training.date.desc())
-    pagination = db.paginate(trainings_q, page=page, per_page=10)
+    conditions = or_(
+        Training.date < datetime.now(timezone.utc),
+        Training.is_canceled.is_(True),
+        Training.is_deleted.is_(True),
+    )
+    stmt = (
+        select(Training)
+        .where(conditions)
+        .order_by(Training.date.desc())
+    )
+    pagination = db.paginate(stmt, page=page, per_page=10)
     return render_template(
         "admin/history.html",
         trainings=pagination.items,
@@ -445,7 +456,7 @@ def history():
 @login_required
 def remove_training(training_id):
     """Permanently delete a training and its bookings."""
-    training = Training.query.get_or_404(training_id)
+    training = _get_or_404(Training, training_id)
     db.session.delete(training)
     db.session.commit()
     flash("Trening został trwale usunięty.", "info")
@@ -470,19 +481,42 @@ def settings():
     existing_adult = list(settings.registration_files_adult or [])
     existing_minor = list(settings.registration_files_minor or [])
 
-    def _choice_label(meta):
-        return meta.get("original_name") or meta.get("filename") or meta.get("stored_name")
+    def _stored_name(meta):
+        if isinstance(meta, dict):
+            stored = meta.get("stored_name")
+            return str(stored) if stored else None
+        return None
 
-    form.remove_adult_files.choices = [
-        (meta.get("stored_name"), _choice_label(meta))
-        for meta in existing_adult
-        if meta.get("stored_name")
-    ]
-    form.remove_minor_files.choices = [
-        (meta.get("stored_name"), _choice_label(meta))
-        for meta in existing_minor
-        if meta.get("stored_name")
-    ]
+    def _choice_label(meta):
+        if isinstance(meta, dict):
+            label = (
+                meta.get("original_name")
+                or meta.get("filename")
+                or meta.get("stored_name")
+            )
+            if label:
+                return label
+            stored_id = meta.get("stored_file_id") or meta.get("id")
+            if stored_id is not None:
+                return f"Załącznik #{stored_id}"
+            return "Załącznik"
+        if meta is None:
+            return "Załącznik"
+        return f"Załącznik #{meta}" if isinstance(meta, int) else f"Załącznik {meta}"
+
+    adult_choices = []
+    for meta in existing_adult:
+        stored_name = _stored_name(meta)
+        if stored_name:
+            adult_choices.append((stored_name, _choice_label(meta)))
+    form.remove_adult_files.choices = adult_choices
+
+    minor_choices = []
+    for meta in existing_minor:
+        stored_name = _stored_name(meta)
+        if stored_name:
+            minor_choices.append((stored_name, _choice_label(meta)))
+    form.remove_minor_files.choices = minor_choices
 
     if form.validate_on_submit():
         settings.server = form.server.data.strip() if form.server.data else None
@@ -498,11 +532,12 @@ def settings():
         attachments_dir.mkdir(parents=True, exist_ok=True)
 
         def _process_files(uploaded, existing, removals):
-            updated = [
-                meta
-                for meta in existing
-                if meta.get("stored_name") and meta.get("stored_name") not in removals
-            ]
+            updated = []
+            for meta in existing:
+                stored_name = _stored_name(meta)
+                if stored_name and stored_name in removals:
+                    continue
+                updated.append(meta)
             for stored_name in removals:
                 if not stored_name:
                     continue
