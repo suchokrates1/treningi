@@ -50,6 +50,8 @@ def test_send_email_emits_info(monkeypatch, caplog):
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
     app = create_app()
 
+    captured = {}
+
     class DummySMTP:
         def __init__(self, host, port):
             pass
@@ -67,7 +69,7 @@ def test_send_email_emits_info(monkeypatch, caplog):
             pass
 
         def send_message(self, msg):
-            pass
+            captured["message"] = msg
 
     monkeypatch.setattr(smtplib, "SMTP", DummySMTP)
 
@@ -81,6 +83,12 @@ def test_send_email_emits_info(monkeypatch, caplog):
             host="smtp.example.com",
             port=25,
             sender="Admin",
+            attachments=[("info.txt", "text/plain", b"hello")],
         )
 
     assert any("Email sent successfully" in r.getMessage() for r in caplog.records)
+    message = captured.get("message")
+    assert message is not None
+    attachment = next(message.iter_attachments(), None)
+    assert attachment is not None
+    assert attachment.get_filename() == "info.txt"

@@ -1,6 +1,7 @@
 from . import db
 from datetime import datetime, timezone
 from sqlalchemy import CheckConstraint, event
+from sqlalchemy import LargeBinary
 
 
 class Coach(db.Model):
@@ -151,6 +152,19 @@ class EmailSettings(db.Model):
     encryption = db.Column(db.String(10), nullable=True)
     registration_template = db.Column(db.Text, nullable=True)
     cancellation_template = db.Column(db.Text, nullable=True)
+    registration_files_adult = db.Column(db.JSON, nullable=True)
+    registration_files_minor = db.Column(db.JSON, nullable=True)
+
+
+class StoredFile(db.Model):
+    """Binary file stored in the database for email attachments."""
+
+    __tablename__ = "stored_files"
+
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(256), nullable=False)
+    content_type = db.Column(db.String(128), nullable=False)
+    data = db.Column(LargeBinary, nullable=False)
 
 
 @event.listens_for(Training.__table__, "before_create")

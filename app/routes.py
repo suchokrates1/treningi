@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from datetime import datetime, timezone
-from .models import Training, Booking, Volunteer, EmailSettings
+from .models import Training, Booking, Volunteer, EmailSettings, StoredFile
 from .forms import VolunteerForm, CancelForm
 from . import db
 from .email_utils import send_email
@@ -98,11 +98,34 @@ def index():
             html_body = render_template_string(
                 settings.registration_template, data
             )
+            attachments: list[tuple[str, str, bytes]] = []
+            if settings:
+                file_ids: list[int] | None
+                if existing_volunteer.is_adult:
+                    file_ids = settings.registration_files_adult or []
+                else:
+                    file_ids = settings.registration_files_minor or []
+                if file_ids:
+                    stored = (
+                        StoredFile.query.filter(StoredFile.id.in_(file_ids)).all()
+                    )
+                    stored_by_id = {file.id: file for file in stored}
+                    attachments = [
+                        (
+                            stored_by_id[file_id].filename,
+                            stored_by_id[file_id].content_type,
+                            stored_by_id[file_id].data,
+                        )
+                        for file_id in file_ids
+                        if file_id in stored_by_id
+                    ]
+
             success, error = send_email(
                 "Potwierdzenie zgłoszenia",
                 None,
                 [existing_volunteer.email],
                 html_body=html_body,
+                attachments=attachments,
             )
             if not success:
                 msg = "Nie udało się wysłać potwierdzenia"
