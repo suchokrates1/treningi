@@ -141,6 +141,15 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const buttons = document.querySelectorAll('.remove-attachment-btn');
+
+    const submitForm = function (form) {
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        HTMLFormElement.prototype.submit.call(form);
+      }
+    };
+
     buttons.forEach(function (button) {
       button.addEventListener('click', function () {
         const checkbox = document.getElementById(this.dataset.target);
@@ -154,7 +163,11 @@
         checkbox.checked = true;
         const form = checkbox.closest('form');
         if (form) {
+
+          submitForm(form);
+
           form.submit();
+
         }
       });
     });
