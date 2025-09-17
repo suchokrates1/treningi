@@ -182,6 +182,38 @@ def test_test_email_preserves_form_data(client, monkeypatch):
     assert b"smtp.example.com" in resp.data
 
 
+def test_test_email_requires_recipient(client, monkeypatch):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    form_data = {
+        "server": "smtp.example.com",
+        "port": "2500",
+        "login": "foo",
+        "password": "bar",
+        "encryption": "tls",
+        "sender": "Sender Name",
+        "registration_template": "Hi",
+        "cancellation_template": "Bye",
+    }
+
+    monkeypatch.setattr(
+        "app.admin_routes.send_email",
+        lambda *args, **kwargs: pytest.fail("send_email should not be called"),
+    )
+
+    resp = client.post(
+        "/admin/settings/test-email",
+        data=form_data,
+        follow_redirects=True,
+    )
+
+    assert resp.status_code == 200
+    assert b"Podaj adres e-mail odbiorcy wiadomo\xc5\x9bci testowej." in resp.data
+
+
 def test_settings_validation_passes(client, app_instance, monkeypatch):
     login = client.post(
         "/admin/login", data={"password": "secret"}, follow_redirects=True

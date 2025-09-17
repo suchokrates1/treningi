@@ -585,29 +585,42 @@ def test_email():
     form.remove_adult_files.choices = []
     form.remove_minor_files.choices = []
     if form.validate_on_submit():
-        recipient = form.test_recipient.data.strip()
-        try:
-            success, error = send_email(
-                "Test konfiguracji",
-                "To jest testowa wiadomość.",
-                [recipient],
-                host=form.server.data or None,
-                port=form.port.data,
-                username=form.login.data or None,
-                password=form.password.data or None,
-                encryption=form.encryption.data,
-                sender=form.sender.data or None,
+        recipient_data = form.test_recipient.data
+        if not recipient_data:
+            flash(
+                "Podaj adres e-mail odbiorcy wiadomości testowej.",
+                "warning",
             )
-            if success:
-                flash("Wysłano wiadomość testową.", "success")
+        else:
+            recipient = recipient_data.strip()
+            if not recipient:
+                flash(
+                    "Podaj adres e-mail odbiorcy wiadomości testowej.",
+                    "warning",
+                )
             else:
-                msg = "Nie udało się wysłać wiadomości testowej"
-                if error:
-                    msg += f": {error}"
-                flash(msg, "danger")
-        except Exception:  # pragma: no cover - safety net
-            current_app.logger.exception("Failed to send test email")
-            flash("Nie udało się wysłać wiadomości testowej.", "danger")
+                try:
+                    success, error = send_email(
+                        "Test konfiguracji",
+                        "To jest testowa wiadomość.",
+                        [recipient],
+                        host=form.server.data or None,
+                        port=form.port.data,
+                        username=form.login.data or None,
+                        password=form.password.data or None,
+                        encryption=form.encryption.data,
+                        sender=form.sender.data or None,
+                    )
+                    if success:
+                        flash("Wysłano wiadomość testową.", "success")
+                    else:
+                        msg = "Nie udało się wysłać wiadomości testowej"
+                        if error:
+                            msg += f": {error}"
+                        flash(msg, "danger")
+                except Exception:  # pragma: no cover - safety net
+                    current_app.logger.exception("Failed to send test email")
+                    flash("Nie udało się wysłać wiadomości testowej.", "danger")
     else:
         flash("Nie udało się wysłać wiadomości testowej.", "danger")
     return render_template("admin/settings.html", form=form)
