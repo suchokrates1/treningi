@@ -5,6 +5,9 @@ from app import db
 from app.models import EmailSettings, StoredFile
 import app
 
+
+ATTACHMENT_ERROR = "Nie udało się zmodyfikować załączników. Zmiany nie zostały zapisane."
+
 # allow send_email to run in this module
 @pytest.fixture(autouse=True)
 def no_email():
@@ -106,6 +109,195 @@ def test_admin_settings_manage_attachments(client, app_instance):
         assert attachments_dir.exists()
         assert not (attachments_dir / adult_meta["stored_name"]).exists()
         assert not (attachments_dir / minor_meta["stored_name"]).exists()
+
+
+def test_admin_settings_attachments_dir_failure(client, app_instance, monkeypatch):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    create_response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "registration_files_adult": [(BytesIO(b"adult"), "adult.txt")],
+            "registration_files_minor": [(BytesIO(b"minor"), "minor.pdf")],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert create_response.status_code == 200
+    assert b"Zapisano ustawienia." in create_response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        initial_adult = settings.registration_files_adult[0].copy()
+        initial_minor = settings.registration_files_minor[0].copy()
+
+    def fail_mkdir(self, *args, **kwargs):
+        raise PermissionError("mkdir denied")
+
+    monkeypatch.setattr(Path, "mkdir", fail_mkdir)
+
+    response = client.post(
+        "/admin/settings",
+        data=data,
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert ATTACHMENT_ERROR.encode("utf-8") in response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings.registration_files_adult[0] == initial_adult
+        assert settings.registration_files_minor[0] == initial_minor
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert (attachments_dir / initial_adult["stored_name"]).exists()
+        assert (attachments_dir / initial_minor["stored_name"]).exists()
+
+
+def test_admin_settings_attachment_unlink_failure(client, app_instance, monkeypatch):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    create_response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "registration_files_adult": [(BytesIO(b"adult"), "adult.txt")],
+            "registration_files_minor": [(BytesIO(b"minor"), "minor.pdf")],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert create_response.status_code == 200
+    assert b"Zapisano ustawienia." in create_response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        initial_adult = settings.registration_files_adult[0].copy()
+        initial_minor = settings.registration_files_minor[0].copy()
+
+    def fail_unlink(self, *args, **kwargs):
+        raise PermissionError("unlink denied")
+
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+
+    response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "remove_adult_files": [initial_adult["stored_name"]],
+            "remove_minor_files": [initial_minor["stored_name"]],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert ATTACHMENT_ERROR.encode("utf-8") in response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings.registration_files_adult[0] == initial_adult
+        assert settings.registration_files_minor[0] == initial_minor
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert (attachments_dir / initial_adult["stored_name"]).exists()
+        assert (attachments_dir / initial_minor["stored_name"]).exists()
+
+
+def test_admin_settings_attachment_save_failure(client, app_instance, monkeypatch):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    create_response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "registration_files_adult": [(BytesIO(b"adult"), "adult.txt")],
+            "registration_files_minor": [(BytesIO(b"minor"), "minor.pdf")],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert create_response.status_code == 200
+    assert b"Zapisano ustawienia." in create_response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        initial_adult = settings.registration_files_adult[0].copy()
+        initial_minor = settings.registration_files_minor[0].copy()
+
+    def fail_save(self, dst, *args, **kwargs):
+        raise PermissionError("save denied")
+
+    monkeypatch.setattr("werkzeug.datastructures.FileStorage.save", fail_save)
+
+    response = client.post(
+        "/admin/settings",
+        data={
+            **data,
+            "registration_files_adult": [(BytesIO(b"new"), "new.txt")],
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert ATTACHMENT_ERROR.encode("utf-8") in response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert len(settings.registration_files_adult) == 1
+        assert len(settings.registration_files_minor) == 1
+        assert settings.registration_files_adult[0] == initial_adult
+        assert settings.registration_files_minor[0] == initial_minor
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert (attachments_dir / initial_adult["stored_name"]).exists()
+        assert (attachments_dir / initial_minor["stored_name"]).exists()
+        assert not any(
+            p.name.endswith("new.txt") for p in attachments_dir.glob("*.txt") if p.is_file()
+        )
 
 
 def test_admin_settings_edit_keeps_existing_files(client, app_instance):
