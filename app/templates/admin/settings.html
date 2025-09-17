@@ -63,9 +63,17 @@
       <div class="mt-2">
         <p class="mb-1">Istniejące załączniki:</p>
         {% for subfield in form.remove_adult_files %}
-        <div class="form-check">
-          {{ subfield(class="form-check-input", id=subfield.id) }}
-          <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+        <div class="d-flex align-items-center mb-1">
+          <div class="form-check mb-0">
+            {{ subfield(class="form-check-input", id=subfield.id) }}
+            <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+          </div>
+          <button type="button"
+                  class="btn btn-sm btn-outline-danger ms-2 remove-attachment-btn"
+                  data-target="{{ subfield.id }}"
+                  data-confirm="Czy na pewno chcesz usunąć ten załącznik?">
+            Usuń
+          </button>
         </div>
         {% endfor %}
         <div class="form-text">Zaznacz pliki, które mają zostać usunięte.</div>
@@ -82,9 +90,17 @@
       <div class="mt-2">
         <p class="mb-1">Istniejące załączniki:</p>
         {% for subfield in form.remove_minor_files %}
-        <div class="form-check">
-          {{ subfield(class="form-check-input", id=subfield.id) }}
-          <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+        <div class="d-flex align-items-center mb-1">
+          <div class="form-check mb-0">
+            {{ subfield(class="form-check-input", id=subfield.id) }}
+            <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+          </div>
+          <button type="button"
+                  class="btn btn-sm btn-outline-danger ms-2 remove-attachment-btn"
+                  data-target="{{ subfield.id }}"
+                  data-confirm="Czy na pewno chcesz usunąć ten załącznik?">
+            Usuń
+          </button>
         </div>
         {% endfor %}
         <div class="form-text">Zaznacz pliki, które mają zostać usunięte.</div>
@@ -122,4 +138,26 @@
     </div>
   </div>
 </div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const buttons = document.querySelectorAll('.remove-attachment-btn');
+    buttons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        const checkbox = document.getElementById(this.dataset.target);
+        if (!checkbox) {
+          return;
+        }
+        const message = this.dataset.confirm;
+        if (message && !window.confirm(message)) {
+          return;
+        }
+        checkbox.checked = true;
+        const form = checkbox.closest('form');
+        if (form) {
+          form.submit();
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}
