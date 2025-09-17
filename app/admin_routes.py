@@ -496,11 +496,23 @@ def settings():
 
     error_occurred = False
 
+    missing_files_cleaned = False
+
     def _normalize_file_entries(entries):
-        nonlocal error_occurred
+        nonlocal error_occurred, missing_files_cleaned
         normalized = []
         for entry in entries:
             if isinstance(entry, dict):
+                stored_name = entry.get("stored_name")
+                if stored_name:
+                    file_path = attachments_dir / stored_name
+                    if not file_path.exists():
+                        current_app.logger.warning(
+                            "Attachment %s referenced in settings but missing on disk",
+                            file_path,
+                        )
+                        missing_files_cleaned = True
+                        continue
                 normalized.append(entry)
                 continue
             if isinstance(entry, int):
@@ -555,6 +567,11 @@ def settings():
 
     existing_adult = _normalize_file_entries(list(settings.registration_files_adult or []))
     existing_minor = _normalize_file_entries(list(settings.registration_files_minor or []))
+
+    if missing_files_cleaned:
+        settings.registration_files_adult = existing_adult
+        settings.registration_files_minor = existing_minor
+        db.session.commit()
 
     def _choice_label(meta):
         return meta.get("original_name") or meta.get("filename") or meta.get("stored_name")
