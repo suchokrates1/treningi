@@ -1,7 +1,15 @@
 from datetime import datetime, timedelta, timezone
 
 from app import db
-from app.models import Booking, Training, Volunteer, Coach, Location
+from app.models import (
+    Booking,
+    Training,
+    Volunteer,
+    Coach,
+    Location,
+    EmailSettings,
+    StoredFile,
+)
 
 
 def sign_up(client, volunteer_data, training_id):
@@ -106,3 +114,67 @@ def test_cancel_booking_sends_email(client, app_instance, sample_data, monkeypat
     )
 
     assert "args" in called
+    assert called["kwargs"].get("attachments") in (None, [])
+
+
+def test_registration_attachments_match_age(
+    client, app_instance, sample_data, monkeypatch
+):
+    training_id, _, _, _ = sample_data
+
+    captured: list[list[tuple[str, str, bytes]] | None] = []
+
+    def fake_send_email(*args, **kwargs):
+        captured.append(kwargs.get("attachments"))
+        return True, None
+
+    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+
+    with app_instance.app_context():
+        adult_file = StoredFile(
+            filename="adult.pdf",
+            content_type="application/pdf",
+            data=b"adult",
+        )
+        minor_file = StoredFile(
+            filename="minor.pdf",
+            content_type="application/pdf",
+            data=b"minor",
+        )
+        db.session.add_all([adult_file, minor_file])
+        db.session.flush()
+        settings = EmailSettings(
+            id=1,
+            port=587,
+            sender="Admin",
+            encryption="tls",
+            registration_template="Hello",
+            registration_files_adult=[adult_file.id],
+            registration_files_minor=[minor_file.id],
+        )
+        db.session.merge(settings)
+        db.session.commit()
+
+    adult_volunteer = {
+        "first_name": "Alice",
+        "last_name": "Adult",
+        "email": "alice.adult@example.com",
+        "is_adult": True,
+    }
+    minor_volunteer = {
+        "first_name": "Bobby",
+        "last_name": "Minor",
+        "email": "bobby.minor@example.com",
+        "is_adult": False,
+    }
+
+    sign_up(client, adult_volunteer, training_id)
+    sign_up(client, minor_volunteer, training_id)
+
+    assert len(captured) == 2
+    assert captured[0] and captured[0][0][0] == "adult.pdf"
+    assert captured[0][0][1] == "application/pdf"
+    assert captured[0][0][2] == b"adult"
+    assert captured[1] and captured[1][0][0] == "minor.pdf"
+    assert captured[1][0][1] == "application/pdf"
+    assert captured[1][0][2] == b"minor"

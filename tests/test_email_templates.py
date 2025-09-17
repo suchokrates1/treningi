@@ -51,6 +51,57 @@ def test_send_email_includes_plain_and_html(app_instance, monkeypatch):
     assert msg.get_body(preferencelist=('html',)).get_content().strip() == "<p>Hello</p>"
 
 
+def test_send_email_adds_attachments(app_instance, monkeypatch):
+    captured = {}
+
+    class DummySMTP:
+        def __init__(self, host, port):
+            captured['host'] = host
+            captured['port'] = port
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            pass
+
+        def starttls(self):
+            captured['tls'] = True
+
+        def login(self, username, password):
+            captured['login'] = (username, password)
+
+        def send_message(self, msg):
+            captured['message'] = msg
+
+    monkeypatch.setattr(smtplib, "SMTP", DummySMTP)
+
+    with app_instance.app_context():
+        settings = EmailSettings(
+            id=1,
+            server="smtp.example.com",
+            port=25,
+            sender="Admin",
+            encryption="tls",
+        )
+        db.session.add(settings)
+        db.session.commit()
+        send_email(
+            "Subject",
+            "Body",
+            ["to@example.com"],
+            attachments=[("info.txt", "text/plain", b"hello")],
+        )
+
+    msg = captured['message']
+    attachments = list(msg.iter_attachments())
+    assert len(attachments) == 1
+    attachment = attachments[0]
+    assert attachment.get_filename() == "info.txt"
+    assert attachment.get_content_type() == "text/plain"
+    assert attachment.get_payload(decode=True) == b"hello"
+
+
 def test_preview_endpoint_renders(client, app_instance):
     with client.session_transaction() as sess:
         sess['admin_logged_in'] = True
