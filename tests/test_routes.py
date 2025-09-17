@@ -1,8 +1,9 @@
 import pytest
 from datetime import datetime, timezone
+from pathlib import Path
 
 from app import db
-from app.models import Coach, Location, Training, Volunteer, Booking
+from app.models import Coach, Location, Training, Volunteer, Booking, EmailSettings
 
 
 def setup_training(app):
@@ -89,3 +90,58 @@ def test_remove_training_deletes_record(client, app_instance):
     with app_instance.app_context():
         assert db.session.get(Training, training_id) is None
         assert Booking.query.count() == 0
+
+
+def test_signup_handles_attachment_metadata(
+    client, app_instance, sample_data, monkeypatch
+):
+    training_id, _, _, _ = sample_data
+    attachments_dir = Path(app_instance.instance_path) / "attachments"
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    stored_name = "test_file.txt"
+    (attachments_dir / stored_name).write_text("Important info", encoding="utf-8")
+
+    with app_instance.app_context():
+        settings = EmailSettings(
+            id=1,
+            registration_template="Hello {first_name}",
+            registration_files_adult=[
+                {
+                    "stored_name": stored_name,
+                    "original_name": "info.txt",
+                    "content_type": "text/plain",
+                }
+            ],
+        )
+        db.session.add(settings)
+        db.session.commit()
+
+    captured: dict[str, list[tuple[str, str, bytes]] | None] = {"attachments": None}
+
+    def fake_send_email(subject, body, recipients, **kwargs):
+        captured["attachments"] = kwargs.get("attachments")
+        return True, None
+
+    monkeypatch.setattr("app.email_utils.send_email", fake_send_email)
+    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+
+    response = client.post(
+        "/",
+        data={
+            "first_name": "New",
+            "last_name": "Volunteer",
+            "email": "new_volunteer@example.com",
+            "training_id": str(training_id),
+            "is_adult": "true",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Zapisano na trening!" in response.data
+    attachments = captured["attachments"]
+    assert attachments is not None and len(attachments) == 1
+    filename, content_type, data = attachments[0]
+    assert filename == "info.txt"
+    assert content_type == "text/plain"
+    assert data == b"Important info"
