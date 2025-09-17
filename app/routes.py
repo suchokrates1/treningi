@@ -6,6 +6,7 @@ from flask import (
     url_for,
     flash,
     request,
+    abort,
 )
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,7 +31,9 @@ def index():
             flash("Niepoprawny ID treningu", "danger")
             return redirect(url_for("routes.index"))
 
-        training = Training.query.get_or_404(training_id)
+        training = db.session.get(Training, training_id)
+        if training is None:
+            abort(404)
         if training.is_canceled or training.is_deleted:
             flash("Ten trening został odwołany lub usunięty.", "danger")
             return redirect(url_for("routes.index"))
@@ -265,7 +268,9 @@ def cancel_booking():
 
     training = None
     if training_id:
-        training = Training.query.get_or_404(training_id)
+        training = db.session.get(Training, training_id)
+        if training is None:
+            abort(404)
 
     return render_template(
         "cancel.html",
