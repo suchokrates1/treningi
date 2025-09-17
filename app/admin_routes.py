@@ -483,9 +483,18 @@ def settings():
         db.session.commit()
 
     form = SettingsForm(obj=settings)
-    if not flask.request.files.getlist("registration_files_adult"):
+    def _has_uploaded_files(field_name: str) -> bool:
+        """Return ``True`` when the request contains real file uploads."""
+
+        files = flask.request.files.getlist(field_name)
+        for storage in files:
+            if storage and getattr(storage, "filename", ""):
+                return True
+        return False
+
+    if not _has_uploaded_files("registration_files_adult"):
         form.registration_files_adult.data = []
-    if not flask.request.files.getlist("registration_files_minor"):
+    if not _has_uploaded_files("registration_files_minor"):
         form.registration_files_minor.data = []
 
     attachments_dir = Path(current_app.instance_path) / "attachments"
