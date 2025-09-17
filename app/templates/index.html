@@ -72,6 +72,16 @@
               {{ form.email.label(class="form-label") }}
               {{ form.email(class="form-control") }}
             </div>
+            <div class="mb-3">
+              {{ form.is_adult.label(class="form-label d-block") }}
+              {% for subfield in form.is_adult %}
+              <div class="form-check">
+                {{ subfield(class="form-check-input", id=subfield.id) }}
+                <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+              </div>
+              {% endfor %}
+            </div>
+            <p class="text-muted small">Dane potrzebne są do dokumentacji.</p>
             {{ form.training_id }}
           </div>
           <div class="modal-footer">
