@@ -2,7 +2,7 @@
 {% block admin_content %}
 <div class="container mt-4">
   <h2>Ustawienia e-mail</h2>
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
     {{ form.csrf_token }}
     <div class="row g-2">
       <div class="col-md-4">
@@ -54,6 +54,44 @@
           <label class="form-check-label" for="registration_html_toggle">Edytuj HTML</label>
         </div>
       </div>
+    </div>
+    <div class="mb-3">
+      {{ form.registration_files_adult.label(class="form-label") }}
+      {{ form.registration_files_adult(class="form-control", multiple=True) }}
+      <div class="form-text">Dodaj dokumenty wysyłane do osób pełnoletnich.</div>
+      {% if form.remove_adult_files.choices %}
+      <div class="mt-2">
+        <p class="mb-1">Istniejące załączniki:</p>
+        {% for subfield in form.remove_adult_files %}
+        <div class="form-check">
+          {{ subfield(class="form-check-input", id=subfield.id) }}
+          <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+        </div>
+        {% endfor %}
+        <div class="form-text">Zaznacz pliki, które mają zostać usunięte.</div>
+      </div>
+      {% else %}
+      <div class="form-text">Brak zapisanych załączników dla osób pełnoletnich.</div>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+      {{ form.registration_files_minor.label(class="form-label") }}
+      {{ form.registration_files_minor(class="form-control", multiple=True) }}
+      <div class="form-text">Dodaj dokumenty wysyłane do osób niepełnoletnich.</div>
+      {% if form.remove_minor_files.choices %}
+      <div class="mt-2">
+        <p class="mb-1">Istniejące załączniki:</p>
+        {% for subfield in form.remove_minor_files %}
+        <div class="form-check">
+          {{ subfield(class="form-check-input", id=subfield.id) }}
+          <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+        </div>
+        {% endfor %}
+        <div class="form-text">Zaznacz pliki, które mają zostać usunięte.</div>
+      </div>
+      {% else %}
+      <div class="form-text">Brak zapisanych załączników dla osób niepełnoletnich.</div>
+      {% endif %}
     </div>
     <div class="mb-3">
       {{ form.cancellation_template.label(class="form-label") }}
