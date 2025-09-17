@@ -2,7 +2,7 @@ import pytest
 from io import BytesIO
 from pathlib import Path
 from app import db
-from app.models import EmailSettings
+from app.models import EmailSettings, StoredFile
 import app
 
 # allow send_email to run in this module
@@ -106,6 +106,77 @@ def test_admin_settings_manage_attachments(client, app_instance):
         assert attachments_dir.exists()
         assert not (attachments_dir / adult_meta["stored_name"]).exists()
         assert not (attachments_dir / minor_meta["stored_name"]).exists()
+
+
+def test_admin_settings_migrates_legacy_file_ids(client, app_instance):
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert b"Zalogowano" in login.data
+
+    with app_instance.app_context():
+        adult_file = StoredFile(
+            filename="legacy_adult.pdf",
+            content_type="application/pdf",
+            data=b"adult",
+        )
+        minor_file = StoredFile(
+            filename="legacy_minor.pdf",
+            content_type="application/pdf",
+            data=b"minor",
+        )
+        db.session.add_all([adult_file, minor_file])
+        db.session.flush()
+        settings = EmailSettings(
+            id=1,
+            port=587,
+            sender="Admin",
+            encryption="tls",
+            registration_template="Hello",
+            registration_files_adult=[adult_file.id],
+            registration_files_minor=[minor_file.id],
+        )
+        db.session.merge(settings)
+        db.session.commit()
+
+    form_data = {
+        "server": "smtp.test.com",
+        "port": "2525",
+        "login": "user",
+        "password": "pass",
+        "encryption": "tls",
+        "sender": "Admin",
+        "registration_template": "Hello",
+        "cancellation_template": "Bye",
+    }
+
+    response = client.post(
+        "/admin/settings",
+        data=form_data,
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Zapisano ustawienia." in response.data
+
+    with app_instance.app_context():
+        settings = db.session.get(EmailSettings, 1)
+        assert settings is not None
+        assert isinstance(settings.registration_files_adult, list)
+        assert isinstance(settings.registration_files_minor, list)
+        assert settings.registration_files_adult
+        assert settings.registration_files_minor
+
+        adult_meta = settings.registration_files_adult[0]
+        minor_meta = settings.registration_files_minor[0]
+        assert adult_meta["original_name"] == "legacy_adult.pdf"
+        assert minor_meta["original_name"] == "legacy_minor.pdf"
+        assert adult_meta["stored_name"].startswith("legacy_")
+        assert minor_meta["stored_name"].startswith("legacy_")
+
+        attachments_dir = Path(app_instance.instance_path) / "attachments"
+        assert (attachments_dir / adult_meta["stored_name"]).read_bytes() == b"adult"
+        assert (attachments_dir / minor_meta["stored_name"]).read_bytes() == b"minor"
 
 
 def test_admin_send_test_email(client, app_instance, monkeypatch):
