@@ -150,6 +150,8 @@ class EmailSettings(db.Model):
     encryption = db.Column(db.String(10), nullable=True)
     registration_template = db.Column(db.Text, nullable=True)
     cancellation_template = db.Column(db.Text, nullable=True)
+    adult_attachments = db.Column(db.JSON, default=list)
+    minor_attachments = db.Column(db.JSON, default=list)
 
 
 @event.listens_for(Training.__table__, "before_create")

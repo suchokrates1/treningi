@@ -2,7 +2,7 @@
 {% block admin_content %}
 <div class="container mt-4">
   <h2>Ustawienia e-mail</h2>
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
     {{ form.csrf_token }}
     <div class="row g-2">
       <div class="col-md-4">
@@ -52,6 +52,78 @@
         <div class="form-check form-switch d-inline-block ms-2">
           <input class="form-check-input html-toggle" type="checkbox" role="switch" id="registration_html_toggle" data-editor="registration_editor">
           <label class="form-check-label" for="registration_html_toggle">Edytuj HTML</label>
+        </div>
+      </div>
+    </div>
+    <div class="row g-4 mt-3">
+      <div class="col-md-6">
+        <h5 class="mb-3">Załączniki (dorośli)</h5>
+        <div class="mb-3">
+          {{ form.adult_attachments.label(class="form-label") }}
+          {{ form.adult_attachments(class_="form-control", multiple=True) }}
+          <div class="form-text">Możesz dodać wiele plików jednocześnie.</div>
+        </div>
+        <div class="mb-2">
+          <h6 class="fw-semibold">{{ form.remove_adult_attachments.label.text }}</h6>
+          {% if adult_attachments %}
+          <ul class="list-group">
+            {% for checkbox in form.remove_adult_attachments %}
+            {% set meta = adult_attachments[loop.index0] %}
+            {% set display_name = meta.get('original_name') or meta.get('filename') %}
+            {% set content_type = meta.get('content_type') %}
+            {% set size = meta.get('size') %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <div>{{ display_name }}</div>
+                <div class="small text-muted">
+                  {{ content_type or 'application/octet-stream' }}{% if size is not none %} • {{ size }} B{% endif %}
+                </div>
+              </div>
+              <div class="form-check m-0">
+                {{ checkbox(class_="form-check-input") }}
+                <label class="form-check-label" for="{{ checkbox.id }}">Usuń</label>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted mb-0">Brak zapisanych załączników.</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h5 class="mb-3">Załączniki (nieletni)</h5>
+        <div class="mb-3">
+          {{ form.minor_attachments.label(class="form-label") }}
+          {{ form.minor_attachments(class_="form-control", multiple=True) }}
+          <div class="form-text">Dodaj pliki dla zapisów nieletnich.</div>
+        </div>
+        <div class="mb-2">
+          <h6 class="fw-semibold">{{ form.remove_minor_attachments.label.text }}</h6>
+          {% if minor_attachments %}
+          <ul class="list-group">
+            {% for checkbox in form.remove_minor_attachments %}
+            {% set meta = minor_attachments[loop.index0] %}
+            {% set display_name = meta.get('original_name') or meta.get('filename') %}
+            {% set content_type = meta.get('content_type') %}
+            {% set size = meta.get('size') %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <div>{{ display_name }}</div>
+                <div class="small text-muted">
+                  {{ content_type or 'application/octet-stream' }}{% if size is not none %} • {{ size }} B{% endif %}
+                </div>
+              </div>
+              <div class="form-check m-0">
+                {{ checkbox(class_="form-check-input") }}
+                <label class="form-check-label" for="{{ checkbox.id }}">Usuń</label>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted mb-0">Brak zapisanych załączników.</p>
+          {% endif %}
         </div>
       </div>
     </div>

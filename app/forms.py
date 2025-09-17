@@ -6,10 +6,18 @@ from wtforms import (
     PasswordField,
 )
 from wtforms.fields.datetime import DateTimeLocalField
-from flask_wtf.file import FileField
+from flask_wtf.file import FileField, MultipleFileField
 from wtforms.validators import DataRequired, Length, Email, Optional, NumberRange
 from wtforms.fields import HiddenField, TelField
+from wtforms import SelectMultipleField, widgets
 from wtforms import IntegerField
+
+
+
+
+class MultiCheckboxField(SelectMultipleField):
+    widget = widgets.ListWidget(prefix_label=False)
+    option_widget = widgets.CheckboxInput()
 
 
 class CoachForm(FlaskForm):
@@ -106,6 +114,24 @@ class SettingsForm(FlaskForm):
     )
     registration_template = HiddenField('Szablon maila zapisu')
     cancellation_template = HiddenField('Szablon maila odwołania')
+    adult_attachments = MultipleFileField(
+        'Załączniki (dorośli)', validators=[Optional()]
+    )
+    remove_adult_attachments = MultiCheckboxField(
+        'Usuń załączniki (dorośli)',
+        choices=[],
+        coerce=str,
+        validators=[Optional()],
+    )
+    minor_attachments = MultipleFileField(
+        'Załączniki (nieletni)', validators=[Optional()]
+    )
+    remove_minor_attachments = MultiCheckboxField(
+        'Usuń załączniki (nieletni)',
+        choices=[],
+        coerce=str,
+        validators=[Optional()],
+    )
     test_recipient = StringField(
         'Adres testowy', validators=[Optional(), Email(), Length(max=128)]
     )

@@ -11,6 +11,7 @@ from flask import (
 import flask
 from functools import wraps
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import db, csrf
 from .email_utils import send_email
@@ -24,6 +25,7 @@ from .forms import (
     SettingsForm,
 )
 from .models import Coach, Training, Location, EmailSettings
+from werkzeug.utils import secure_filename
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -36,6 +38,98 @@ def login_required(view):
         return view(*args, **kwargs)
 
     return wrapped
+
+
+def _get_attachment_metadata(settings):
+    if not settings:
+        return [], []
+    adult = settings.adult_attachments or []
+    minor = settings.minor_attachments or []
+    return list(adult), list(minor)
+
+
+def _populate_attachment_fields(form, adult_meta, minor_meta):
+    def _build_choices(items):
+        choices = []
+        for item in items:
+            stored_name = item.get("filename") if isinstance(item, dict) else None
+            if not stored_name:
+                continue
+            label = item.get("original_name") if isinstance(item, dict) else None
+            if not label:
+                label = stored_name
+            choices.append((stored_name, label))
+        return choices
+
+    form.remove_adult_attachments.choices = _build_choices(adult_meta)
+    form.remove_minor_attachments.choices = _build_choices(minor_meta)
+
+
+def _ensure_attachments_dir():
+    attachments_dir = Path(current_app.instance_path) / "attachments"
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    return attachments_dir
+
+
+def _generate_unique_name(base_name, target_dir):
+    path = Path(base_name)
+    stem = path.stem or "attachment"
+    suffix = path.suffix
+    candidate = base_name if base_name else "attachment"
+    counter = 1
+    while (target_dir / candidate).exists():
+        candidate = f"{stem}_{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
+def _store_uploaded_files(files, target_dir):
+    saved = []
+    for storage in files or []:
+        if not storage:
+            continue
+        if not hasattr(storage, "filename"):
+            continue
+        original_name = storage.filename
+        if not original_name:
+            continue
+        filename = secure_filename(original_name)
+        if not filename:
+            continue
+        unique_name = _generate_unique_name(filename, target_dir)
+        stored_path = target_dir / unique_name
+        storage.save(stored_path)
+        try:
+            size = stored_path.stat().st_size
+        except OSError:
+            size = None
+        saved.append(
+            {
+                "filename": unique_name,
+                "original_name": original_name,
+                "content_type": storage.mimetype or "application/octet-stream",
+                "size": size,
+            }
+        )
+    return saved
+
+
+def _prune_attachments(metadata, filenames_to_remove, target_dir):
+    remaining = []
+    filenames = set(filenames_to_remove or [])
+    for item in metadata:
+        stored_name = item.get("filename") if isinstance(item, dict) else None
+        if not stored_name or stored_name not in filenames:
+            remaining.append(item)
+            continue
+        file_path = target_dir / stored_name
+        try:
+            file_path.unlink()
+        except FileNotFoundError:
+            current_app.logger.warning(
+                "Attachment %s not found during removal", stored_name
+            )
+    return remaining
 
 
 @admin_bp.route("/")
@@ -458,8 +552,23 @@ def settings():
         db.session.commit()
 
     form = SettingsForm(obj=settings)
+    adult_meta, minor_meta = _get_attachment_metadata(settings)
+    _populate_attachment_fields(form, adult_meta, minor_meta)
 
     if form.validate_on_submit():
+        attachments_dir = _ensure_attachments_dir()
+        updated_adult_meta = _prune_attachments(
+            adult_meta, form.remove_adult_attachments.data, attachments_dir
+        )
+        updated_minor_meta = _prune_attachments(
+            minor_meta, form.remove_minor_attachments.data, attachments_dir
+        )
+        updated_adult_meta.extend(
+            _store_uploaded_files(form.adult_attachments.data, attachments_dir)
+        )
+        updated_minor_meta.extend(
+            _store_uploaded_files(form.minor_attachments.data, attachments_dir)
+        )
         settings.server = form.server.data.strip() if form.server.data else None
         settings.port = form.port.data
         settings.encryption = form.encryption.data
@@ -468,11 +577,18 @@ def settings():
         settings.sender = form.sender.data.strip()
         settings.registration_template = form.registration_template.data
         settings.cancellation_template = form.cancellation_template.data
+        settings.adult_attachments = updated_adult_meta
+        settings.minor_attachments = updated_minor_meta
         db.session.commit()
         flash("Zapisano ustawienia.", "success")
         return redirect(url_for("admin.settings"))
 
-    return render_template("admin/settings.html", form=form)
+    return render_template(
+        "admin/settings.html",
+        form=form,
+        adult_attachments=adult_meta,
+        minor_attachments=minor_meta,
+    )
 
 
 @admin_bp.route("/settings/test-email", methods=["POST"])
@@ -480,6 +596,9 @@ def settings():
 def test_email():
     """Send a test email using provided settings without saving."""
     form = SettingsForm()
+    settings = db.session.get(EmailSettings, 1)
+    adult_meta, minor_meta = _get_attachment_metadata(settings)
+    _populate_attachment_fields(form, adult_meta, minor_meta)
     if form.validate_on_submit():
         recipient = form.test_recipient.data.strip()
         try:
@@ -506,7 +625,12 @@ def test_email():
             flash("Nie udało się wysłać wiadomości testowej.", "danger")
     else:
         flash("Nie udało się wysłać wiadomości testowej.", "danger")
-    return render_template("admin/settings.html", form=form)
+    return render_template(
+        "admin/settings.html",
+        form=form,
+        adult_attachments=adult_meta,
+        minor_attachments=minor_meta,
+    )
 
 
 @admin_bp.route("/settings/preview/<template>", methods=["GET", "POST"])
