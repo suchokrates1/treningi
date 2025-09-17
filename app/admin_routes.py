@@ -11,6 +11,11 @@ from flask import (
 import flask
 from functools import wraps
 from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
+import mimetypes
+
+from werkzeug.utils import secure_filename
 
 from . import db, csrf
 from .email_utils import send_email
@@ -458,6 +463,26 @@ def settings():
         db.session.commit()
 
     form = SettingsForm(obj=settings)
+    if not flask.request.files.getlist("registration_files_adult"):
+        form.registration_files_adult.data = []
+    if not flask.request.files.getlist("registration_files_minor"):
+        form.registration_files_minor.data = []
+    existing_adult = list(settings.registration_files_adult or [])
+    existing_minor = list(settings.registration_files_minor or [])
+
+    def _choice_label(meta):
+        return meta.get("original_name") or meta.get("filename") or meta.get("stored_name")
+
+    form.remove_adult_files.choices = [
+        (meta.get("stored_name"), _choice_label(meta))
+        for meta in existing_adult
+        if meta.get("stored_name")
+    ]
+    form.remove_minor_files.choices = [
+        (meta.get("stored_name"), _choice_label(meta))
+        for meta in existing_minor
+        if meta.get("stored_name")
+    ]
 
     if form.validate_on_submit():
         settings.server = form.server.data.strip() if form.server.data else None
@@ -468,6 +493,63 @@ def settings():
         settings.sender = form.sender.data.strip()
         settings.registration_template = form.registration_template.data
         settings.cancellation_template = form.cancellation_template.data
+
+        attachments_dir = Path(current_app.instance_path) / "attachments"
+        attachments_dir.mkdir(parents=True, exist_ok=True)
+
+        def _process_files(uploaded, existing, removals):
+            updated = [
+                meta
+                for meta in existing
+                if meta.get("stored_name") and meta.get("stored_name") not in removals
+            ]
+            for stored_name in removals:
+                if not stored_name:
+                    continue
+                file_path = attachments_dir / stored_name
+                if file_path.exists():
+                    file_path.unlink()
+
+            for storage in uploaded:
+                if not storage or not storage.filename:
+                    continue
+                original_name = storage.filename
+                secure_name = secure_filename(original_name)
+                if not secure_name:
+                    continue
+                stored_name = f"{uuid4().hex}_{secure_name}"
+                target_path = attachments_dir / stored_name
+                storage.save(target_path)
+                content_type = (
+                    storage.mimetype
+                    or mimetypes.guess_type(original_name)[0]
+                    or "application/octet-stream"
+                )
+                updated.append(
+                    {
+                        "stored_name": stored_name,
+                        "original_name": original_name,
+                        "content_type": content_type,
+                    }
+                )
+            return updated
+
+        adult_removals = set(form.remove_adult_files.data or [])
+        minor_removals = set(form.remove_minor_files.data or [])
+
+        updated_adult = _process_files(
+            form.registration_files_adult.data or [],
+            existing_adult,
+            adult_removals,
+        )
+        updated_minor = _process_files(
+            form.registration_files_minor.data or [],
+            existing_minor,
+            minor_removals,
+        )
+
+        settings.registration_files_adult = updated_adult
+        settings.registration_files_minor = updated_minor
         db.session.commit()
         flash("Zapisano ustawienia.", "success")
         return redirect(url_for("admin.settings"))
@@ -480,6 +562,8 @@ def settings():
 def test_email():
     """Send a test email using provided settings without saving."""
     form = SettingsForm()
+    form.remove_adult_files.choices = []
+    form.remove_minor_files.choices = []
     if form.validate_on_submit():
         recipient = form.test_recipient.data.strip()
         try:
