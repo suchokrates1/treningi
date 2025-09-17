@@ -7,7 +7,7 @@ from wtforms import (
     RadioField,
 )
 from wtforms.fields.datetime import DateTimeLocalField
-from flask_wtf.file import FileField
+from flask_wtf.file import FileField, MultipleFileField
 from wtforms.validators import (
     DataRequired,
     Length,
@@ -18,6 +18,14 @@ from wtforms.validators import (
 )
 from wtforms.fields import HiddenField, TelField
 from wtforms import IntegerField
+from wtforms import SelectMultipleField, widgets
+
+
+class MultiCheckboxField(SelectMultipleField):
+    """Render a set of checkboxes representing a multi-select field."""
+
+    widget = widgets.ListWidget(prefix_label=False)
+    option_widget = widgets.CheckboxInput()
 
 
 class CoachForm(FlaskForm):
@@ -122,6 +130,18 @@ class SettingsForm(FlaskForm):
     cancellation_template = HiddenField('Szablon maila odwołania')
     test_recipient = StringField(
         'Adres testowy', validators=[Optional(), Email(), Length(max=128)]
+    )
+    registration_files_adult = MultipleFileField(
+        'Załączniki - osoba pełnoletnia', validators=[Optional()]
+    )
+    registration_files_minor = MultipleFileField(
+        'Załączniki - osoba niepełnoletnia', validators=[Optional()]
+    )
+    remove_adult_files = MultiCheckboxField(
+        'Usuń załączniki (pełnoletni)', choices=[], validators=[Optional()]
+    )
+    remove_minor_files = MultiCheckboxField(
+        'Usuń załączniki (niepełnoletni)', choices=[], validators=[Optional()]
     )
     submit = SubmitField('Zapisz')
     send_test = SubmitField('Wyślij test')
