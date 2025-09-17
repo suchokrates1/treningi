@@ -84,6 +84,7 @@ class Volunteer(db.Model):
     first_name = db.Column(db.String(64), nullable=False)
     last_name = db.Column(db.String(64), nullable=False)
     email = db.Column(db.String(128), nullable=False, unique=True)
+    is_adult = db.Column(db.Boolean, nullable=True)
 
     def __repr__(self):
         return f"<Volunteer {self.first_name} {self.last_name}>"

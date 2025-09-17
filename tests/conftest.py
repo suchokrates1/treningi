@@ -37,7 +37,10 @@ def sample_data(app_instance):
         coach = Coach(first_name="John", last_name="Doe", phone_number="123")
         location = Location(name="Court")
         volunteer = Volunteer(
-            first_name="Ann", last_name="Smith", email="ann@example.com"
+            first_name="Ann",
+            last_name="Smith",
+            email="ann@example.com",
+            is_adult=True,
         )
         training = Training(
             date=datetime.now(timezone.utc),

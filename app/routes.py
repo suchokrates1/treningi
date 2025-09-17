@@ -40,14 +40,24 @@ def index():
             email=email,
         ).first()
 
+        first_name = form.first_name.data.strip()
+        last_name = form.last_name.data.strip()
+
         if not existing_volunteer:
             existing_volunteer = Volunteer(
-                first_name=form.first_name.data.strip(),
-                last_name=form.last_name.data.strip(),
+                first_name=first_name,
+                last_name=last_name,
                 email=email,
             )
             db.session.add(existing_volunteer)
-            db.session.commit()
+        else:
+            existing_volunteer.first_name = first_name
+            existing_volunteer.last_name = last_name
+
+        existing_volunteer.is_adult = form.is_adult.data
+
+        if existing_volunteer.id is None:
+            db.session.flush()
 
         existing_booking = Booking.query.filter_by(
             training_id=training.id,
