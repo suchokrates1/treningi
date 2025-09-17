@@ -15,7 +15,12 @@ def setup_training(app):
             coach=coach,
             location=location,
         )
-        volunteer = Volunteer(first_name='Ann', last_name='Smith', email='ann@example.com')
+        volunteer = Volunteer(
+            first_name='Ann',
+            last_name='Smith',
+            email='ann@example.com',
+            is_adult=True,
+        )
         db.session.add_all([coach, location, volunteer, training])
         db.session.commit()
         return training.id, volunteer.id
@@ -36,6 +41,7 @@ def test_duplicate_booking_flash(client, app_instance):
             'last_name': 'Smith',
             'email': 'ann@example.com',
             'training_id': str(training_id),
+            'is_adult': 'true',
         },
         follow_redirects=True,
     )
@@ -43,6 +49,8 @@ def test_duplicate_booking_flash(client, app_instance):
     assert b'Jeste' in response.data
     with app_instance.app_context():
         assert Booking.query.count() == 1
+        volunteer = db.session.get(Volunteer, volunteer_id)
+        assert volunteer.is_adult is True
 
 
 def test_deleted_training_shows_in_history(client, app_instance):

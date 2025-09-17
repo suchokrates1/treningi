@@ -4,10 +4,18 @@ from wtforms import (
     SubmitField,
     SelectField,
     PasswordField,
+    RadioField,
 )
 from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField
-from wtforms.validators import DataRequired, Length, Email, Optional, NumberRange
+from wtforms.validators import (
+    DataRequired,
+    Length,
+    Email,
+    Optional,
+    NumberRange,
+    InputRequired,
+)
 from wtforms.fields import HiddenField, TelField
 from wtforms import IntegerField
 
@@ -55,6 +63,12 @@ class VolunteerForm(FlaskForm):
     )
     email = StringField(
         'Email', validators=[DataRequired(), Email(), Length(max=128)]
+    )
+    is_adult = RadioField(
+        'Czy jesteś pełnoletni?',
+        choices=[('true', 'Tak'), ('false', 'Nie')],
+        coerce=lambda value: value == 'true',
+        validators=[InputRequired()],
     )
     training_id = HiddenField()  # ukryte pole – ID treningu
     submit = SubmitField('Zapisz się')
