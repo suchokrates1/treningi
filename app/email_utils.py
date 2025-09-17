@@ -4,6 +4,7 @@ from . import db
 import smtplib
 from email.message import EmailMessage
 import re
+from collections.abc import Iterable
 
 
 def send_email(
@@ -19,6 +20,7 @@ def send_email(
     sender: str | None = None,
     encryption: str | None = None,
     use_tls: bool | None = None,
+    attachments: Iterable[tuple[str, str, bytes]] | None = None,
 ) -> tuple[bool, str | None]:
     """Send an email using stored SMTP settings.
 
@@ -97,6 +99,18 @@ def send_email(
 
     if html_body:
         msg.add_alternative(html_body, subtype="html")
+
+    if attachments:
+        for filename, content_type, data in attachments:
+            maintype, subtype = (content_type.split("/", 1) + [""])[:2]
+            if not subtype:
+                maintype, subtype = "application", "octet-stream"
+            msg.add_attachment(
+                data,
+                maintype=maintype,
+                subtype=subtype,
+                filename=filename,
+            )
 
     try:
         smtp_cls = smtplib.SMTP_SSL if encryption == "ssl" else smtplib.SMTP
