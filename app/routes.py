@@ -1,5 +1,14 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import (
+    Blueprint,
+    current_app,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    request,
+)
 from datetime import datetime, timezone
+from pathlib import Path
 from .models import Training, Booking, Volunteer, EmailSettings, StoredFile
 from .forms import VolunteerForm, CancelForm
 from . import db
@@ -100,25 +109,59 @@ def index():
             )
             attachments: list[tuple[str, str, bytes]] = []
             if settings:
-                file_ids: list[int] | None
-                if existing_volunteer.is_adult:
-                    file_ids = settings.registration_files_adult or []
-                else:
-                    file_ids = settings.registration_files_minor or []
-                if file_ids:
+                attachments_meta = (
+                    settings.registration_files_adult
+                    if existing_volunteer.is_adult
+                    else settings.registration_files_minor
+                ) or []
+
+                legacy_ids = [
+                    entry for entry in attachments_meta if isinstance(entry, int)
+                ]
+                if legacy_ids:
                     stored = (
-                        StoredFile.query.filter(StoredFile.id.in_(file_ids)).all()
+                        StoredFile.query.filter(StoredFile.id.in_(legacy_ids)).all()
                     )
                     stored_by_id = {file.id: file for file in stored}
-                    attachments = [
-                        (
-                            stored_by_id[file_id].filename,
-                            stored_by_id[file_id].content_type,
-                            stored_by_id[file_id].data,
+                    for file_id in legacy_ids:
+                        stored_file = stored_by_id.get(file_id)
+                        if not stored_file:
+                            current_app.logger.warning(
+                                "Stored file with id %s referenced in settings but missing",
+                                file_id,
+                            )
+                            continue
+                        attachments.append(
+                            (
+                                stored_file.filename,
+                                stored_file.content_type,
+                                stored_file.data,
+                            )
                         )
-                        for file_id in file_ids
-                        if file_id in stored_by_id
-                    ]
+
+                attachments_dir = Path(current_app.instance_path) / "attachments"
+                for entry in attachments_meta:
+                    if not isinstance(entry, dict):
+                        continue
+                    stored_name = entry.get("stored_name")
+                    if not stored_name:
+                        continue
+                    file_path = attachments_dir / stored_name
+                    try:
+                        data = file_path.read_bytes()
+                    except OSError:
+                        current_app.logger.warning(
+                            "Attachment file %s referenced in settings is missing",
+                            file_path,
+                        )
+                        continue
+                    filename = (
+                        entry.get("original_name")
+                        or entry.get("filename")
+                        or stored_name
+                    )
+                    content_type = entry.get("content_type") or "application/octet-stream"
+                    attachments.append((filename, content_type, data))
 
             success, error = send_email(
                 "Potwierdzenie zgłoszenia",
