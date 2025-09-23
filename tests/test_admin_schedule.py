@@ -1,9 +1,10 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
 from app import db
 from app.models import Coach, Location, Training, TrainingSeries
+from app.admin_routes import _generate_schedule
 
 
 @pytest.fixture
@@ -183,3 +184,19 @@ def test_delete_series_marks_trainings_as_deleted(client, app_instance):
         assert all(t.is_deleted for t in trainings)
         series = db.session.get(TrainingSeries, series_id)
         assert series.created_count == 0
+
+
+def test_generate_schedule_handles_high_occurrence_count():
+    start = datetime(2024, 1, 5, 18, 0)
+    occurrences = 250
+    interval_weeks = 2
+
+    schedule = _generate_schedule(
+        start,
+        occurrences_limit=occurrences,
+        interval_weeks=interval_weeks,
+    )
+
+    assert len(schedule) == occurrences
+    assert schedule[0] == start
+    assert schedule[-1] == start + timedelta(weeks=interval_weeks * (occurrences - 1))
