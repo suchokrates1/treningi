@@ -14,9 +14,6 @@
       <a class="nav-link {% if request.path.startswith('/admin/trainers') %}active{% endif %}" href="{{ url_for('admin.manage_trainers') }}">Trenerzy</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/schedule') %}active{% endif %}" href="{{ url_for('admin.schedule') }}">Harmonogram</a>
-    </li>
-    <li class="nav-item">
       <a class="nav-link {% if request.path.startswith('/admin/locations') %}active{% endif %}" href="/admin/locations">Miejsca</a>
     </li>
     <li class="nav-item">

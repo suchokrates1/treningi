@@ -31,6 +31,9 @@ def test_manage_trainings_repeat_controls_render(client, coach_and_location):
     assert 'name="repeat_interval"' in page
     assert 'name="repeat_until"' in page
     assert "Łącznie wystąpień" in page
+    assert "Dzień tygodnia" in page
+    assert 'id="weekday-label"' in page
+    assert 'name="create_schedule"' in page
 
 
 def test_manage_trainings_repeat_creates_series_skipping_conflicts(
