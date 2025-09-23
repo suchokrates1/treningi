@@ -45,6 +45,8 @@ def send_email(
     )
     display_name = sender or (settings.sender if settings and settings.sender else None)
     address = current_app.config.get("SMTP_SENDER")
+    if address and "@" not in address:
+        address = "noreply@example.com"
     port = port or (
         settings.port
         if settings and settings.port
