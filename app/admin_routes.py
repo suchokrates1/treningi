@@ -205,6 +205,7 @@ def manage_trainings():
     form.location_id.choices = [
         (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
     ]
+    repeat_feedback = session.pop("repeat_feedback", None)
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     trainings_q = Training.query.filter(
         Training.date >= today,
@@ -218,21 +219,87 @@ def manage_trainings():
         trainings_by_month.setdefault(month_key, []).append(t)
 
     if form.validate_on_submit():
-        new_training = Training(
-            date=form.date.data,
-            location_id=form.location_id.data,
-            coach_id=form.coach_id.data,
-            max_volunteers=form.max_volunteers.data,
-        )
-        db.session.add(new_training)
-        db.session.commit()
-        flash("Dodano nowy trening.", "success")
+        planned_dates = form.iter_occurrences()
+        planned_count = len(planned_dates)
+        created = 0
+        conflicts = []
+
+        for candidate in planned_dates:
+            conflict = (
+                Training.query.filter(
+                    Training.date == candidate,
+                    Training.location_id == form.location_id.data,
+                    Training.is_deleted.is_(False),
+                )
+                .order_by(Training.id)
+                .first()
+            )
+
+            if conflict:
+                conflicts.append(candidate)
+                continue
+
+            new_training = Training(
+                date=candidate,
+                location_id=form.location_id.data,
+                coach_id=form.coach_id.data,
+                max_volunteers=form.max_volunteers.data,
+            )
+            db.session.add(new_training)
+            created += 1
+
+        if created:
+            db.session.commit()
+        else:
+            db.session.rollback()
+
+        conflict_strings = [dt.strftime("%Y-%m-%d %H:%M") for dt in conflicts]
+
+        if conflicts and created:
+            summary_category = "warning"
+        elif conflicts and not created:
+            summary_category = "danger"
+        else:
+            summary_category = "success"
+
+        if planned_count:
+            summary_message = (
+                f"Dodano {created} z {planned_count} zaplanowanych treningów."
+            )
+        else:
+            summary_message = "Nie udało się zaplanować treningów."
+
+        if conflicts:
+            summary_message += (
+                f" Pominięto {len(conflicts)} terminów z konfliktem."
+            )
+
+        if (
+            planned_count == 1
+            and created == 1
+            and not conflicts
+        ):
+            flash_message = "Dodano nowy trening."
+        else:
+            flash_message = summary_message
+
+        flash(flash_message, summary_category)
+
+        session["repeat_feedback"] = {
+            "category": summary_category,
+            "created": created,
+            "planned": planned_count,
+            "skipped": conflict_strings,
+            "message": summary_message,
+        }
+
         return redirect(url_for("admin.manage_trainings"))
 
     return render_template(
         "admin/trainings.html",
         form=form,
         trainings_by_month=trainings_by_month,
+        repeat_feedback=repeat_feedback,
     )
 
 
