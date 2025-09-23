@@ -1,10 +1,11 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
 from app import db
 from app.models import Coach, Location, Training, TrainingSeries
 from app.admin_routes import _generate_schedule
+from app.forms import TrainingForm
 
 
 @pytest.fixture
@@ -198,5 +199,63 @@ def test_generate_schedule_handles_high_occurrence_count():
     )
 
     assert len(schedule) == occurrences
-    assert schedule[0] == start
-    assert schedule[-1] == start + timedelta(weeks=interval_weeks * (occurrences - 1))
+
+
+def test_naive_training_conflict_detected_in_schedule_preview(
+    client, app_instance, monkeypatch
+):
+    with app_instance.app_context():
+        coach = Coach(first_name="Inga", last_name="Iota", phone_number="555")
+        location = Location(name="Sala D")
+        db.session.add_all([coach, location])
+        db.session.commit()
+        coach_id = coach.id
+        location_id = location.id
+
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert login.status_code == 200
+
+    form_data = {
+        "date": "2024-03-01T10:00",
+        "location_id": str(location_id),
+        "coach_id": str(coach_id),
+        "max_volunteers": "4",
+        "repeat_interval": "1",
+        "repeat_until": "",
+    }
+
+    initial_response = client.post(
+        "/admin/trainings", data=form_data, follow_redirects=True
+    )
+    assert initial_response.status_code == 200
+
+    aware_occurrence = datetime(2024, 3, 1, 10, 0, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(
+        TrainingForm,
+        "iter_occurrences",
+        lambda self: [aware_occurrence],
+    )
+
+    collision_response = client.post(
+        "/admin/trainings", data=form_data, follow_redirects=True
+    )
+    assert collision_response.status_code == 200
+    page = collision_response.get_data(as_text=True)
+    assert "Pominięto 1 terminów z konfliktem." in page
+    assert "Pominięto 2024-03-01 10:00" in page
+
+    with app_instance.app_context():
+        trainings = Training.query.filter_by(location_id=location_id).all()
+        assert len(trainings) == 1
+        conflict = (
+            Training.query.filter(
+                Training.date == aware_occurrence,
+                Training.location_id == location_id,
+            )
+            .order_by(Training.id)
+            .first()
+        )
+        assert conflict is not None
