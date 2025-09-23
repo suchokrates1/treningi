@@ -30,6 +30,8 @@ from .forms import (
     ImportTrainingsForm,
     LocationForm,
     SettingsForm,
+    ScheduleSeriesForm,
+    ConfirmSeriesDeletionForm,
 )
 from .models import (
     Coach,
@@ -481,6 +483,169 @@ def edit_series(series_key):
 def delete_series(series_key):
     flash("Usuwanie serii treningów będzie wkrótce dostępne.", "warning")
     return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/schedule/<int:series_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_schedule_series(series_id):
+    series = db.session.get(TrainingSeries, series_id)
+    if series is None:
+        abort(404)
+
+    trainings = (
+        Training.query.filter(
+            Training.series_id == series.id,
+            Training.is_deleted.is_(False),
+        )
+        .order_by(Training.date)
+        .all()
+    )
+
+    if not trainings:
+        flash("Seria nie posiada aktywnych treningów do edycji.", "warning")
+        return redirect(url_for("admin.manage_trainings"))
+
+    form = ScheduleSeriesForm()
+    form.coach_id.choices = [
+        (
+            c.id,
+            f"{c.first_name} {c.last_name}",
+        )
+        for c in Coach.query.order_by(Coach.last_name).all()
+    ]
+    form.location_id.choices = [
+        (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
+    ]
+
+    if not form.is_submitted():
+        first_training = trainings[0]
+        time_value = first_training.date.time().replace(microsecond=0)
+        form.time.data = time_value
+        form.coach_id.data = series.coach_id
+        form.location_id.data = series.location_id
+        form.max_volunteers.data = series.max_volunteers
+
+    if form.validate_on_submit():
+        updated = 0
+        skipped = []
+        new_time = form.time.data
+        new_coach_id = form.coach_id.data
+        new_location_id = form.location_id.data
+        new_limit = form.max_volunteers.data
+
+        for training in trainings:
+            current_date = training.date
+            new_date = current_date.replace(
+                hour=new_time.hour,
+                minute=new_time.minute,
+                second=getattr(new_time, "second", 0),
+                microsecond=0,
+            )
+
+            conflict = (
+                Training.query.filter(
+                    Training.id != training.id,
+                    Training.date == new_date,
+                    Training.location_id == new_location_id,
+                    Training.is_deleted.is_(False),
+                )
+                .order_by(Training.id)
+                .first()
+            )
+
+            if conflict:
+                skipped.append(new_date)
+                continue
+
+            training.date = new_date
+            training.coach_id = new_coach_id
+            training.location_id = new_location_id
+            training.max_volunteers = new_limit
+            updated += 1
+
+        if updated:
+            series.coach_id = new_coach_id
+            series.location_id = new_location_id
+            series.max_volunteers = new_limit
+            series.start_date = min(t.date for t in trainings)
+            series.created_count = len(trainings)
+            db.session.commit()
+        else:
+            db.session.rollback()
+
+        total = len(trainings)
+        if updated:
+            message = f"Zaktualizowano {updated} z {total} treningów serii."
+        else:
+            message = "Nie zaktualizowano żadnego treningu serii."
+
+        if skipped:
+            skipped_labels = [dt.strftime("%Y-%m-%d %H:%M") for dt in skipped]
+            message += " Pominięto " + ", ".join(skipped_labels) + " z powodu kolizji."
+
+        if skipped and updated:
+            category = "warning"
+        elif skipped and not updated:
+            category = "danger"
+        else:
+            category = "success"
+
+        flash(message, category)
+        return redirect(url_for("admin.manage_trainings"))
+
+    return render_template(
+        "admin/schedule_edit.html",
+        form=form,
+        series=series,
+        trainings=trainings,
+    )
+
+
+@admin_bp.route("/schedule/<int:series_id>/delete", methods=["GET", "POST"])
+@login_required
+def delete_schedule_series(series_id):
+    series = db.session.get(TrainingSeries, series_id)
+    if series is None:
+        abort(404)
+
+    form = ConfirmSeriesDeletionForm()
+
+    if form.validate_on_submit():
+        trainings = (
+            Training.query.filter(
+                Training.series_id == series.id,
+                Training.is_deleted.is_(False),
+            )
+            .order_by(Training.date)
+            .all()
+        )
+
+        removed = 0
+        for training in trainings:
+            if not training.is_deleted:
+                training.is_deleted = True
+                removed += 1
+
+        if removed:
+            series.created_count = len(
+                Training.query.filter(
+                    Training.series_id == series.id,
+                    Training.is_deleted.is_(False),
+                ).all()
+            )
+            db.session.commit()
+            flash(f"Usunięto {removed} treningów serii.", "info")
+        else:
+            db.session.rollback()
+            flash("Wszystkie treningi tej serii były już usunięte.", "warning")
+
+        return redirect(url_for("admin.manage_trainings"))
+
+    return render_template(
+        "admin/schedule_delete.html",
+        form=form,
+        series=series,
+    )
 
 
 @admin_bp.route("/export")
