@@ -21,7 +21,8 @@ from . import db, csrf
 from . import email_utils
 
 # Alias retained for compatibility with tests that monkeypatch the function.
-send_email = email_utils.send_email
+def send_email(*args, **kwargs):
+    return email_utils.send_email(*args, **kwargs)
 from .template_utils import render_template_string
 from .forms import (
     CoachForm,
@@ -519,7 +520,7 @@ def cancel_training(training_id):
         html_body = f"Trening {data['date']} w {data['location']} został odwołany."
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
-        success, error = email_utils.send_email(
+        success, error = send_email(
             subject, None, recipients, html_body=html_body
         )
         if not success:
@@ -1145,7 +1146,7 @@ def test_email():
                 )
             else:
                 try:
-                    success, error = email_utils.send_email(
+                    success, error = send_email(
                         "Test konfiguracji",
                         "To jest testowa wiadomość.",
                         [recipient],
