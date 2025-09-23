@@ -34,6 +34,39 @@
         <button class="btn btn-success">Dodaj trening</button>
       </div>
     </div>
+    <div class="row g-2 align-items-center mt-2">
+      <div class="col-auto">
+        <div class="form-check form-switch">
+          {{ form.repeat(class="form-check-input", id="repeat-toggle") }}
+          <label class="form-check-label" for="repeat-toggle">{{ form.repeat.label.text }}</label>
+        </div>
+      </div>
+      <div class="col-auto col-lg-2">
+        {{ form.repeat_interval.label(class="form-label mb-0") }}
+        {{ form.repeat_interval(class="form-control", min="1") }}
+      </div>
+      <div class="col-auto col-lg-2">
+        {{ form.repeat_until.label(class="form-label mb-0") }}
+        {{ form.repeat_until(class="form-control") }}
+      </div>
+      <div class="col-auto">
+        <div class="small text-muted">
+          Łącznie wystąpień: <strong>{{ form.occurrence_count }}</strong>
+        </div>
+      </div>
+    </div>
+    {% if repeat_feedback %}
+      <div class="alert alert-{{ repeat_feedback.category }} mt-3 mb-0">
+        <div>{{ repeat_feedback.message }}</div>
+        {% if repeat_feedback.skipped %}
+          <ul class="mb-0 small">
+            {% for conflict in repeat_feedback.skipped %}
+              <li>Pominięto {{ conflict }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endif %}
   </form>
 
   {% for month, ts in trainings_by_month.items() %}
