@@ -10,7 +10,7 @@ from flask import (
 )
 import flask
 from functools import wraps
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from uuid import uuid4
 import mimetypes
@@ -18,7 +18,10 @@ import mimetypes
 from werkzeug.utils import secure_filename
 
 from . import db, csrf
-from .email_utils import send_email
+from . import email_utils
+
+# Alias retained for compatibility with tests that monkeypatch the function.
+send_email = email_utils.send_email
 from .template_utils import render_template_string
 from .forms import (
     CoachForm,
@@ -27,6 +30,7 @@ from .forms import (
     ImportTrainingsForm,
     LocationForm,
     SettingsForm,
+    ScheduleForm,
 )
 from .models import Coach, Training, Location, EmailSettings, StoredFile
 
@@ -233,6 +237,133 @@ def manage_trainings():
     )
 
 
+@admin_bp.route("/schedule", methods=["GET", "POST"])
+@login_required
+def schedule():
+    form = ScheduleForm()
+    form.coach_id.choices = [
+        (c.id, f"{c.first_name} {c.last_name}")
+        for c in Coach.query.order_by(Coach.last_name).all()
+    ]
+    form.location_id.choices = [
+        (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
+    ]
+
+    planned_trainings = None
+    skipped_collisions = []
+
+    def _generate_schedule():
+        selected_days = sorted(int(day) for day in form.days.data)
+        start_date = form.start_date.data
+        start_time = form.start_time.data
+        end_date = form.end_date.data
+        occurrences_limit = form.occurrences.data
+        interval_weeks = form.interval_weeks.data
+        location_id = form.location_id.data
+        coach_id = form.coach_id.data
+
+        planned = []
+        collisions = []
+
+        if not selected_days:
+            return planned, collisions
+
+        current_date = start_date
+        created_count = 0
+        checked_days = 0
+        max_days = 365 * 5
+
+        while True:
+            if end_date and current_date > end_date:
+                break
+            if checked_days > max_days:
+                break
+
+            if current_date.weekday() in selected_days:
+                weeks_since_start = ((current_date - start_date).days) // 7
+                if weeks_since_start % interval_weeks == 0:
+                    candidate_dt = datetime.combine(current_date, start_time)
+                    if candidate_dt.tzinfo is None:
+                        candidate_dt = candidate_dt.replace(tzinfo=timezone.utc)
+                    existing = Training.query.filter(
+                        Training.date == candidate_dt,
+                        Training.is_deleted.is_(False),
+                    ).all()
+                    has_conflict = False
+                    collected_reasons = []
+                    for entry in existing:
+                        entry_reasons = []
+                        if entry.location_id == location_id:
+                            entry_reasons.append("miejsce")
+                        if entry.coach_id == coach_id:
+                            entry_reasons.append("trener")
+                        if entry_reasons:
+                            has_conflict = True
+                            collected_reasons.extend(entry_reasons)
+                    if has_conflict:
+                        collisions.append(
+                            {
+                                "date": candidate_dt,
+                                "reasons": sorted(set(collected_reasons)),
+                            }
+                        )
+                    else:
+                        planned.append(candidate_dt)
+                        created_count += 1
+                        if occurrences_limit and created_count >= occurrences_limit:
+                            break
+
+            current_date += timedelta(days=1)
+            checked_days += 1
+            if not end_date and occurrences_limit and checked_days > max_days:
+                break
+            if not end_date and not occurrences_limit:
+                break
+
+        return planned, collisions
+
+    if form.validate_on_submit():
+        planned_trainings, skipped_collisions = _generate_schedule()
+        if form.save.data:
+            if planned_trainings:
+                for date_value in planned_trainings:
+                    training = Training(
+                        date=date_value,
+                        location_id=form.location_id.data,
+                        coach_id=form.coach_id.data,
+                        max_volunteers=form.max_volunteers.data,
+                    )
+                    db.session.add(training)
+                db.session.commit()
+                flash(
+                    f"Zaplanowano {len(planned_trainings)} treningów.",
+                    "success",
+                )
+            else:
+                flash("Brak nowych treningów do dodania.", "info")
+            return redirect(url_for("admin.schedule"))
+
+    coach = (
+        db.session.get(Coach, form.coach_id.data)
+        if form.coach_id.data
+        else None
+    )
+    location = (
+        db.session.get(Location, form.location_id.data)
+        if form.location_id.data
+        else None
+    )
+
+    return render_template(
+        "admin/schedule.html",
+        form=form,
+        planned_trainings=planned_trainings,
+        skipped_collisions=skipped_collisions,
+        coach=coach,
+        location=location,
+    )
+
+
 @admin_bp.route("/trainings/edit/<int:training_id>", methods=["GET", "POST"])
 @login_required
 def edit_training(training_id):
@@ -291,7 +422,9 @@ def cancel_training(training_id):
         html_body = f"Trening {data['date']} w {data['location']} został odwołany."
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
-        success, error = send_email(subject, None, recipients, html_body=html_body)
+        success, error = email_utils.send_email(
+            subject, None, recipients, html_body=html_body
+        )
         if not success:
             msg = "Nie udało się wysłać e-maila"
             if error:
@@ -738,7 +871,7 @@ def test_email():
                 )
             else:
                 try:
-                    success, error = send_email(
+                    success, error = email_utils.send_email(
                         "Test konfiguracji",
                         "To jest testowa wiadomość.",
                         [recipient],
