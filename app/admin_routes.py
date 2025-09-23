@@ -501,6 +501,82 @@ def schedule():
         (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
     ]
 
+    if flask.request.method == "GET" and flask.request.args:
+        initial_data = {}
+
+        start_date_arg = flask.request.args.get("start_date")
+        if start_date_arg:
+            try:
+                initial_data["start_date"] = datetime.strptime(
+                    start_date_arg, "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                pass
+
+        start_time_arg = flask.request.args.get("start_time")
+        if start_time_arg:
+            for fmt in ("%H:%M", "%H:%M:%S"):
+                try:
+                    initial_data["start_time"] = datetime.strptime(
+                        start_time_arg, fmt
+                    ).time()
+                    break
+                except ValueError:
+                    continue
+
+        interval_arg = flask.request.args.get("interval_weeks")
+        if interval_arg:
+            try:
+                initial_data["interval_weeks"] = int(interval_arg)
+            except (TypeError, ValueError):
+                pass
+
+        end_date_arg = flask.request.args.get("end_date")
+        if end_date_arg:
+            try:
+                initial_data["end_date"] = datetime.strptime(
+                    end_date_arg, "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                pass
+
+        days_args = flask.request.args.getlist("days")
+        if days_args:
+            cleaned_days = []
+            for value in days_args:
+                if value is None:
+                    continue
+                try:
+                    cleaned_days.append(str(int(value)))
+                except (TypeError, ValueError):
+                    continue
+            if cleaned_days:
+                initial_data["days"] = cleaned_days
+
+        location_arg = flask.request.args.get("location_id")
+        if location_arg:
+            try:
+                initial_data["location_id"] = int(location_arg)
+            except (TypeError, ValueError):
+                pass
+
+        coach_arg = flask.request.args.get("coach_id")
+        if coach_arg:
+            try:
+                initial_data["coach_id"] = int(coach_arg)
+            except (TypeError, ValueError):
+                pass
+
+        max_volunteers_arg = flask.request.args.get("max_volunteers")
+        if max_volunteers_arg:
+            try:
+                initial_data["max_volunteers"] = int(max_volunteers_arg)
+            except (TypeError, ValueError):
+                pass
+
+        if initial_data:
+            form.process(data=initial_data)
+
     planned_trainings = None
     skipped_collisions = []
 
