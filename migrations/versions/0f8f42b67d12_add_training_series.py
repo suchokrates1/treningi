@@ -65,38 +65,39 @@ def upgrade():
         )
 
     # 2) Kolumna trainings.series_id + FK do training_series
-    if _table_exists(bind, TRAININGS_TABLE) and not _column_exists(
-        bind, TRAININGS_TABLE, SERIES_ID_COL
-    ):
-        op.add_column(
-            TRAININGS_TABLE,
-            sa.Column(SERIES_ID_COL, sa.Integer(), nullable=True),
-        )
+    if _table_exists(bind, TRAININGS_TABLE):
+        column_exists = _column_exists(bind, TRAININGS_TABLE, SERIES_ID_COL)
+        fk_exists = _fk_exists(bind, TRAININGS_TABLE, FK_NAME)
+        series_table_exists = _table_exists(bind, TABLE_NAME)
 
-    if (
-        _table_exists(bind, TRAININGS_TABLE)
-        and _column_exists(bind, TRAININGS_TABLE, SERIES_ID_COL)
-        and not _fk_exists(bind, TRAININGS_TABLE, FK_NAME)
-    ):
-        op.create_foreign_key(
-            FK_NAME,
-            TRAININGS_TABLE,
-            TABLE_NAME,
-            [SERIES_ID_COL],
-            ["id"],
-        )
+        with op.batch_alter_table(TRAININGS_TABLE) as batch_op:
+            if not column_exists:
+                batch_op.add_column(
+                    sa.Column(SERIES_ID_COL, sa.Integer(), nullable=True),
+                )
+                column_exists = True
+
+            if column_exists and series_table_exists and not fk_exists:
+                batch_op.create_foreign_key(
+                    FK_NAME,
+                    TABLE_NAME,
+                    [SERIES_ID_COL],
+                    ["id"],
+                )
 
 
 def downgrade():
     bind = op.get_bind()
 
     # 1) Usuń FK jeśli istnieje
-    if _table_exists(bind, TRAININGS_TABLE) and _fk_exists(bind, TRAININGS_TABLE, FK_NAME):
-        op.drop_constraint(FK_NAME, TRAININGS_TABLE, type_="foreignkey")
+    if _table_exists(bind, TRAININGS_TABLE):
+        with op.batch_alter_table(TRAININGS_TABLE) as batch_op:
+            if _fk_exists(bind, TRAININGS_TABLE, FK_NAME):
+                batch_op.drop_constraint(FK_NAME, type_="foreignkey")
 
-    # 2) Usuń kolumnę series_id z trainings jeśli istnieje
-    if _table_exists(bind, TRAININGS_TABLE) and _column_exists(bind, TRAININGS_TABLE, SERIES_ID_COL):
-        op.drop_column(TRAININGS_TABLE, SERIES_ID_COL)
+            # 2) Usuń kolumnę series_id z trainings jeśli istnieje
+            if _column_exists(bind, TRAININGS_TABLE, SERIES_ID_COL):
+                batch_op.drop_column(SERIES_ID_COL)
 
     # 3) Usuń tabelę training_series jeśli istnieje
     if _table_exists(bind, TABLE_NAME):
