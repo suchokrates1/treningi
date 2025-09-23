@@ -1,0 +1,45 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Edytuj serię treningów</h2>
+  <p class="text-muted">
+    Seria obejmuje {{ trainings|length }} treningów rozpoczynających się
+    {{ trainings[0].date.strftime('%Y-%m-%d') }}.
+  </p>
+  <form method="POST" class="mb-4">
+    {{ form.hidden_tag() }}
+    <div class="row g-2 align-items-end row-cols-lg-auto">
+      <div class="col-auto">
+        {{ form.time.label(class="form-label") }}
+        {{ form.time(class="form-control") }}
+      </div>
+      <div class="col-auto col-lg-3">
+        {{ form.coach_id.label(class="form-label") }}
+        {{ form.coach_id(class="form-select") }}
+      </div>
+      <div class="col-auto col-lg-3">
+        {{ form.location_id.label(class="form-label") }}
+        {{ form.location_id(class="form-select") }}
+      </div>
+      <div class="col-auto">
+        {{ form.max_volunteers.label(class="form-label") }}
+        {{ form.max_volunteers(class="form-control") }}
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary">Zapisz zmiany</button>
+        <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-secondary ms-2">Anuluj</a>
+      </div>
+    </div>
+  </form>
+
+  <h5>Treningi w serii</h5>
+  <ul class="list-group list-group-flush">
+    {% for training in trainings %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>{{ training.date.strftime('%Y-%m-%d') }}</span>
+        <span class="text-muted">{{ training.date.strftime('%H:%M') }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
