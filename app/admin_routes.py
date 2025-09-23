@@ -10,7 +10,7 @@ from flask import (
 )
 import flask
 from functools import wraps
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from uuid import uuid4
 import mimetypes
@@ -43,6 +43,79 @@ from .models import (
 )
 
 admin_bp = Blueprint("admin", __name__)
+
+
+def _generate_schedule(
+    start_date,
+    *,
+    occurrences_limit=None,
+    interval_weeks=1,
+    repeat_until=None,
+):
+    """Return a list of schedule datetimes for the given parameters.
+
+    The previous implementation relied on a fixed number of days to guard
+    against malformed input. This meant that large occurrence counts were cut
+    off even when the request was perfectly valid.  The guard is now based on
+    the expected span derived from ``occurrences_limit`` and ``interval_weeks``
+    so long schedules are honoured while the safety net remains for malformed
+    input.
+    """
+
+    if start_date is None:
+        return []
+
+    if interval_weeks is None or interval_weeks <= 0:
+        interval_weeks = 1
+
+    # Normalise ``repeat_until`` to a date for comparisons.  Accept both date
+    # and datetime values for backwards compatibility with callers.
+    if repeat_until is not None:
+        if hasattr(repeat_until, "date"):
+            repeat_until_date = repeat_until.date()
+        else:  # pragma: no cover - defensive fallback for unexpected types
+            repeat_until_date = repeat_until
+    else:
+        repeat_until_date = None
+
+    if occurrences_limit is not None and occurrences_limit <= 0:
+        return []
+
+    interval = timedelta(weeks=interval_weeks)
+
+    safety_margin = max(7, interval_weeks * 7)
+    if occurrences_limit is not None:
+        guard_days = occurrences_limit * interval_weeks * 7 + safety_margin
+    else:
+        # Fallback guard when the caller does not provide an explicit limit.
+        # This mirrors the previous behaviour but keeps the door open for
+        # longer schedules whenever the caller specifies a count.
+        guard_days = 365 + safety_margin
+
+    guard_until = start_date + timedelta(days=guard_days)
+
+    occurrences = []
+    current = start_date
+    produced = 0
+
+    while True:
+        occurrences.append(current)
+        produced += 1
+
+        if occurrences_limit is not None and produced >= occurrences_limit:
+            break
+
+        next_date = current + interval
+
+        if repeat_until_date and next_date.date() > repeat_until_date:
+            break
+
+        if next_date > guard_until:
+            break
+
+        current = next_date
+
+    return occurrences
 
 
 def login_required(view):
