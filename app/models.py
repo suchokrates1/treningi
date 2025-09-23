@@ -24,6 +24,31 @@ class Location(db.Model):
         return f"<Location {self.name}>"
 
 
+class TrainingSeries(db.Model):
+    __tablename__ = 'training_series'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    start_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    repeat = db.Column(db.Boolean, nullable=False, default=False)
+    repeat_interval_weeks = db.Column(db.Integer, nullable=True)
+    repeat_until = db.Column(db.Date, nullable=True)
+    planned_count = db.Column(db.Integer, nullable=False, default=0)
+    created_count = db.Column(db.Integer, nullable=False, default=0)
+    skipped_dates = db.Column(db.JSON, nullable=False, default=list)
+    coach_id = db.Column(db.Integer, db.ForeignKey('coaches.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    max_volunteers = db.Column(db.Integer, nullable=False)
+
+    coach = db.relationship('Coach', backref=db.backref('training_series', lazy=True))
+    location = db.relationship('Location', backref=db.backref('training_series', lazy=True))
+    trainings = db.relationship('Training', back_populates='series', lazy=True)
+
+
 class Training(db.Model):
     __tablename__ = 'trainings'
     id = db.Column(db.Integer, primary_key=True)
@@ -37,6 +62,11 @@ class Training(db.Model):
         db.Integer,
         db.ForeignKey('coaches.id'),
         nullable=False,
+    )
+    series_id = db.Column(
+        db.Integer,
+        db.ForeignKey('training_series.id'),
+        nullable=True,
     )
     is_canceled = db.Column(
         db.Boolean,
@@ -70,6 +100,10 @@ class Training(db.Model):
     location = db.relationship(
         'Location',
         backref=db.backref('trainings', lazy=True),
+    )
+    series = db.relationship(
+        'TrainingSeries',
+        back_populates='trainings',
     )
 
     def __repr__(self):

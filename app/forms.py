@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
@@ -5,6 +7,7 @@ from wtforms import (
     SelectField,
     PasswordField,
     RadioField,
+    BooleanField,
 )
 from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField, MultipleFileField
@@ -60,7 +63,79 @@ class TrainingForm(FlaskForm):
         default=2,
         validators=[DataRequired(), NumberRange(min=1, max=20)],
     )
+    repeat = BooleanField('Powtarzaj')
+    repeat_interval = IntegerField(
+        'Odstęp (tygodnie)',
+        default=1,
+        validators=[Optional(), NumberRange(min=1, max=52)],
+    )
+    repeat_until = DateField(
+        'Powtarzaj do',
+        format='%Y-%m-%d',
+        validators=[Optional()],
+        render_kw={"placeholder": "rrrr-mm-dd"},
+    )
     submit = SubmitField('Zapisz')
+
+    def validate(self, extra_validators=None):
+        is_valid = super().validate(extra_validators=extra_validators)
+
+        if not is_valid:
+            return False
+
+        if self.repeat.data:
+            repeat_ok = True
+
+            if not self.repeat_interval.data:
+                self.repeat_interval.errors.append(
+                    'Podaj odstęp między treningami.'
+                )
+                repeat_ok = False
+
+            if not self.repeat_until.data:
+                self.repeat_until.errors.append('Podaj datę zakończenia powtórzeń.')
+                repeat_ok = False
+            elif self.date.data and self.repeat_until.data < self.date.data.date():
+                self.repeat_until.errors.append(
+                    'Data zakończenia musi być późniejsza niż początek.'
+                )
+                repeat_ok = False
+
+            return repeat_ok
+
+        return True
+
+    def iter_occurrences(self):
+        """Return a list of scheduled training datetimes based on the form."""
+
+        if not self.date.data:
+            return []
+
+        occurrences = [self.date.data]
+
+        if not (
+            self.repeat.data
+            and self.repeat_interval.data
+            and self.repeat_interval.data > 0
+            and self.repeat_until.data
+        ):
+            return occurrences
+
+        interval = timedelta(weeks=self.repeat_interval.data)
+        current = self.date.data
+
+        while True:
+            next_date = current + interval
+            if next_date.date() > self.repeat_until.data:
+                break
+            occurrences.append(next_date)
+            current = next_date
+
+        return occurrences
+
+    @property
+    def occurrence_count(self):
+        return len(self.iter_occurrences())
 
 
 class ScheduleForm(FlaskForm):
@@ -177,6 +252,25 @@ class CancelForm(FlaskForm):
     )
     training_id = HiddenField()
     submit = SubmitField('Wypisz się')
+
+
+class ScheduleSeriesForm(FlaskForm):
+    """Form for editing schedule series details."""
+
+    time = TimeField('Godzina', format='%H:%M', validators=[InputRequired()])
+    coach_id = SelectField('Trener', coerce=int, validators=[DataRequired()])
+    location_id = SelectField('Miejsce', coerce=int, validators=[DataRequired()])
+    max_volunteers = IntegerField(
+        'Limit miejsc', validators=[DataRequired(), NumberRange(min=1, max=20)]
+    )
+    submit = SubmitField('Zapisz zmiany')
+
+
+class ConfirmSeriesDeletionForm(FlaskForm):
+    """Form requiring confirmation before deleting a series."""
+
+    confirm = BooleanField('Potwierdzam usunięcie serii', validators=[DataRequired()])
+    submit = SubmitField('Usuń serię')
 
 
 class SettingsForm(FlaskForm):
