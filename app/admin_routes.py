@@ -213,6 +213,62 @@ def manage_trainings():
     ).order_by(Training.date)
     trainings = trainings_q.all()
 
+    # Aggregate recurring trainings into series grouped by weekday, time, coach and location
+    day_names = [
+        "Poniedziałek",
+        "Wtorek",
+        "Środa",
+        "Czwartek",
+        "Piątek",
+        "Sobota",
+        "Niedziela",
+    ]
+    series_map = {}
+    for training in trainings:
+        date = training.date
+        weekday = date.weekday()
+        time_label = date.strftime("%H:%M")
+        key = (
+            weekday,
+            time_label,
+            training.coach_id,
+            training.location_id,
+        )
+        series = series_map.get(key)
+        if series is None:
+            series_key = (
+                f"{weekday}-{date.strftime('%H%M')}-c{training.coach_id}-"
+                f"l{training.location_id}"
+            )
+            series = {
+                "series_key": series_key,
+                "weekday": weekday,
+                "weekday_label": day_names[weekday],
+                "time_label": time_label,
+                "coach_name": f"{training.coach.first_name} {training.coach.last_name}",
+                "location_name": training.location.name,
+                "count": 0,
+                "first_date": date,
+                "last_date": date,
+            }
+            series_map[key] = series
+
+        series["count"] += 1
+        if date < series["first_date"]:
+            series["first_date"] = date
+        if date > series["last_date"]:
+            series["last_date"] = date
+
+    series_summary = sorted(
+        series_map.values(),
+        key=lambda data: (
+            data["weekday"],
+            data["time_label"],
+            data["coach_name"],
+            data["location_name"],
+        ),
+    )
+
     trainings_by_month = {}
     for t in trainings:
         month_key = t.date.strftime("%Y-%m")
@@ -300,6 +356,7 @@ def manage_trainings():
         form=form,
         trainings_by_month=trainings_by_month,
         repeat_feedback=repeat_feedback,
+        series_summary=series_summary,
     )
 
 
@@ -383,6 +440,20 @@ def delete_training(training_id):
     training.is_deleted = True
     db.session.commit()
     flash("Trening został usunięty.", "info")
+    return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/trainings/series/<series_key>/edit")
+@login_required
+def edit_series(series_key):
+    flash("Edycja serii treningów będzie wkrótce dostępna.", "info")
+    return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/trainings/series/<series_key>/delete", methods=["POST"])
+@login_required
+def delete_series(series_key):
+    flash("Usuwanie serii treningów będzie wkrótce dostępne.", "warning")
     return redirect(url_for("admin.manage_trainings"))
 
 
