@@ -54,14 +54,30 @@
             Łącznie wystąpień: <strong id="occurrence-count">{{ form.occurrence_count }}</strong>
           </div>
         </div>
+        <div class="col-auto">
+          {% set weekday_names = [
+            'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'
+          ] %}
+          {% set weekday_value = '–' %}
+          {% if form.date.data %}
+            {% set weekday_index = form.date.data.weekday() %}
+            {% if 0 <= weekday_index < weekday_names|length %}
+              {% set weekday_value = weekday_names[weekday_index] %}
+            {% endif %}
+          {% endif %}
+          <div class="small text-muted">
+            Dzień tygodnia: <strong id="weekday-label">{{ weekday_value }}</strong>
+          </div>
+        </div>
       </div>
       <div class="mt-3 d-flex flex-wrap gap-2">
         <button type="submit" class="btn btn-success">Dodaj pojedynczy trening</button>
         <button
-          type="button"
+          type="submit"
+          name="create_schedule"
+          value="1"
           class="btn btn-outline-primary{% if not form.repeat.data %} d-none{% endif %}"
           id="schedule-button"
-          data-schedule-url="{{ url_for('admin.schedule') }}"
         >
           Dodaj harmonogram treningów
         </button>

@@ -55,12 +55,20 @@
     const scheduleButton = document.getElementById("schedule-button");
     const fallbackSubmit = document.getElementById("single-submit-fallback");
     const occurrenceDisplay = document.getElementById("occurrence-count");
+    const weekdayDisplay = document.getElementById("weekday-label");
     const dateField = document.getElementById("date");
     const repeatIntervalField = document.getElementById("repeat_interval");
     const repeatUntilField = document.getElementById("repeat_until");
-    const locationField = document.getElementById("location_id");
-    const coachField = document.getElementById("coach_id");
-    const maxVolunteersField = document.getElementById("max_volunteers");
+
+    const weekdayNames = [
+      "Poniedziałek",
+      "Wtorek",
+      "Środa",
+      "Czwartek",
+      "Piątek",
+      "Sobota",
+      "Niedziela",
+    ];
 
     function updateRepeatVisibility() {
       if (!repeatToggle) {
@@ -82,6 +90,7 @@
       }
 
       updateOccurrenceCount();
+      updateWeekdayLabel();
     }
 
     function updateOccurrenceCount() {
@@ -104,70 +113,42 @@
       occurrenceDisplay.textContent = occurrences === null ? "–" : String(occurrences);
     }
 
-    function buildScheduleUrl() {
-      if (!scheduleButton) {
-        return null;
-      }
-      const baseUrl = scheduleButton.getAttribute("data-schedule-url");
-      if (!baseUrl) {
-        return null;
+    function updateWeekdayLabel() {
+      if (!weekdayDisplay) {
+        return;
       }
 
-      const url = new URL(baseUrl, window.location.origin);
-
-      if (dateField && dateField.value) {
-        const [startDatePart, startTimePart = ""] = dateField.value.split("T");
-        if (startDatePart) {
-          url.searchParams.set("start_date", startDatePart);
-          const weekday = toDate(`${startDatePart}T00:00:00`);
-          if (weekday) {
-            const pythonWeekday = (weekday.getDay() + 6) % 7;
-            url.searchParams.append("days", String(pythonWeekday));
-          }
-        }
-        if (startTimePart) {
-          url.searchParams.set("start_time", startTimePart);
-        }
+      const repeatEnabled = repeatToggle ? repeatToggle.checked : false;
+      if (!repeatEnabled) {
+        weekdayDisplay.textContent = "–";
+        return;
       }
 
-      if (repeatIntervalField && repeatIntervalField.value) {
-        url.searchParams.set("interval_weeks", repeatIntervalField.value);
+      const startValue = dateField ? dateField.value : null;
+      if (!startValue) {
+        weekdayDisplay.textContent = "–";
+        return;
       }
 
-      if (repeatUntilField && repeatUntilField.value) {
-        url.searchParams.set("end_date", repeatUntilField.value);
+      const [datePart] = startValue.split("T");
+      if (!datePart) {
+        weekdayDisplay.textContent = "–";
+        return;
       }
 
-      if (locationField && locationField.value) {
-        url.searchParams.set("location_id", locationField.value);
+      const parsedDate = toDate(`${datePart}T00:00:00`);
+      if (!parsedDate) {
+        weekdayDisplay.textContent = "–";
+        return;
       }
 
-      if (coachField && coachField.value) {
-        url.searchParams.set("coach_id", coachField.value);
-      }
-
-      if (maxVolunteersField && maxVolunteersField.value) {
-        url.searchParams.set("max_volunteers", maxVolunteersField.value);
-      }
-
-      return url;
+      const weekdayIndex = (parsedDate.getDay() + 6) % 7;
+      const label = weekdayNames[weekdayIndex] || "–";
+      weekdayDisplay.textContent = label;
     }
 
     if (repeatToggle) {
       repeatToggle.addEventListener("change", updateRepeatVisibility);
-    }
-
-    const scheduleClickHandler = function (event) {
-      const url = buildScheduleUrl();
-      if (!url) {
-        return;
-      }
-      event.preventDefault();
-      window.location.href = url.toString();
-    };
-
-    if (scheduleButton) {
-      scheduleButton.addEventListener("click", scheduleClickHandler);
     }
 
     [dateField, repeatIntervalField, repeatUntilField].forEach(function (field) {
@@ -177,6 +158,11 @@
       field.addEventListener("change", updateOccurrenceCount);
       field.addEventListener("input", updateOccurrenceCount);
     });
+
+    if (dateField) {
+      dateField.addEventListener("change", updateWeekdayLabel);
+      dateField.addEventListener("input", updateWeekdayLabel);
+    }
 
     updateRepeatVisibility();
   });
