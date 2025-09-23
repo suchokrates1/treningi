@@ -1,0 +1,121 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Harmonogram treningów</h2>
+  <form method="POST" class="mt-3">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+      <div class="col-md-6">
+        {{ form.days.label(class="form-label") }}
+        <div class="form-control p-2">
+          {% for subfield in form.days %}
+            <div class="form-check">
+              {{ subfield(class="form-check-input", id=subfield.id) }}
+              <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+            </div>
+          {% endfor %}
+        </div>
+        {% if form.days.errors %}
+          <div class="text-danger small">{{ form.days.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.start_date.label(class="form-label") }}
+        {{ form.start_date(class="form-control") }}
+        {% if form.start_date.errors %}
+          <div class="text-danger small">{{ form.start_date.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.start_time.label(class="form-label") }}
+        {{ form.start_time(class="form-control", step="900") }}
+        {% if form.start_time.errors %}
+          <div class="text-danger small">{{ form.start_time.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.interval_weeks.label(class="form-label") }}
+        {{ form.interval_weeks(class="form-control") }}
+        {% if form.interval_weeks.errors %}
+          <div class="text-danger small">{{ form.interval_weeks.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.end_date.label(class="form-label") }}
+        {{ form.end_date(class="form-control") }}
+        {% if form.end_date.errors %}
+          <div class="text-danger small">{{ form.end_date.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.occurrences.label(class="form-label") }}
+        {{ form.occurrences(class="form-control") }}
+        {% if form.occurrences.errors %}
+          <div class="text-danger small">{{ form.occurrences.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.location_id.label(class="form-label") }}
+        {{ form.location_id(class="form-select") }}
+        {% if form.location_id.errors %}
+          <div class="text-danger small">{{ form.location_id.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.coach_id.label(class="form-label") }}
+        {{ form.coach_id(class="form-select") }}
+        {% if form.coach_id.errors %}
+          <div class="text-danger small">{{ form.coach_id.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        {{ form.max_volunteers.label(class="form-label") }}
+        {{ form.max_volunteers(class="form-control") }}
+        {% if form.max_volunteers.errors %}
+          <div class="text-danger small">{{ form.max_volunteers.errors[0] }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="mt-3 d-flex gap-2">
+      {{ form.preview(class="btn btn-outline-primary") }}
+      {% if planned_trainings is not none %}
+        {{ form.save(class="btn btn-success") }}
+      {% endif %}
+    </div>
+
+    {% if planned_trainings is not none %}
+      <div class="card mt-4">
+        <div class="card-header">Podsumowanie zaplanowanych treningów</div>
+        <div class="card-body">
+          {% if planned_trainings %}
+            <p>Nowe treningi zostaną utworzone dla:</p>
+            <ul class="list-group list-group-flush">
+              {% for item in planned_trainings %}
+                <li class="list-group-item">
+                  {{ item.strftime('%Y-%m-%d %H:%M') }} –
+                  {% if location %}{{ location.name }}{% endif %}
+                  ({% if coach %}{{ coach.first_name }} {{ coach.last_name }}{% endif %})
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted mb-0">Brak nowych treningów do dodania.</p>
+          {% endif %}
+
+          {% if skipped_collisions %}
+            <hr>
+            <p class="text-warning">Pominięto następujące terminy z powodu kolizji:</p>
+            <ul class="list-group list-group-flush">
+              {% for collision in skipped_collisions %}
+                <li class="list-group-item">
+                  {{ collision.date.strftime('%Y-%m-%d %H:%M') }} – konflikt: {{ ', '.join(collision.reasons) }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}
