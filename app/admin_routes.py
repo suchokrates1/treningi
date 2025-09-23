@@ -46,6 +46,19 @@ from .models import (
 admin_bp = Blueprint("admin", __name__)
 
 
+def _normalise_schedule_datetime(value):
+    """Return ``value`` converted to the application's canonical timezone."""
+
+    if value is None:
+        return None
+
+    tzinfo = value.tzinfo
+    if tzinfo is None or tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
+
+
 def _generate_schedule(
     start_date,
     *,
@@ -65,6 +78,8 @@ def _generate_schedule(
 
     if start_date is None:
         return []
+
+    start_date = _normalise_schedule_datetime(start_date)
 
     if interval_weeks is None or interval_weeks <= 0:
         interval_weeks = 1
@@ -106,7 +121,7 @@ def _generate_schedule(
         if occurrences_limit is not None and produced >= occurrences_limit:
             break
 
-        next_date = current + interval
+        next_date = _normalise_schedule_datetime(current + interval)
 
         if repeat_until_date and next_date.date() > repeat_until_date:
             break
@@ -358,7 +373,11 @@ def manage_trainings():
         trainings_by_month.setdefault(month_key, []).append(t)
 
     if form.validate_on_submit():
-        planned_dates = form.iter_occurrences()
+        planned_dates = []
+        for occurrence in form.iter_occurrences():
+            if occurrence is None:
+                continue
+            planned_dates.append(_normalise_schedule_datetime(occurrence))
         planned_count = len(planned_dates)
         created = 0
         conflicts = []
@@ -392,8 +411,13 @@ def manage_trainings():
         conflict_strings = [dt.strftime("%Y-%m-%d %H:%M") for dt in conflicts]
 
         if created:
+            series_start = (
+                planned_dates[0]
+                if planned_dates
+                else _normalise_schedule_datetime(form.date.data)
+            )
             series = TrainingSeries(
-                start_date=form.date.data,
+                start_date=series_start,
                 repeat=bool(form.repeat.data),
                 repeat_interval_weeks=(
                     form.repeat_interval.data if form.repeat.data else None
@@ -811,6 +835,7 @@ def import_excel():
                 time_part = datetime.strptime(str(time_val), "%H:%M").time()
 
             dt = datetime.combine(date_part, time_part)
+            dt = _normalise_schedule_datetime(dt)
 
             coach = Coach.query.filter_by(phone_number=str(phone).strip()).first()
             if not coach:
