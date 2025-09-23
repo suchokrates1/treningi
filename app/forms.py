@@ -185,6 +185,25 @@ class CancelForm(FlaskForm):
     submit = SubmitField('Wypisz się')
 
 
+class ScheduleSeriesForm(FlaskForm):
+    """Form for editing schedule series details."""
+
+    time = TimeField('Godzina', format='%H:%M', validators=[InputRequired()])
+    coach_id = SelectField('Trener', coerce=int, validators=[DataRequired()])
+    location_id = SelectField('Miejsce', coerce=int, validators=[DataRequired()])
+    max_volunteers = IntegerField(
+        'Limit miejsc', validators=[DataRequired(), NumberRange(min=1, max=20)]
+    )
+    submit = SubmitField('Zapisz zmiany')
+
+
+class ConfirmSeriesDeletionForm(FlaskForm):
+    """Form requiring confirmation before deleting a series."""
+
+    confirm = BooleanField('Potwierdzam usunięcie serii', validators=[DataRequired()])
+    submit = SubmitField('Usuń serię')
+
+
 class SettingsForm(FlaskForm):
     """Form for configuring email settings."""
 

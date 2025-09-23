@@ -1,0 +1,21 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Usuń serię treningów</h2>
+  <div class="alert alert-warning">
+    Usunięcie serii oznaczy wszystkie powiązane treningi jako usunięte i ukryje je z harmonogramu.
+  </div>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="form-check mb-3">
+      {{ form.confirm(class="form-check-input", id="confirm-delete") }}
+      <label class="form-check-label" for="confirm-delete">{{ form.confirm.label.text }}</label>
+    </div>
+    {% if form.confirm.errors %}
+      <div class="alert alert-danger">{{ form.confirm.errors[0] }}</div>
+    {% endif %}
+    <button class="btn btn-danger">Usuń serię</button>
+    <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-secondary ms-2">Anuluj</a>
+  </form>
+</div>
+{% endblock %}
