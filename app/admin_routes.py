@@ -31,7 +31,14 @@ from .forms import (
     LocationForm,
     SettingsForm,
 )
-from .models import Coach, Training, Location, EmailSettings, StoredFile
+from .models import (
+    Coach,
+    Training,
+    Location,
+    EmailSettings,
+    StoredFile,
+    TrainingSeries,
+)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -223,6 +230,7 @@ def manage_trainings():
         planned_count = len(planned_dates)
         created = 0
         conflicts = []
+        new_trainings = []
 
         for candidate in planned_dates:
             conflict = (
@@ -246,14 +254,32 @@ def manage_trainings():
                 max_volunteers=form.max_volunteers.data,
             )
             db.session.add(new_training)
+            new_trainings.append(new_training)
             created += 1
 
+        conflict_strings = [dt.strftime("%Y-%m-%d %H:%M") for dt in conflicts]
+
         if created:
+            series = TrainingSeries(
+                start_date=form.date.data,
+                repeat=bool(form.repeat.data),
+                repeat_interval_weeks=(
+                    form.repeat_interval.data if form.repeat.data else None
+                ),
+                repeat_until=(form.repeat_until.data if form.repeat.data else None),
+                planned_count=planned_count,
+                created_count=created,
+                skipped_dates=conflict_strings,
+                coach_id=form.coach_id.data,
+                location_id=form.location_id.data,
+                max_volunteers=form.max_volunteers.data,
+            )
+            db.session.add(series)
+            for training in new_trainings:
+                training.series = series
             db.session.commit()
         else:
             db.session.rollback()
-
-        conflict_strings = [dt.strftime("%Y-%m-%d %H:%M") for dt in conflicts]
 
         if conflicts and created:
             summary_category = "warning"
