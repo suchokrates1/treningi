@@ -22,6 +22,7 @@ from . import email_utils
 
 # Alias retained for compatibility with tests that monkeypatch the function.
 send_email = email_utils.send_email
+
 from .template_utils import render_template_string
 from .forms import (
     CoachForm,
@@ -31,10 +32,107 @@ from .forms import (
     LocationForm,
     SettingsForm,
     ScheduleForm,
+    ScheduleSeriesForm,
+    ConfirmSeriesDeletionForm,
 )
-from .models import Coach, Training, Location, EmailSettings, StoredFile
+from .models import (
+    Coach,
+    Training,
+    Location,
+    EmailSettings,
+    StoredFile,
+    TrainingSeries,
+)
 
 admin_bp = Blueprint("admin", __name__)
+
+
+def _normalise_schedule_datetime(value):
+    """Return ``value`` converted to the application's canonical timezone."""
+
+    if value is None:
+        return None
+
+    tzinfo = value.tzinfo
+    if tzinfo is None or tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
+
+
+def _generate_schedule(
+    start_date,
+    *,
+    occurrences_limit=None,
+    interval_weeks=1,
+    repeat_until=None,
+):
+    """Return a list of schedule datetimes for the given parameters.
+
+    The previous implementation relied on a fixed number of days to guard
+    against malformed input. This meant that large occurrence counts were cut
+    off even when the request was perfectly valid.  The guard is now based on
+    the expected span derived from ``occurrences_limit`` and ``interval_weeks``
+    so long schedules are honoured while the safety net remains for malformed
+    input.
+    """
+
+    if start_date is None:
+        return []
+
+    start_date = _normalise_schedule_datetime(start_date)
+
+    if interval_weeks is None or interval_weeks <= 0:
+        interval_weeks = 1
+
+    # Normalise ``repeat_until`` to a date for comparisons.  Accept both date
+    # and datetime values for backwards compatibility with callers.
+    if repeat_until is not None:
+        if hasattr(repeat_until, "date"):
+            repeat_until_date = repeat_until.date()
+        else:  # pragma: no cover - defensive fallback for unexpected types
+            repeat_until_date = repeat_until
+    else:
+        repeat_until_date = None
+
+    if occurrences_limit is not None and occurrences_limit <= 0:
+        return []
+
+    interval = timedelta(weeks=interval_weeks)
+
+    safety_margin = max(7, interval_weeks * 7)
+    if occurrences_limit is not None:
+        guard_days = occurrences_limit * interval_weeks * 7 + safety_margin
+    else:
+        # Fallback guard when the caller does not provide an explicit limit.
+        # This mirrors the previous behaviour but keeps the door open for
+        # longer schedules whenever the caller specifies a count.
+        guard_days = 365 + safety_margin
+
+    guard_until = start_date + timedelta(days=guard_days)
+
+    occurrences = []
+    current = start_date
+    produced = 0
+
+    while True:
+        occurrences.append(current)
+        produced += 1
+
+        if occurrences_limit is not None and produced >= occurrences_limit:
+            break
+
+        next_date = _normalise_schedule_datetime(current + interval)
+
+        if repeat_until_date and next_date.date() > repeat_until_date:
+            break
+
+        if next_date > guard_until:
+            break
+
+        current = next_date
+
+    return occurrences
 
 
 def login_required(view):
@@ -206,6 +304,7 @@ def manage_trainings():
     form.location_id.choices = [
         (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
     ]
+    repeat_feedback = session.pop("repeat_feedback", None)
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     trainings_q = Training.query.filter(
         Training.date >= today,
@@ -213,27 +312,178 @@ def manage_trainings():
     ).order_by(Training.date)
     trainings = trainings_q.all()
 
+    # Aggregate recurring trainings into series grouped by weekday, time, coach and location
+    day_names = [
+        "Poniedziałek",
+        "Wtorek",
+        "Środa",
+        "Czwartek",
+        "Piątek",
+        "Sobota",
+        "Niedziela",
+    ]
+    series_map = {}
+    for training in trainings:
+        date = training.date
+        weekday = date.weekday()
+        time_label = date.strftime("%H:%M")
+        key = (
+            weekday,
+            time_label,
+            training.coach_id,
+            training.location_id,
+        )
+        series = series_map.get(key)
+        if series is None:
+            series_key = (
+                f"{weekday}-{date.strftime('%H%M')}-c{training.coach_id}-"
+                f"l{training.location_id}"
+            )
+            series = {
+                "series_key": series_key,
+                "weekday": weekday,
+                "weekday_label": day_names[weekday],
+                "time_label": time_label,
+                "coach_name": f"{training.coach.first_name} {training.coach.last_name}",
+                "location_name": training.location.name,
+                "count": 0,
+                "first_date": date,
+                "last_date": date,
+            }
+            series_map[key] = series
+
+        series["count"] += 1
+        if date < series["first_date"]:
+            series["first_date"] = date
+        if date > series["last_date"]:
+            series["last_date"] = date
+
+    series_summary = sorted(
+        series_map.values(),
+        key=lambda data: (
+            data["weekday"],
+            data["time_label"],
+            data["coach_name"],
+            data["location_name"],
+        ),
+    )
+
     trainings_by_month = {}
     for t in trainings:
         month_key = t.date.strftime("%Y-%m")
         trainings_by_month.setdefault(month_key, []).append(t)
 
     if form.validate_on_submit():
-        new_training = Training(
-            date=form.date.data,
-            location_id=form.location_id.data,
-            coach_id=form.coach_id.data,
-            max_volunteers=form.max_volunteers.data,
-        )
-        db.session.add(new_training)
-        db.session.commit()
-        flash("Dodano nowy trening.", "success")
+        planned_dates = []
+        for occurrence in form.iter_occurrences():
+            if occurrence is None:
+                continue
+            planned_dates.append(_normalise_schedule_datetime(occurrence))
+        planned_count = len(planned_dates)
+        created = 0
+        conflicts = []
+        new_trainings = []
+
+        for candidate in planned_dates:
+            conflict = (
+                Training.query.filter(
+                    Training.date == candidate,
+                    Training.location_id == form.location_id.data,
+                    Training.is_deleted.is_(False),
+                )
+                .order_by(Training.id)
+                .first()
+            )
+
+            if conflict:
+                conflicts.append(candidate)
+                continue
+
+            new_training = Training(
+                date=candidate,
+                location_id=form.location_id.data,
+                coach_id=form.coach_id.data,
+                max_volunteers=form.max_volunteers.data,
+            )
+            db.session.add(new_training)
+            new_trainings.append(new_training)
+            created += 1
+
+        conflict_strings = [dt.strftime("%Y-%m-%d %H:%M") for dt in conflicts]
+
+        if created:
+            series_start = (
+                planned_dates[0]
+                if planned_dates
+                else _normalise_schedule_datetime(form.date.data)
+            )
+            series = TrainingSeries(
+                start_date=series_start,
+                repeat=bool(form.repeat.data),
+                repeat_interval_weeks=(
+                    form.repeat_interval.data if form.repeat.data else None
+                ),
+                repeat_until=(form.repeat_until.data if form.repeat.data else None),
+                planned_count=planned_count,
+                created_count=created,
+                skipped_dates=conflict_strings,
+                coach_id=form.coach_id.data,
+                location_id=form.location_id.data,
+                max_volunteers=form.max_volunteers.data,
+            )
+            db.session.add(series)
+            for training in new_trainings:
+                training.series = series
+            db.session.commit()
+        else:
+            db.session.rollback()
+
+        if conflicts and created:
+            summary_category = "warning"
+        elif conflicts and not created:
+            summary_category = "danger"
+        else:
+            summary_category = "success"
+
+        if planned_count:
+            summary_message = (
+                f"Dodano {created} z {planned_count} zaplanowanych treningów."
+            )
+        else:
+            summary_message = "Nie udało się zaplanować treningów."
+
+        if conflicts:
+            summary_message += (
+                f" Pominięto {len(conflicts)} terminów z konfliktem."
+            )
+
+        if (
+            planned_count == 1
+            and created == 1
+            and not conflicts
+        ):
+            flash_message = "Dodano nowy trening."
+        else:
+            flash_message = summary_message
+
+        flash(flash_message, summary_category)
+
+        session["repeat_feedback"] = {
+            "category": summary_category,
+            "created": created,
+            "planned": planned_count,
+            "skipped": conflict_strings,
+            "message": summary_message,
+        }
+
         return redirect(url_for("admin.manage_trainings"))
 
     return render_template(
         "admin/trainings.html",
         form=form,
         trainings_by_month=trainings_by_month,
+        repeat_feedback=repeat_feedback,
+        series_summary=series_summary,
     )
 
 
@@ -422,7 +672,7 @@ def cancel_training(training_id):
         html_body = f"Trening {data['date']} w {data['location']} został odwołany."
     recipients = [b.volunteer.email for b in training.bookings]
     if recipients:
-        success, error = email_utils.send_email(
+        success, error = send_email(
             subject, None, recipients, html_body=html_body
         )
         if not success:
@@ -445,6 +695,183 @@ def delete_training(training_id):
     db.session.commit()
     flash("Trening został usunięty.", "info")
     return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/trainings/series/<series_key>/edit")
+@login_required
+def edit_series(series_key):
+    flash("Edycja serii treningów będzie wkrótce dostępna.", "info")
+    return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/trainings/series/<series_key>/delete", methods=["POST"])
+@login_required
+def delete_series(series_key):
+    flash("Usuwanie serii treningów będzie wkrótce dostępne.", "warning")
+    return redirect(url_for("admin.manage_trainings"))
+
+
+@admin_bp.route("/schedule/<int:series_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_schedule_series(series_id):
+    series = db.session.get(TrainingSeries, series_id)
+    if series is None:
+        abort(404)
+
+    trainings = (
+        Training.query.filter(
+            Training.series_id == series.id,
+            Training.is_deleted.is_(False),
+        )
+        .order_by(Training.date)
+        .all()
+    )
+
+    if not trainings:
+        flash("Seria nie posiada aktywnych treningów do edycji.", "warning")
+        return redirect(url_for("admin.manage_trainings"))
+
+    form = ScheduleSeriesForm()
+    form.coach_id.choices = [
+        (
+            c.id,
+            f"{c.first_name} {c.last_name}",
+        )
+        for c in Coach.query.order_by(Coach.last_name).all()
+    ]
+    form.location_id.choices = [
+        (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
+    ]
+
+    if not form.is_submitted():
+        first_training = trainings[0]
+        time_value = first_training.date.time().replace(microsecond=0)
+        form.time.data = time_value
+        form.coach_id.data = series.coach_id
+        form.location_id.data = series.location_id
+        form.max_volunteers.data = series.max_volunteers
+
+    if form.validate_on_submit():
+        updated = 0
+        skipped = []
+        new_time = form.time.data
+        new_coach_id = form.coach_id.data
+        new_location_id = form.location_id.data
+        new_limit = form.max_volunteers.data
+
+        for training in trainings:
+            current_date = training.date
+            new_date = current_date.replace(
+                hour=new_time.hour,
+                minute=new_time.minute,
+                second=getattr(new_time, "second", 0),
+                microsecond=0,
+            )
+
+            conflict = (
+                Training.query.filter(
+                    Training.id != training.id,
+                    Training.date == new_date,
+                    Training.location_id == new_location_id,
+                    Training.is_deleted.is_(False),
+                )
+                .order_by(Training.id)
+                .first()
+            )
+
+            if conflict:
+                skipped.append(new_date)
+                continue
+
+            training.date = new_date
+            training.coach_id = new_coach_id
+            training.location_id = new_location_id
+            training.max_volunteers = new_limit
+            updated += 1
+
+        if updated:
+            series.coach_id = new_coach_id
+            series.location_id = new_location_id
+            series.max_volunteers = new_limit
+            series.start_date = min(t.date for t in trainings)
+            series.created_count = len(trainings)
+            db.session.commit()
+        else:
+            db.session.rollback()
+
+        total = len(trainings)
+        if updated:
+            message = f"Zaktualizowano {updated} z {total} treningów serii."
+        else:
+            message = "Nie zaktualizowano żadnego treningu serii."
+
+        if skipped:
+            skipped_labels = [dt.strftime("%Y-%m-%d %H:%M") for dt in skipped]
+            message += " Pominięto " + ", ".join(skipped_labels) + " z powodu kolizji."
+
+        if skipped and updated:
+            category = "warning"
+        elif skipped and not updated:
+            category = "danger"
+        else:
+            category = "success"
+
+        flash(message, category)
+        return redirect(url_for("admin.manage_trainings"))
+
+    return render_template(
+        "admin/schedule_edit.html",
+        form=form,
+        series=series,
+        trainings=trainings,
+    )
+
+
+@admin_bp.route("/schedule/<int:series_id>/delete", methods=["GET", "POST"])
+@login_required
+def delete_schedule_series(series_id):
+    series = db.session.get(TrainingSeries, series_id)
+    if series is None:
+        abort(404)
+
+    form = ConfirmSeriesDeletionForm()
+
+    if form.validate_on_submit():
+        trainings = (
+            Training.query.filter(
+                Training.series_id == series.id,
+                Training.is_deleted.is_(False),
+            )
+            .order_by(Training.date)
+            .all()
+        )
+
+        removed = 0
+        for training in trainings:
+            if not training.is_deleted:
+                training.is_deleted = True
+                removed += 1
+
+        if removed:
+            series.created_count = len(
+                Training.query.filter(
+                    Training.series_id == series.id,
+                    Training.is_deleted.is_(False),
+                ).all()
+            )
+            db.session.commit()
+            flash(f"Usunięto {removed} treningów serii.", "info")
+        else:
+            db.session.rollback()
+            flash("Wszystkie treningi tej serii były już usunięte.", "warning")
+
+        return redirect(url_for("admin.manage_trainings"))
+
+    return render_template(
+        "admin/schedule_delete.html",
+        form=form,
+        series=series,
+    )
 
 
 @admin_bp.route("/export")
@@ -536,6 +963,7 @@ def import_excel():
                 time_part = datetime.strptime(str(time_val), "%H:%M").time()
 
             dt = datetime.combine(date_part, time_part)
+            dt = _normalise_schedule_datetime(dt)
 
             coach = Coach.query.filter_by(phone_number=str(phone).strip()).first()
             if not coach:

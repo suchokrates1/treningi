@@ -34,7 +34,87 @@
         <button class="btn btn-success">Dodaj trening</button>
       </div>
     </div>
+    <div class="row g-2 align-items-center mt-2">
+      <div class="col-auto">
+        <div class="form-check form-switch">
+          {{ form.repeat(class="form-check-input", id="repeat-toggle") }}
+          <label class="form-check-label" for="repeat-toggle">{{ form.repeat.label.text }}</label>
+        </div>
+      </div>
+      <div class="col-auto col-lg-2">
+        {{ form.repeat_interval.label(class="form-label mb-0") }}
+        {{ form.repeat_interval(class="form-control", min="1") }}
+      </div>
+      <div class="col-auto col-lg-2">
+        {{ form.repeat_until.label(class="form-label mb-0") }}
+        {{ form.repeat_until(class="form-control") }}
+      </div>
+      <div class="col-auto">
+        <div class="small text-muted">
+          Łącznie wystąpień: <strong>{{ form.occurrence_count }}</strong>
+        </div>
+      </div>
+    </div>
+    {% if repeat_feedback %}
+      <div class="alert alert-{{ repeat_feedback.category }} mt-3 mb-0">
+        <div>{{ repeat_feedback.message }}</div>
+        {% if repeat_feedback.skipped %}
+          <ul class="mb-0 small">
+            {% for conflict in repeat_feedback.skipped %}
+              <li>Pominięto {{ conflict }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endif %}
   </form>
+
+  <h4 class="mt-4">Harmonogram</h4>
+  <div class="table-responsive">
+    <table class="table table-striped table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Dzień tygodnia</th>
+          <th>Godzina</th>
+          <th>Trener</th>
+          <th>Miejsce</th>
+          <th>Liczba treningów</th>
+          <th>Zakres dat</th>
+          <th class="text-end">Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if series_summary %}
+          {% for series in series_summary %}
+            <tr>
+              <td>{{ series.weekday_label }}</td>
+              <td>{{ series.time_label }}</td>
+              <td>{{ series.coach_name }}</td>
+              <td>{{ series.location_name }}</td>
+              <td>{{ series.count }}</td>
+              <td>
+                {{ series.first_date.strftime('%Y-%m-%d') }} –
+                {{ series.last_date.strftime('%Y-%m-%d') }}
+              </td>
+              <td class="text-end">
+                <a href="{{ url_for('admin.edit_series', series_key=series.series_key) }}" class="btn btn-sm btn-outline-primary me-1">
+                  Edytuj
+                </a>
+                <form method="post" action="{{ url_for('admin.delete_series', series_key=series.series_key) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger">Usuń</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">Brak zaplanowanych treningów.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
 
   {% for month, ts in trainings_by_month.items() %}
   <h4 class="mt-4">{{ month|replace("-", " / ") }}</h4>
