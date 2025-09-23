@@ -324,6 +324,8 @@ def manage_trainings():
     ]
     series_map = {}
     for training in trainings:
+        if not training.series or not training.series.repeat:
+            continue
         date = training.date
         weekday = date.weekday()
         time_label = date.strftime("%H:%M")
