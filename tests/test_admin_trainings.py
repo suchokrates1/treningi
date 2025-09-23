@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, date
 
 import pytest
 
 from app import db
-from app.models import Coach, Location, Training
+from app.models import Coach, Location, Training, TrainingSeries
 
 
 @pytest.fixture
@@ -88,8 +88,87 @@ def test_manage_trainings_repeat_creates_series_skipping_conflicts(
             t for t in trainings if t.date.strftime("%Y-%m-%d %H:%M") != "2024-01-10 18:00"
         ]
         assert len(new_trainings) == 2
+        series_ids = {t.series_id for t in new_trainings}
+        assert len(series_ids) == 1
+        assert series_ids.pop() is not None
         for training in new_trainings:
             assert training.max_volunteers == 4
             assert training.coach_id == coach_id
             assert training.location_id == location_id
+
+
+def test_manage_trainings_series_metadata_saved(client, app_instance, coach_and_location):
+    coach_id, location_id = coach_and_location
+
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert login.status_code == 200
+
+    response = client.post(
+        "/admin/trainings",
+        data={
+            "date": "2024-01-03T18:00",
+            "location_id": str(location_id),
+            "coach_id": str(coach_id),
+            "max_volunteers": "5",
+            "repeat": "y",
+            "repeat_interval": "2",
+            "repeat_until": "2024-01-31",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with app_instance.app_context():
+        series = TrainingSeries.query.one()
+        assert series.start_date == datetime(2024, 1, 3, 18, 0)
+        assert series.repeat is True
+        assert series.repeat_interval_weeks == 2
+        assert series.repeat_until == date(2024, 1, 31)
+        assert series.max_volunteers == 5
+        assert series.coach_id == coach_id
+        assert series.location_id == location_id
+        assert series.planned_count == 3
+        assert series.created_count == 3
+        assert series.skipped_dates == []
+
+        trainings = Training.query.filter(Training.series_id == series.id).all()
+        assert len(trainings) == 3
+
+
+def test_manage_trainings_single_session_has_series(
+    client, app_instance, coach_and_location
+):
+    coach_id, location_id = coach_and_location
+
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert login.status_code == 200
+
+    response = client.post(
+        "/admin/trainings",
+        data={
+            "date": "2024-02-05T19:30",
+            "location_id": str(location_id),
+            "coach_id": str(coach_id),
+            "max_volunteers": "6",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with app_instance.app_context():
+        series = TrainingSeries.query.one()
+        assert series.repeat is False
+        assert series.repeat_interval_weeks is None
+        assert series.repeat_until is None
+        assert series.planned_count == 1
+        assert series.created_count == 1
+        assert series.skipped_dates == []
+
+        trainings = Training.query.all()
+        assert len(trainings) == 1
+        assert trainings[0].series_id == series.id
 
