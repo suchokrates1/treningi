@@ -18,6 +18,7 @@ import mimetypes
 from werkzeug.utils import secure_filename
 
 from . import db, csrf
+from sqlalchemy.orm import joinedload
 from . import email_utils
 
 # Alias retained for compatibility with tests that monkeypatch the function.
@@ -31,6 +32,7 @@ from .forms import (
     ImportTrainingsForm,
     LocationForm,
     SettingsForm,
+    TrainingSeriesForm,
 )
 from .models import (
     Coach,
@@ -55,6 +57,75 @@ def _normalise_schedule_datetime(value):
         return value.replace(tzinfo=timezone.utc)
 
     return value.astimezone(timezone.utc)
+
+
+def _as_utc(value):
+    """Return ``value`` as an aware datetime in UTC."""
+
+    if value is None:
+        return None
+
+    tzinfo = value.tzinfo
+    if tzinfo is None or tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
+
+
+def _parse_series_key(series_key):
+    """Return tuple describing a series derived from ``series_key``."""
+
+    try:
+        weekday_str, time_str, coach_part, location_part = series_key.split("-")
+        if not weekday_str.isdigit():
+            raise ValueError
+        if len(time_str) != 4 or not time_str.isdigit():
+            raise ValueError
+        if not coach_part.startswith("c") or not location_part.startswith("l"):
+            raise ValueError
+        weekday = int(weekday_str)
+        coach_id = int(coach_part[1:])
+        location_id = int(location_part[1:])
+    except (AttributeError, ValueError):
+        return None
+
+    return weekday, time_str, coach_id, location_id
+
+
+def _resolve_series(series_key):
+    """Return ``(series, trainings, metadata)`` for ``series_key`` or ``None``."""
+
+    parsed = _parse_series_key(series_key)
+    if not parsed:
+        return None
+
+    weekday, time_label, coach_id, location_id = parsed
+    candidate_series = (
+        TrainingSeries.query.options(joinedload(TrainingSeries.trainings))
+        .filter(TrainingSeries.repeat.is_(True))
+        .all()
+    )
+
+    for series in candidate_series:
+        trainings = [
+            training
+            for training in series.trainings
+            if not training.is_deleted
+            and training.coach_id == coach_id
+            and training.location_id == location_id
+            and training.date.weekday() == weekday
+            and training.date.strftime("%H%M") == time_label
+        ]
+        if trainings:
+            metadata = {
+                "weekday": weekday,
+                "time_label": f"{time_label[:2]}:{time_label[2:]}",
+                "coach_id": coach_id,
+                "location_id": location_id,
+            }
+            return series, trainings, metadata
+
+    return None
 
 
 def login_required(view):
@@ -495,17 +566,142 @@ def delete_training(training_id):
     return redirect(url_for("admin.manage_trainings"))
 
 
-@admin_bp.route("/trainings/series/<series_key>/edit")
+@admin_bp.route("/trainings/series/<series_key>/edit", methods=["GET", "POST"])
 @login_required
 def edit_series(series_key):
-    flash("Edycja serii treningów będzie wkrótce dostępna.", "info")
-    return redirect(url_for("admin.manage_trainings"))
+    resolved = _resolve_series(series_key)
+    if not resolved:
+        abort(404)
+
+    series, trainings, metadata = resolved
+    form = TrainingSeriesForm(obj=series)
+    form.coach_id.choices = [
+        (c.id, f"{c.first_name} {c.last_name}")
+        for c in Coach.query.order_by(Coach.last_name).all()
+    ]
+    form.location_id.choices = [
+        (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
+    ]
+
+    upcoming_trainings = [
+        training
+        for training in trainings
+        if _as_utc(training.date) >= datetime.now(timezone.utc)
+    ]
+    if not upcoming_trainings:
+        upcoming_trainings = trainings
+
+    if form.validate_on_submit():
+        conflict_dates: list[str] = []
+        for training in upcoming_trainings:
+            conflict = (
+                Training.query.filter(
+                    Training.id != training.id,
+                    Training.date == training.date,
+                    Training.location_id == form.location_id.data,
+                    Training.is_deleted.is_(False),
+                )
+                .order_by(Training.id)
+                .first()
+            )
+            if conflict:
+                conflict_dates.append(training.date.strftime("%Y-%m-%d %H:%M"))
+
+        if conflict_dates:
+            conflict_list = ", ".join(conflict_dates)
+            form.location_id.errors.append(
+                f"W wybranym miejscu istnieją kolizje dla terminów: {conflict_list}."
+            )
+            return render_template(
+                "admin/edit_series.html",
+                form=form,
+                series=series,
+                trainings=upcoming_trainings,
+                metadata=metadata,
+            )
+
+        capacity_conflicts = [
+            training.date.strftime("%Y-%m-%d %H:%M")
+            for training in upcoming_trainings
+            if len(training.bookings) > form.max_volunteers.data
+        ]
+
+        if capacity_conflicts:
+            form.max_volunteers.errors.append(
+                "Nie można ustawić limitu miejsc poniżej liczby zapisanych wolontariuszy "
+                f"dla terminów: {', '.join(capacity_conflicts)}."
+            )
+            return render_template(
+                "admin/edit_series.html",
+                form=form,
+                series=series,
+                trainings=upcoming_trainings,
+                metadata=metadata,
+            )
+
+        series.coach_id = form.coach_id.data
+        series.location_id = form.location_id.data
+        series.max_volunteers = form.max_volunteers.data
+
+        for training in upcoming_trainings:
+            training.coach_id = form.coach_id.data
+            training.location_id = form.location_id.data
+            training.max_volunteers = form.max_volunteers.data
+
+        db.session.commit()
+        flash("Zaktualizowano serię treningów.", "success")
+        return redirect(url_for("admin.manage_trainings"))
+
+    if flask.request.method == "GET":
+        form.coach_id.data = series.coach_id
+        form.location_id.data = series.location_id
+        form.max_volunteers.data = series.max_volunteers
+
+    weekday_names = [
+        "Poniedziałek",
+        "Wtorek",
+        "Środa",
+        "Czwartek",
+        "Piątek",
+        "Sobota",
+        "Niedziela",
+    ]
+    weekday_label = (
+        weekday_names[metadata["weekday"]]
+        if 0 <= metadata["weekday"] < len(weekday_names)
+        else "?"
+    )
+
+    return render_template(
+        "admin/edit_series.html",
+        form=form,
+        series=series,
+        trainings=upcoming_trainings,
+        metadata={
+            **metadata,
+            "weekday_label": weekday_label,
+            "count": len(upcoming_trainings),
+        },
+    )
 
 
 @admin_bp.route("/trainings/series/<series_key>/delete", methods=["POST"])
 @login_required
 def delete_series(series_key):
-    flash("Usuwanie serii treningów będzie wkrótce dostępne.", "warning")
+    resolved = _resolve_series(series_key)
+    if not resolved:
+        abort(404)
+
+    series, trainings, _metadata = resolved
+
+    for training in series.trainings:
+        if training.is_deleted:
+            continue
+        training.is_deleted = True
+
+    series.repeat = False
+    db.session.commit()
+    flash("Seria treningów została usunięta.", "info")
     return redirect(url_for("admin.manage_trainings"))
 
 
