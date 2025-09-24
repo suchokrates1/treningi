@@ -175,3 +175,134 @@ def test_manage_trainings_single_session_has_series(
         assert len(trainings) == 1
         assert trainings[0].series_id == series.id
 
+
+def _series_key_for(training: Training) -> str:
+    return (
+        f"{training.date.weekday()}-"
+        f"{training.date.strftime('%H%M')}-"
+        f"c{training.coach_id}-"
+        f"l{training.location_id}"
+    )
+
+
+def test_edit_series_updates_trainings(client, app_instance, coach_and_location):
+    coach_id, location_id = coach_and_location
+
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert login.status_code == 200
+
+    response = client.post(
+        "/admin/trainings",
+        data={
+            "date": "2099-01-03T18:00",
+            "location_id": str(location_id),
+            "coach_id": str(coach_id),
+            "max_volunteers": "4",
+            "repeat": "y",
+            "repeat_interval": "1",
+            "repeat_until": "2099-01-17",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with app_instance.app_context():
+        new_coach = Coach(
+            first_name="Updated",
+            last_name="Coach",
+            phone_number="789",
+        )
+        new_location = Location(name="Updated Hall")
+        db.session.add_all([new_coach, new_location])
+        db.session.commit()
+
+        series = TrainingSeries.query.one()
+        trainings = sorted(
+            [t for t in series.trainings if not t.is_deleted],
+            key=lambda t: t.date,
+        )
+        assert trainings
+        series_key = _series_key_for(trainings[0])
+        new_coach_id = new_coach.id
+        new_location_id = new_location.id
+
+    update = client.post(
+        f"/admin/trainings/series/{series_key}/edit",
+        data={
+            "coach_id": str(new_coach_id),
+            "location_id": str(new_location_id),
+            "max_volunteers": "7",
+        },
+        follow_redirects=True,
+    )
+    assert update.status_code == 200
+    page = update.get_data(as_text=True)
+    assert "Zaktualizowano serię treningów." in page
+
+    with app_instance.app_context():
+        series = TrainingSeries.query.one()
+        assert series.coach_id == new_coach_id
+        assert series.location_id == new_location_id
+        assert series.max_volunteers == 7
+
+        trainings = sorted(
+            Training.query.filter_by(series_id=series.id, is_deleted=False),
+            key=lambda t: t.date,
+        )
+        assert trainings
+        for training in trainings:
+            assert training.coach_id == new_coach_id
+            assert training.location_id == new_location_id
+            assert training.max_volunteers == 7
+
+
+def test_delete_series_marks_trainings_deleted(
+    client, app_instance, coach_and_location
+):
+    coach_id, location_id = coach_and_location
+
+    login = client.post(
+        "/admin/login", data={"password": "secret"}, follow_redirects=True
+    )
+    assert login.status_code == 200
+
+    response = client.post(
+        "/admin/trainings",
+        data={
+            "date": "2099-02-05T19:30",
+            "location_id": str(location_id),
+            "coach_id": str(coach_id),
+            "max_volunteers": "5",
+            "repeat": "y",
+            "repeat_interval": "1",
+            "repeat_until": "2099-02-19",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with app_instance.app_context():
+        series = TrainingSeries.query.one()
+        trainings = sorted(
+            [t for t in series.trainings if not t.is_deleted],
+            key=lambda t: t.date,
+        )
+        assert trainings
+        series_key = _series_key_for(trainings[0])
+
+    delete_resp = client.post(
+        f"/admin/trainings/series/{series_key}/delete",
+        follow_redirects=True,
+    )
+    assert delete_resp.status_code == 200
+    page = delete_resp.get_data(as_text=True)
+    assert "Seria treningów została usunięta." in page
+
+    with app_instance.app_context():
+        trainings = Training.query.all()
+        assert trainings
+        assert all(t.is_deleted for t in trainings)
+        series = TrainingSeries.query.one()
+        assert series.repeat is False
