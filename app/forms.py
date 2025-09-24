@@ -138,6 +138,20 @@ class TrainingForm(FlaskForm):
         return len(self.iter_occurrences())
 
 
+class TrainingSeriesForm(FlaskForm):
+    coach_id = SelectField(
+        "Trener", coerce=int, validators=[DataRequired()]
+    )
+    location_id = SelectField(
+        "Miejsce", coerce=int, validators=[DataRequired()]
+    )
+    max_volunteers = IntegerField(
+        "Liczba miejsc",
+        validators=[DataRequired(), NumberRange(min=1, max=20)],
+    )
+    submit = SubmitField("Zapisz")
+
+
 class VolunteerForm(FlaskForm):
     first_name = StringField(
         'Imię', validators=[DataRequired(), Length(max=64)]

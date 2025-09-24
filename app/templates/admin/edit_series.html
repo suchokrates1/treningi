@@ -1,0 +1,51 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>Edytuj serię treningów</h2>
+  <div class="mb-3">
+    <div><strong>Dzień:</strong> {{ metadata.weekday_label }}</div>
+    <div><strong>Godzina:</strong> {{ metadata.time_label }}</div>
+    <div><strong>Liczba nadchodzących treningów:</strong> {{ metadata.count }}</div>
+  </div>
+  <form method="POST" class="mb-3">
+    {{ form.hidden_tag() }}
+    <div class="row g-3 align-items-end row-cols-lg-auto">
+      <div class="col-auto col-lg-3">
+        {{ form.location_id.label(class="form-label") }}
+        {{ form.location_id(class="form-select") }}
+        {% for error in form.location_id.errors %}
+          <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-auto col-lg-3">
+        {{ form.coach_id.label(class="form-label") }}
+        {{ form.coach_id(class="form-select") }}
+        {% for error in form.coach_id.errors %}
+          <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-auto col-lg-2">
+        {{ form.max_volunteers.label(class="form-label") }}
+        {{ form.max_volunteers(class="form-control") }}
+        {% for error in form.max_volunteers.errors %}
+          <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary">Zapisz zmiany</button>
+        <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-secondary ms-2">Anuluj</a>
+      </div>
+    </div>
+  </form>
+  {% if trainings %}
+  <div class="alert alert-info">
+    <div class="fw-bold">Aktualizowane treningi:</div>
+    <ul class="mb-0 small">
+      {% for training in trainings|sort(attribute='date') %}
+      <li>{{ training.date.strftime('%Y-%m-%d %H:%M') }} – {{ training.location.name }} / {{ training.coach.first_name }} {{ training.coach.last_name }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
