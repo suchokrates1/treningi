@@ -60,15 +60,23 @@
   <!-- FOOTER -->
   <footer class="bg-light py-3 border-top fixed-bottom footer">
     <div class="container d-flex justify-content-between align-items-center flex-wrap">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="Fundacja Widzimy Inaczej" class="footer-logo">
+      <a href="https://widzimyinaczej.org.pl/">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Fundacja Widzimy Inaczej" class="footer-logo">
+      </a>
       <div class="text-muted">
         <i class="bi bi-envelope-fill me-1"></i>
-        <a href="mailto:kontakt@vestmedia.pl">kontakt@vestmedia.pl</a>
+        <a href="mailto:biuro@widzimyinaczej.org.pl">biuro@widzimyinaczej.org.pl</a>
       </div>
       <div class="text-muted">
-        Powered by:
-        <i class="bi bi-globe mx-1"></i>
-        <a href="https://vestmedia.pl" target="_blank" rel="noopener noreferrer">Vest Media</a>
+        Webmaster:
+        <i class="bi bi-envelope-fill mx-1"></i>
+        <a href="mailto:kontakt@vestmedia.pl">kontakt@vestmedia.pl</a>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted">Powered by:</span>
+        <a href="https://vestmedia.pl" target="_blank" rel="noopener noreferrer">
+          <img src="{{ url_for('static', filename='vestmedia_logo.png') }}" alt="Vest Media" class="footer-logo">
+        </a>
       </div>
     </div>
   </footer>

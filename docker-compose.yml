@@ -19,7 +19,7 @@ services:
     command: python run.py
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tenis-rezerwacje.rule=Host(`treningi.vestmedia.pl`)"
+      - "traefik.http.routers.tenis-rezerwacje.rule=Host(`treningi.widzimyinaczej.org.pl`)"
       - "traefik.http.routers.tenis-rezerwacje.entrypoints=https"
       - "traefik.http.routers.tenis-rezerwacje.tls=true"
       - "traefik.http.services.tenis-rezerwacje.loadbalancer.server.port=8000"
