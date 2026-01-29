@@ -14,7 +14,7 @@ services:
       - FLASK_ENV=development
       - WHATSAPP_API_URL=http://waha:3000
       - WHATSAPP_SESSION=default
-      - WHATSAPP_API_KEY=${WAHA_API_KEY:-}
+      - WHATSAPP_API_KEY=blindtenis2026
     expose:
       - "8000"
     env_file:
@@ -39,7 +39,9 @@ services:
       - WHATSAPP_DEFAULT_ENGINE=WEBJS
       - WAHA_PRINT_QR=true
       - WHATSAPP_RESTART_ALL_SESSIONS=true
-      - WAHA_API_KEY=
+      - WAHA_API_KEY=blindtenis2026
+      - WAHA_DASHBOARD_USERNAME=admin
+      - WAHA_DASHBOARD_PASSWORD=blindtenis2026
     volumes:
       - waha_sessions:/app/.sessions
     labels:
