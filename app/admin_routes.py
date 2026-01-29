@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 from . import db, csrf
 from sqlalchemy.orm import joinedload
 from . import email_utils
+from .whatsapp_utils import notify_volunteer_training_canceled
 
 # Alias retained for compatibility with tests that monkeypatch the function.
 send_email = email_utils.send_email
@@ -549,6 +550,25 @@ def cancel_training(training_id):
             if error:
                 msg += f": {error}"
             flash(msg, "danger")
+
+    # Send WhatsApp notifications to all volunteers
+    training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
+    for booking in training.bookings:
+        volunteer = booking.volunteer
+        if volunteer.phone_number:
+            volunteer_full_name = f"{volunteer.first_name} {volunteer.last_name}"
+            wa_success, wa_error = notify_volunteer_training_canceled(
+                volunteer_phone=volunteer.phone_number,
+                volunteer_name=volunteer_full_name,
+                training_date=training_date_str,
+                training_location=training.location.name,
+            )
+            if not wa_success and wa_error:
+                current_app.logger.warning(
+                    "WhatsApp notification to %s failed: %s",
+                    volunteer_full_name,
+                    wa_error,
+                )
 
     flash("Trening został oznaczony jako odwołany.", "warning")
     return redirect(url_for("admin.manage_trainings"))

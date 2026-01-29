@@ -8,6 +8,7 @@ from wtforms import (
     PasswordField,
     RadioField,
     BooleanField,
+    ValidationError,
 )
 from wtforms.fields.datetime import DateTimeLocalField
 from flask_wtf.file import FileField, MultipleFileField
@@ -18,11 +19,33 @@ from wtforms.validators import (
     Optional,
     NumberRange,
     InputRequired,
+    Regexp,
 )
 from wtforms.fields import HiddenField, TelField
 from wtforms import IntegerField
 from wtforms.fields import DateField
 from wtforms import SelectMultipleField, widgets
+
+
+def validate_polish_phone(form, field):
+    """Walidator numeru telefonu (9 cyfr, opcjonalnie +48)."""
+    import re
+    phone = re.sub(r'[\s\-()]', '', field.data or '')
+    if phone.startswith('+48'):
+        phone = phone[3:]
+    if not re.match(r'^\d{9}$', phone):
+        raise ValidationError('Podaj poprawny numer telefonu (9 cyfr).')
+
+
+def format_phone_number(phone):
+    """Formatuje numer telefonu do postaci 000 000 000."""
+    import re
+    phone = re.sub(r'[\s\-()]', '', phone or '')
+    if phone.startswith('+48'):
+        phone = phone[3:]
+    if len(phone) == 9:
+        return f"{phone[:3]} {phone[3:6]} {phone[6:]}"
+    return phone
 
 
 class MultiCheckboxField(SelectMultipleField):
@@ -40,7 +63,7 @@ class CoachForm(FlaskForm):
         'Nazwisko', validators=[DataRequired(), Length(max=64)]
     )
     phone_number = TelField(
-        'Telefon', validators=[DataRequired(), Length(max=20)]
+        'Telefon', validators=[DataRequired(), Length(max=20), validate_polish_phone]
     )
     submit = SubmitField('Zapisz')
 
@@ -162,11 +185,21 @@ class VolunteerForm(FlaskForm):
     email = StringField(
         'Email', validators=[DataRequired(), Email(), Length(max=128)]
     )
+    phone_number = TelField(
+        'Telefon', validators=[DataRequired(), Length(max=20), validate_polish_phone]
+    )
     is_adult = RadioField(
         'Czy jesteś pełnoletni?',
         choices=[('true', 'Tak'), ('false', 'Nie')],
         coerce=lambda value: value == 'true',
         validators=[InputRequired()],
+    )
+    privacy_consent = BooleanField(
+        'Zapoznałem/am się z <a href="https://widzimyinaczej.org.pl/polityka-prywatnosci/" '
+        'target="_blank" rel="noopener noreferrer">polityką prywatności</a> '
+        'i wyrażam zgodę na przetwarzanie moich danych osobowych w celu kontaktu '
+        'związanego z wolontariatem.',
+        validators=[DataRequired(message='Musisz wyrazić zgodę na przetwarzanie danych.')],
     )
     training_id = HiddenField()  # ukryte pole – ID treningu
     submit = SubmitField('Zapisz się')

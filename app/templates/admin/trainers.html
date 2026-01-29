@@ -29,7 +29,7 @@
       {% for coach in coaches %}
         <tr>
           <td>{{ coach.first_name }} {{ coach.last_name }}</td>
-          <td><a href="tel:{{ coach.phone_number }}">{{ coach.phone_number }}</a></td>
+          <td><a href="tel:{{ coach.phone_number }}">{{ coach.phone_number|format_phone }}</a></td>
           <td>
             <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-outline-primary" title="Edytuj">
               <i class="bi bi-pencil"></i>

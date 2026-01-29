@@ -56,6 +56,11 @@ def create_app():
         or ("tls" if os.environ.get("SMTP_USE_TLS", "1") == "1" else "none")
     )
 
+    # WhatsApp (WAHA) configuration
+    app.config['WHATSAPP_API_URL'] = os.environ.get('WHATSAPP_API_URL')
+    app.config['WHATSAPP_SESSION'] = os.environ.get('WHATSAPP_SESSION', 'default')
+    app.config['WHATSAPP_API_KEY'] = os.environ.get('WHATSAPP_API_KEY')
+
     log_level = os.environ.get("LOG_LEVEL")
     if log_level:
         level_value = _resolve_log_level(log_level)
@@ -76,9 +81,16 @@ def create_app():
     csrf.init_app(app)
 
     with app.app_context():
-        from . import routes, admin_routes
+        from . import routes, admin_routes, cli
+        from .whatsapp_utils import format_phone_display
         app.register_blueprint(routes.bp)
         app.register_blueprint(admin_routes.admin_bp, url_prefix='/admin')
         # Blueprints are registered after extensions so migrations can run
+
+        # Register custom Jinja filter for phone formatting
+        app.jinja_env.filters['format_phone'] = format_phone_display
+
+        # Register CLI commands
+        cli.init_app(app)
 
     return app

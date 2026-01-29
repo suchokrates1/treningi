@@ -12,6 +12,8 @@ services:
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=development
+      - WHATSAPP_API_URL=http://waha:3000
+      - WHATSAPP_SESSION=default
     expose:
       - "8000"
     env_file:
@@ -23,3 +25,27 @@ services:
       - "traefik.http.routers.tenis-rezerwacje.entrypoints=https"
       - "traefik.http.routers.tenis-rezerwacje.tls=true"
       - "traefik.http.services.tenis-rezerwacje.loadbalancer.server.port=8000"
+    depends_on:
+      - waha
+
+  waha:
+    image: devlikeapro/waha
+    container_name: tenis_waha
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=WEBJS
+      - WAHA_PRINT_QR=true
+      - WHATSAPP_RESTART_ALL_SESSIONS=true
+    volumes:
+      - waha_sessions:/app/.sessions
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tenis-waha.rule=Host(`waha.widzimyinaczej.org.pl`)"
+      - "traefik.http.routers.tenis-waha.entrypoints=https"
+      - "traefik.http.routers.tenis-waha.tls=true"
+      - "traefik.http.services.tenis-waha.loadbalancer.server.port=3000"
+
+volumes:
+  waha_sessions:

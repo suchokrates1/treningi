@@ -8,8 +8,10 @@ def sign_up(client, training_id, email, is_adult=True):
             'first_name': 'Bob',
             'last_name': 'Tester',
             'email': email,
+            'phone_number': '500600700',
             'training_id': str(training_id),
             'is_adult': 'true' if is_adult else 'false',
+            'privacy_consent': 'y',
         },
         follow_redirects=True,
     )

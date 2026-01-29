@@ -19,8 +19,10 @@ def sign_up(client, volunteer_data, training_id):
             'first_name': volunteer_data['first_name'],
             'last_name': volunteer_data['last_name'],
             'email': volunteer_data['email'],
+            'phone_number': volunteer_data.get('phone_number', '500600700'),
             'training_id': str(training_id),
             'is_adult': 'true' if volunteer_data.get('is_adult', True) else 'false',
+            'privacy_consent': 'y',
         },
         follow_redirects=True,
     )

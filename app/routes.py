@@ -15,6 +15,11 @@ from .forms import VolunteerForm, CancelForm
 from . import db
 from .email_utils import send_email
 from .template_utils import render_template_string
+from .whatsapp_utils import (
+    notify_coach_new_signup,
+    notify_coach_volunteer_canceled,
+    format_phone_display,
+)
 
 bp = Blueprint('routes', __name__)
 
@@ -54,17 +59,20 @@ def index():
 
         first_name = form.first_name.data.strip()
         last_name = form.last_name.data.strip()
+        phone_number = form.phone_number.data.strip() if form.phone_number.data else None
 
         if not existing_volunteer:
             existing_volunteer = Volunteer(
                 first_name=first_name,
                 last_name=last_name,
                 email=email,
+                phone_number=phone_number,
             )
             db.session.add(existing_volunteer)
         else:
             existing_volunteer.first_name = first_name
             existing_volunteer.last_name = last_name
+            existing_volunteer.phone_number = phone_number
 
         existing_volunteer.is_adult = form.is_adult.data
 
@@ -86,6 +94,20 @@ def index():
         )
         db.session.add(booking)
         db.session.commit()
+
+        # Notify coach via WhatsApp about new signup
+        if training.coach.phone_number:
+            volunteer_full_name = f"{existing_volunteer.first_name} {existing_volunteer.last_name}"
+            training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
+            wa_success, wa_error = notify_coach_new_signup(
+                coach_phone=training.coach.phone_number,
+                coach_name=f"{training.coach.first_name} {training.coach.last_name}",
+                volunteer_name=volunteer_full_name,
+                training_date=training_date_str,
+                training_location=training.location.name,
+            )
+            if not wa_success and wa_error:
+                current_app.logger.warning("WhatsApp notification failed: %s", wa_error)
 
         settings = db.session.get(EmailSettings, 1)
         if settings and settings.registration_template:
@@ -225,8 +247,23 @@ def cancel_booking():
             ).first()
             if booking:
                 training = booking.training
+                volunteer_full_name = f"{volunteer.first_name} {volunteer.last_name}"
+                training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
+                
                 db.session.delete(booking)
                 db.session.commit()
+
+                # Notify coach via WhatsApp about volunteer cancellation
+                if training.coach.phone_number:
+                    wa_success, wa_error = notify_coach_volunteer_canceled(
+                        coach_phone=training.coach.phone_number,
+                        coach_name=f"{training.coach.first_name} {training.coach.last_name}",
+                        volunteer_name=volunteer_full_name,
+                        training_date=training_date_str,
+                        training_location=training.location.name,
+                    )
+                    if not wa_success and wa_error:
+                        current_app.logger.warning("WhatsApp notification failed: %s", wa_error)
 
                 settings = db.session.get(EmailSettings, 1)
                 template = (
