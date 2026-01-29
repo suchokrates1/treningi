@@ -171,18 +171,17 @@ def notify_volunteer_reminder(
     coach_name: str,
     coach_phone: str,
 ) -> tuple[bool, Optional[str]]:
-    """Send a reminder to a volunteer about their upcoming training."""
+    """Send a reminder to a volunteer about their upcoming training (day before)."""
     formatted_coach_phone = format_phone_display(coach_phone)
     message = (
-        f"🎾 Przypomnienie o dzisiejszym wolontariacie!\n\n"
+        f"🎾 Przypomnienie o jutrzejszym wolontariacie!\n\n"
         f"Cześć {volunteer_name}!\n\n"
-        f"Przypominamy, że dziś odbędzie się Twój wolontariat:\n\n"
-        f"📅 Data: {training_date}\n"
-        f"🕐 Godzina: {training_time}\n"
+        f"Przypominamy, że jutro o {training_time} masz wolontariat:\n\n"
         f"📍 Miejsce: {training_location}\n"
         f"👨‍🏫 Trener: {coach_name}\n"
         f"📞 Telefon do trenera: {formatted_coach_phone}\n\n"
-        f"Do zobaczenia!\n"
+        f"✅ Odpisz POTWIERDZAM jeśli będziesz\n"
+        f"❌ Odpisz REZYGNUJĘ jeśli nie możesz\n\n"
         f"Fundacja Widzimy Inaczej"
     )
     return send_whatsapp_message(volunteer_phone, message)
@@ -224,3 +223,23 @@ def notify_coach_volunteer_canceled(
         f"System zapisów Blind Tenis"
     )
     return send_whatsapp_message(coach_phone, message)
+
+
+def notify_volunteer_signup_confirmation(
+    volunteer_phone: str,
+    volunteer_name: str,
+    training_date: str,
+    training_location: str,
+) -> tuple[bool, Optional[str]]:
+    """Send signup confirmation to volunteer with a note to check email."""
+    message = (
+        f"✅ Dziękujemy za zapisanie się!\n\n"
+        f"Cześć {volunteer_name}!\n\n"
+        f"Twój zapis na wolontariat został przyjęty:\n\n"
+        f"📅 Data: {training_date}\n"
+        f"📍 Miejsce: {training_location}\n\n"
+        f"📧 Sprawdź swoją skrzynkę e-mail - wysłaliśmy Ci szczegółowe informacje oraz potrzebne dokumenty.\n\n"
+        f"Do zobaczenia!\n"
+        f"Fundacja Widzimy Inaczej"
+    )
+    return send_whatsapp_message(volunteer_phone, message)

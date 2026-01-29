@@ -143,6 +143,11 @@ class Booking(db.Model):
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),
     )
+    is_confirmed = db.Column(
+        db.Boolean,
+        nullable=True,
+        default=None,
+    )
 
     training = db.relationship(
         'Training',
