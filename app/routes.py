@@ -11,7 +11,7 @@ from flask import (
 from datetime import datetime, timezone
 from pathlib import Path
 from .models import Training, Booking, Volunteer, EmailSettings, StoredFile
-from .forms import VolunteerForm, CancelForm
+from .forms import VolunteerForm, CancelForm, PhoneUpdateForm
 from . import db
 from .email_utils import send_email
 from .template_utils import render_template_string
@@ -329,3 +329,55 @@ def cancel_booking():
         form=form,
         training=training,
     )
+
+
+@bp.route("/update-phone/<token>", methods=["GET", "POST"])
+def update_phone(token):
+    """Strona do aktualizacji numeru telefonu wolontariusza."""
+    # Znajdź wolontariusza po tokenie
+    volunteer = Volunteer.query.filter_by(phone_update_token=token).first()
+    
+    if not volunteer:
+        return render_template(
+            "update_phone.html",
+            error="Link jest nieprawidłowy lub wygasł.",
+            form=None,
+            volunteer=None,
+            success=False,
+        )
+    
+    # Jeśli wolontariusz już ma numer telefonu
+    if volunteer.phone_number:
+        return render_template(
+            "update_phone.html",
+            error="Twój numer telefonu jest już zapisany.",
+            form=None,
+            volunteer=volunteer,
+            success=False,
+        )
+    
+    form = PhoneUpdateForm()
+    
+    if form.validate_on_submit():
+        # Zapisz numer telefonu
+        volunteer.phone_number = form.phone_number.data
+        # Wyczyść token - link jednorazowy
+        volunteer.phone_update_token = None
+        db.session.commit()
+        
+        return render_template(
+            "update_phone.html",
+            success=True,
+            form=None,
+            volunteer=volunteer,
+            error=None,
+        )
+    
+    return render_template(
+        "update_phone.html",
+        form=form,
+        volunteer=volunteer,
+        success=False,
+        error=None,
+    )
+
