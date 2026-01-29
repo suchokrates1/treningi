@@ -64,20 +64,88 @@
   body.dark-mode .section-header h2 { color: #a855f7; }
   body.dark-mode .section-header::after { background: linear-gradient(90deg, #a855f7, transparent); }
 
-  /* Month Headers */
-  .month-header {
-    background: linear-gradient(135deg, #663399, #1e3c72);
-    color: white;
-    padding: 0.75rem 1.5rem;
+  /* Filters */
+  .filters-card {
+    background: white;
     border-radius: 1rem;
-    display: inline-flex;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  body.dark-mode .filters-card {
+    background: #2a2a40;
+  }
+  .filters-card .form-select, .filters-card .form-check-label {
+    font-size: 0.9rem;
+  }
+  .filter-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #663399;
+    margin-bottom: 0.25rem;
+  }
+  body.dark-mode .filter-label { color: #a855f7; }
+
+  /* Month Tabs */
+  .month-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .month-tab {
+    background: white;
+    border: 2px solid #e0e0e0;
+    color: #666;
+    padding: 0.75rem 1.25rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-weight: 600;
-    margin: 1.5rem 0 1rem 0;
+  }
+  .month-tab:hover {
+    border-color: #663399;
+    color: #663399;
+  }
+  .month-tab.active {
+    background: linear-gradient(135deg, #663399, #1e3c72);
+    border-color: transparent;
+    color: white;
     box-shadow: 0 4px 15px rgba(102, 51, 153, 0.3);
   }
-  .month-header i { font-size: 1.25rem; }
+  .month-tab .count {
+    background: rgba(0,0,0,0.1);
+    padding: 0.15rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+  }
+  .month-tab.active .count {
+    background: rgba(255,255,255,0.2);
+  }
+  body.dark-mode .month-tab {
+    background: #2a2a40;
+    border-color: #444;
+    color: #aaa;
+  }
+  body.dark-mode .month-tab:hover {
+    border-color: #a855f7;
+    color: #a855f7;
+  }
+  body.dark-mode .month-tab.active {
+    background: linear-gradient(135deg, #663399, #1e3c72);
+    color: white;
+  }
+
+  /* Month Content */
+  .month-content {
+    display: none;
+  }
+  .month-content.active {
+    display: block;
+  }
 
   /* Training Cards */
   .training-card {
@@ -103,6 +171,9 @@
   }
   .training-card.full {
     border-left-color: #6c757d;
+  }
+  .training-card.hidden-by-filter {
+    display: none !important;
   }
   body.dark-mode .training-card {
     background: #2a2a40;
@@ -156,6 +227,7 @@
     display: flex;
     gap: 0.5rem;
     margin-top: 0.75rem;
+    flex-wrap: wrap;
   }
   .volunteer-badge {
     background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
@@ -223,6 +295,18 @@
   body.dark-mode .status-canceled { background: #4a1c1c; color: #ef9a9a; }
   body.dark-mode .status-full { background: #3a3a50; color: #aaa; }
 
+  /* No results */
+  .no-results {
+    text-align: center;
+    padding: 3rem;
+    color: #999;
+  }
+  .no-results i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
   /* Modal Improvements */
   .modal-content {
     border: none;
@@ -274,7 +358,9 @@
       justify-content: center;
       gap: 0.5rem;
     }
-    .training-volunteers { justify-content: center; flex-wrap: wrap; }
+    .training-volunteers { justify-content: center; }
+    .month-tabs { justify-content: center; }
+    .filters-card .row > div { margin-bottom: 0.75rem; }
   }
 </style>
 {% endblock %}
@@ -295,59 +381,135 @@
     <h2><i class="bi bi-calendar-event me-2"></i>Nadchodzące treningi</h2>
   </div>
 
-  {% for month, trainings in trainings_by_month.items() %}
-    <div class="month-header">
-      <i class="bi bi-calendar3"></i>
-      {{ month|replace("-", " / ") }}
-    </div>
-
-    {% for training in trainings %}
-    <div class="training-card {% if training.is_canceled %}canceled{% elif training.bookings|length >= 2 %}full{% endif %}">
-      <div class="training-date">
-        <div class="day">{{ training.date.strftime('%d') }}</div>
-        <div class="month-year">{{ training.date.strftime('%b %Y') }}</div>
-        <div class="time"><i class="bi bi-clock me-1"></i>{{ training.date.strftime('%H:%M') }}</div>
-      </div>
-
-      <div class="training-info">
-        <h5><i class="bi bi-geo-alt-fill me-2"></i>{{ training.location.name }}</h5>
-        <div class="detail">
-          <i class="bi bi-person-fill"></i>
-          <span>{{ training.coach.first_name }} {{ training.coach.last_name }}</span>
-        </div>
-        <div class="detail">
-          <i class="bi bi-telephone-fill"></i>
-          <a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number|format_phone }}</a>
-        </div>
-        <div class="training-volunteers">
-          {% for booking in training.bookings %}
-            <span class="volunteer-badge"><i class="bi bi-person-check me-1"></i>{{ booking.volunteer.first_name }}</span>
+  <!-- Filters -->
+  <div class="filters-card">
+    <div class="row align-items-end">
+      <div class="col-md-3 col-6">
+        <div class="filter-label"><i class="bi bi-geo-alt me-1"></i>Miejsce</div>
+        <select id="filterLocation" class="form-select form-select-sm">
+          <option value="">Wszystkie</option>
+          {% set locations = [] %}
+          {% for month, trainings in trainings_by_month.items() %}
+            {% for training in trainings %}
+              {% if training.location.name not in locations %}
+                {% set _ = locations.append(training.location.name) %}
+              {% endif %}
+            {% endfor %}
           {% endfor %}
-          {% for i in range(2 - training.bookings|length) %}
-            <span class="volunteer-empty"><i class="bi bi-person-plus me-1"></i>Wolne miejsce</span>
+          {% for loc in locations|sort %}
+            <option value="{{ loc }}">{{ loc }}</option>
           {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="filter-label"><i class="bi bi-person me-1"></i>Trener</div>
+        <select id="filterTrainer" class="form-select form-select-sm">
+          <option value="">Wszyscy</option>
+          {% set trainers = [] %}
+          {% for month, trainings in trainings_by_month.items() %}
+            {% for training in trainings %}
+              {% set trainer_name = training.coach.first_name ~ ' ' ~ training.coach.last_name %}
+              {% if trainer_name not in trainers %}
+                {% set _ = trainers.append(trainer_name) %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {% for trainer in trainers|sort %}
+            <option value="{{ trainer }}">{{ trainer }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="filterHideFull">
+          <label class="form-check-label" for="filterHideFull">
+            <i class="bi bi-eye-slash me-1"></i>Ukryj zajęte
+          </label>
         </div>
       </div>
-
-      <div class="training-action">
-        {% if training.is_canceled %}
-          <span class="status-badge status-canceled"><i class="bi bi-x-circle me-1"></i>Odwołany</span>
-        {% elif training.bookings|length < 2 %}
-          <button type="button" class="btn btn-signup" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
-            <i class="bi bi-pencil-square me-1"></i>Zapisz się
-          </button>
-          <div class="btn-cancel">
-            <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="text-muted"><i class="bi bi-x-circle me-1"></i>Wypisz się</a>
-          </div>
-        {% else %}
-          <span class="status-badge status-full"><i class="bi bi-people-fill me-1"></i>Komplet</span>
-          <div class="btn-cancel">
-            <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="text-muted"><i class="bi bi-x-circle me-1"></i>Wypisz się</a>
-          </div>
-        {% endif %}
+      <div class="col-md-3 col-6 text-end">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="clearFilters">
+          <i class="bi bi-x-circle me-1"></i>Wyczyść filtry
+        </button>
       </div>
     </div>
+  </div>
+
+  <!-- Month Tabs -->
+  <div class="month-tabs" role="tablist">
+    {% set month_names = {'01': 'Styczeń', '02': 'Luty', '03': 'Marzec', '04': 'Kwiecień', '05': 'Maj', '06': 'Czerwiec', '07': 'Lipiec', '08': 'Sierpień', '09': 'Wrzesień', '10': 'Październik', '11': 'Listopad', '12': 'Grudzień'} %}
+    {% for month, trainings in trainings_by_month.items() %}
+      {% set year_month = month.split('-') %}
+      {% set month_pl = month_names[year_month[1]] %}
+      <button type="button" class="month-tab {% if loop.first %}active{% endif %}" 
+              data-month="{{ month }}" role="tab" aria-selected="{{ 'true' if loop.first else 'false' }}">
+        <i class="bi bi-calendar3"></i>
+        {{ month_pl }} {{ year_month[0] }}
+        <span class="count">{{ trainings|length }}</span>
+      </button>
     {% endfor %}
+  </div>
+
+  <!-- Month Contents -->
+  {% set month_names_short = {'01': 'sty', '02': 'lut', '03': 'mar', '04': 'kwi', '05': 'maj', '06': 'cze', '07': 'lip', '08': 'sie', '09': 'wrz', '10': 'paź', '11': 'lis', '12': 'gru'} %}
+  {% for month, trainings in trainings_by_month.items() %}
+    <div class="month-content {% if loop.first %}active{% endif %}" data-month="{{ month }}">
+      {% for training in trainings %}
+      {% set is_full = training.bookings|length >= 2 %}
+      <div class="training-card {% if training.is_canceled %}canceled{% elif is_full %}full{% endif %}"
+           data-location="{{ training.location.name }}"
+           data-trainer="{{ training.coach.first_name }} {{ training.coach.last_name }}"
+           data-full="{{ 'true' if is_full else 'false' }}">
+        <div class="training-date">
+          <div class="day">{{ training.date.strftime('%d') }}</div>
+          <div class="month-year">{{ month_names_short[training.date.strftime('%m')] }} {{ training.date.strftime('%Y') }}</div>
+          <div class="time"><i class="bi bi-clock me-1"></i>{{ training.date.strftime('%H:%M') }}</div>
+        </div>
+
+        <div class="training-info">
+          <h5><i class="bi bi-geo-alt-fill me-2"></i>{{ training.location.name }}</h5>
+          <div class="detail">
+            <i class="bi bi-person-fill"></i>
+            <span>{{ training.coach.first_name }} {{ training.coach.last_name }}</span>
+          </div>
+          <div class="detail">
+            <i class="bi bi-telephone-fill"></i>
+            <a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number|format_phone }}</a>
+          </div>
+          <div class="training-volunteers">
+            {% for booking in training.bookings %}
+              <span class="volunteer-badge"><i class="bi bi-person-check me-1"></i>{{ booking.volunteer.first_name }}</span>
+            {% endfor %}
+            {% for i in range(2 - training.bookings|length) %}
+              <span class="volunteer-empty"><i class="bi bi-person-plus me-1"></i>Wolne miejsce</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="training-action">
+          {% if training.is_canceled %}
+            <span class="status-badge status-canceled"><i class="bi bi-x-circle me-1"></i>Odwołany</span>
+          {% elif training.bookings|length < 2 %}
+            <button type="button" class="btn btn-signup" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
+              <i class="bi bi-pencil-square me-1"></i>Zapisz się
+            </button>
+            <div class="btn-cancel">
+              <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="text-muted"><i class="bi bi-x-circle me-1"></i>Wypisz się</a>
+            </div>
+          {% else %}
+            <span class="status-badge status-full"><i class="bi bi-people-fill me-1"></i>Komplet</span>
+            <div class="btn-cancel">
+              <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="text-muted"><i class="bi bi-x-circle me-1"></i>Wypisz się</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      <div class="no-results" style="display: none;">
+        <i class="bi bi-search"></i>
+        <p>Brak treningów spełniających kryteria filtrowania</p>
+      </div>
+    </div>
   {% endfor %}
 </div>
 
@@ -404,11 +566,102 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    // Modal training ID
     var signupModal = document.getElementById('signupModal');
     signupModal.addEventListener('show.bs.modal', function (event) {
       var button = event.relatedTarget;
       var trainingId = button.getAttribute('data-training-id');
       signupModal.querySelector('input[name="training_id"]').value = trainingId;
+    });
+
+    // Month tabs
+    var monthTabs = document.querySelectorAll('.month-tab');
+    var monthContents = document.querySelectorAll('.month-content');
+    
+    monthTabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var month = this.getAttribute('data-month');
+        
+        // Update tabs
+        monthTabs.forEach(function(t) {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        this.classList.add('active');
+        this.setAttribute('aria-selected', 'true');
+        
+        // Update content
+        monthContents.forEach(function(content) {
+          content.classList.remove('active');
+          if (content.getAttribute('data-month') === month) {
+            content.classList.add('active');
+          }
+        });
+        
+        // Re-apply filters
+        applyFilters();
+      });
+    });
+
+    // Filters
+    var filterLocation = document.getElementById('filterLocation');
+    var filterTrainer = document.getElementById('filterTrainer');
+    var filterHideFull = document.getElementById('filterHideFull');
+    var clearFiltersBtn = document.getElementById('clearFilters');
+
+    function applyFilters() {
+      var location = filterLocation.value;
+      var trainer = filterTrainer.value;
+      var hideFull = filterHideFull.checked;
+      
+      document.querySelectorAll('.month-content').forEach(function(content) {
+        var cards = content.querySelectorAll('.training-card');
+        var visibleCount = 0;
+        
+        cards.forEach(function(card) {
+          var matchLocation = !location || card.getAttribute('data-location') === location;
+          var matchTrainer = !trainer || card.getAttribute('data-trainer') === trainer;
+          var isFull = card.getAttribute('data-full') === 'true';
+          var matchFull = !hideFull || !isFull;
+          
+          if (matchLocation && matchTrainer && matchFull) {
+            card.classList.remove('hidden-by-filter');
+            visibleCount++;
+          } else {
+            card.classList.add('hidden-by-filter');
+          }
+        });
+        
+        // Show/hide no results message
+        var noResults = content.querySelector('.no-results');
+        if (noResults) {
+          noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+      });
+      
+      // Update tab counts
+      updateTabCounts();
+    }
+    
+    function updateTabCounts() {
+      monthTabs.forEach(function(tab) {
+        var month = tab.getAttribute('data-month');
+        var content = document.querySelector('.month-content[data-month="' + month + '"]');
+        var visibleCards = content.querySelectorAll('.training-card:not(.hidden-by-filter)').length;
+        var countSpan = tab.querySelector('.count');
+        countSpan.textContent = visibleCards;
+      });
+    }
+
+    filterLocation.addEventListener('change', applyFilters);
+    filterTrainer.addEventListener('change', applyFilters);
+    filterHideFull.addEventListener('change', applyFilters);
+    
+    clearFiltersBtn.addEventListener('click', function() {
+      filterLocation.value = '';
+      filterTrainer.value = '';
+      filterHideFull.checked = false;
+      applyFilters();
     });
   });
 </script>
