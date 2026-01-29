@@ -119,6 +119,7 @@ class Volunteer(db.Model):
     first_name = db.Column(db.String(64), nullable=False)
     last_name = db.Column(db.String(64), nullable=False)
     email = db.Column(db.String(128), nullable=False, unique=True)
+    phone_number = db.Column(db.String(20), nullable=True)
     is_adult = db.Column(db.Boolean, nullable=True)
 
     def __repr__(self):

@@ -32,6 +32,22 @@ Create a `.env` file and define at least:
   - `SMTP_SENDER` – email address used for outgoing mail.
     The display name is configured in the admin panel.
   - `SMTP_ENCRYPTION` – `tls`, `ssl` or `none` to control the connection security.
+
+#### WhatsApp notifications (optional)
+
+The application can send WhatsApp notifications to coaches (when a volunteer signs up or cancels) and to volunteers (reminders and training cancellations). It uses [WAHA](https://waha.devlike.pro/) – a self-hosted WhatsApp HTTP API.
+
+Configure the following variables:
+  - `WHATSAPP_API_URL` – WAHA API URL (e.g. `http://waha:3000` when using Docker Compose).
+  - `WHATSAPP_SESSION` – WAHA session name (default: `default`).
+  - `WHATSAPP_API_KEY` – WAHA API key (optional, if authentication is enabled).
+
+To send daily reminders to volunteers, run:
+```bash
+flask send-reminders
+```
+Add this command to your cron or scheduler to run each morning.
+
 Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.
 `LOG_LEVEL` controls the verbosity of both the Flask logger and the
 root Python logger. Valid values follow the standard Python logging

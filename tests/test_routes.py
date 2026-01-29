@@ -41,8 +41,10 @@ def test_duplicate_booking_flash(client, app_instance):
             'first_name': 'Ann',
             'last_name': 'Smith',
             'email': 'ann@example.com',
+            'phone_number': '500600700',
             'training_id': str(training_id),
             'is_adult': 'true',
+            'privacy_consent': 'y',
         },
         follow_redirects=True,
     )
@@ -131,8 +133,10 @@ def test_signup_handles_attachment_metadata(
             "first_name": "New",
             "last_name": "Volunteer",
             "email": "new_volunteer@example.com",
+            "phone_number": "500600700",
             "training_id": str(training_id),
             "is_adult": "true",
+            "privacy_consent": "y",
         },
         follow_redirects=True,
     )

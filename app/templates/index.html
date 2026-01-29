@@ -20,7 +20,7 @@
         <tr class="{% if training.is_canceled %}table-danger{% endif %}">
           <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
           <td>{{ training.location.name }}</td>
-          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a></small></td>
+          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number|format_phone }}</a></small></td>
           <td class="volunteers-col">
             <ul class="mb-0">
               {% for booking in training.bookings %}
@@ -73,6 +73,10 @@
               {{ form.email(class="form-control") }}
             </div>
             <div class="mb-3">
+              {{ form.phone_number.label(class="form-label") }}
+              {{ form.phone_number(class="form-control", placeholder="np. 500 600 700") }}
+            </div>
+            <div class="mb-3">
               {{ form.is_adult.label(class="form-label d-block") }}
               {% for subfield in form.is_adult %}
               <div class="form-check">
@@ -81,7 +85,10 @@
               </div>
               {% endfor %}
             </div>
-            <p class="text-muted small">Dane potrzebne są do dokumentacji.</p>
+            <div class="mb-3 form-check">
+              {{ form.privacy_consent(class="form-check-input") }}
+              <label class="form-check-label" for="{{ form.privacy_consent.id }}">{{ form.privacy_consent.label.text|safe }}</label>
+            </div>
             {{ form.training_id }}
           </div>
           <div class="modal-footer">
