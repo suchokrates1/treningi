@@ -2,7 +2,7 @@
 
 import click
 import secrets
-from flask import current_app, url_for
+from flask import current_app
 from flask.cli import with_appcontext
 from datetime import datetime, timezone, timedelta
 
@@ -101,8 +101,10 @@ def send_reminders_command():
 
 
 @click.command('send-phone-requests')
+@click.option('--base-url', default='https://treningi.widzimyinaczej.org.pl', 
+              help='Base URL for the application')
 @with_appcontext
-def send_phone_requests_command():
+def send_phone_requests_command(base_url):
     """Send email to volunteers without phone numbers asking them to add their phone.
     
     Each volunteer receives this email only once (tracked by phone_request_sent flag).
@@ -129,6 +131,9 @@ def send_phone_requests_command():
     template = setting.phone_request_template
     sent_count = 0
     failed_count = 0
+    
+    # Logo URL
+    logo_url = f"{base_url}/static/logo.png"
 
     for volunteer in volunteers:
         # Generuj unikalny token
@@ -136,11 +141,13 @@ def send_phone_requests_command():
         volunteer.phone_update_token = token
         
         # Przygotuj dane do szablonu
+        update_link = f"{base_url}/update-phone/{token}"
         data = {
             'first_name': volunteer.first_name,
             'last_name': volunteer.last_name,
             'email': volunteer.email,
-            'update_link': url_for('routes.update_phone', token=token, _external=True),
+            'update_link': update_link,
+            'logo': logo_url,
         }
         
         try:
