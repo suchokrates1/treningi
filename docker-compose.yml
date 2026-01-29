@@ -14,6 +14,7 @@ services:
       - FLASK_ENV=development
       - WHATSAPP_API_URL=http://waha:3000
       - WHATSAPP_SESSION=default
+      - WHATSAPP_API_KEY=${WAHA_API_KEY:-}
     expose:
       - "8000"
     env_file:
