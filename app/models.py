@@ -121,6 +121,8 @@ class Volunteer(db.Model):
     email = db.Column(db.String(128), nullable=False, unique=True)
     phone_number = db.Column(db.String(20), nullable=True)
     is_adult = db.Column(db.Boolean, nullable=True)
+    phone_request_sent = db.Column(db.Boolean, nullable=True, default=False)
+    phone_update_token = db.Column(db.String(64), nullable=True)
 
     def __repr__(self):
         return f"<Volunteer {self.first_name} {self.last_name}>"
@@ -194,6 +196,7 @@ class EmailSettings(db.Model):
     cancellation_template = db.Column(db.Text, nullable=True)
     registration_files_adult = db.Column(db.JSON, nullable=True)
     registration_files_minor = db.Column(db.JSON, nullable=True)
+    phone_request_template = db.Column(db.Text, nullable=True)
 
 
 class StoredFile(db.Model):

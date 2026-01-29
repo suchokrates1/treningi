@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .update-phone-card {
+    max-width: 500px;
+    margin: 2rem auto;
+    background: white;
+    border-radius: 1.5rem;
+    padding: 2rem;
+    box-shadow: 0 10px 40px rgba(102, 51, 153, 0.15);
+  }
+  body.dark-mode .update-phone-card {
+    background: #2a2a40;
+  }
+  .update-phone-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .update-phone-header i {
+    font-size: 4rem;
+    color: #663399;
+    margin-bottom: 1rem;
+    display: block;
+  }
+  body.dark-mode .update-phone-header i {
+    color: #a855f7;
+  }
+  .update-phone-header h2 {
+    font-weight: 700;
+    color: #333;
+  }
+  body.dark-mode .update-phone-header h2 {
+    color: #f0f0f0;
+  }
+  .update-phone-header p {
+    color: #666;
+  }
+  body.dark-mode .update-phone-header p {
+    color: #aaa;
+  }
+  .btn-update {
+    background: linear-gradient(135deg, #663399, #1e3c72);
+    border: none;
+    color: white;
+    padding: 0.75rem 2rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    width: 100%;
+  }
+  .btn-update:hover {
+    background: linear-gradient(135deg, #7744aa, #2a4c82);
+    color: white;
+  }
+  .success-message {
+    text-align: center;
+    padding: 2rem;
+  }
+  .success-message i {
+    font-size: 5rem;
+    color: #28a745;
+    margin-bottom: 1rem;
+    display: block;
+  }
+  .volunteer-info {
+    background: #f8f9fa;
+    border-radius: 1rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+  body.dark-mode .volunteer-info {
+    background: #1e1e2f;
+  }
+  .volunteer-info .name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #333;
+  }
+  body.dark-mode .volunteer-info .name {
+    color: #f0f0f0;
+  }
+  .volunteer-info .email {
+    color: #666;
+    font-size: 0.9rem;
+  }
+  body.dark-mode .volunteer-info .email {
+    color: #aaa;
+  }
+  .error-page {
+    text-align: center;
+    padding: 3rem;
+  }
+  .error-page i {
+    font-size: 5rem;
+    color: #dc3545;
+    margin-bottom: 1rem;
+    display: block;
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="update-phone-card">
+    {% if error %}
+      <!-- Error state -->
+      <div class="error-page">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <h3>{{ error }}</h3>
+        <p class="text-muted">Jeśli potrzebujesz pomocy, skontaktuj się z nami.</p>
+        <a href="mailto:biuro@widzimyinaczej.org.pl" class="btn btn-outline-primary mt-3">
+          <i class="bi bi-envelope me-2"></i>Napisz do nas
+        </a>
+      </div>
+    {% elif success %}
+      <!-- Success state -->
+      <div class="success-message">
+        <i class="bi bi-check-circle-fill"></i>
+        <h3>Dziękujemy!</h3>
+        <p class="text-muted">Twój numer telefonu został zapisany.<br>Od teraz będziesz otrzymywać powiadomienia WhatsApp o treningach.</p>
+        <a href="{{ url_for('routes.index') }}" class="btn btn-update mt-3">
+          <i class="bi bi-calendar-event me-2"></i>Przejdź do treningów
+        </a>
+      </div>
+    {% else %}
+      <!-- Form state -->
+      <div class="update-phone-header">
+        <i class="bi bi-whatsapp"></i>
+        <h2>Powiadomienia WhatsApp</h2>
+        <p>Podaj swój numer telefonu, aby otrzymywać przypomnienia o treningach przez WhatsApp.</p>
+      </div>
+      
+      <div class="volunteer-info">
+        <div class="name">{{ volunteer.first_name }} {{ volunteer.last_name }}</div>
+        <div class="email">{{ volunteer.email }}</div>
+      </div>
+
+      <form method="post">
+        {{ form.csrf_token }}
+        <div class="mb-4">
+          <label for="{{ form.phone_number.id }}" class="form-label fw-semibold">
+            <i class="bi bi-phone me-1"></i>Numer telefonu
+          </label>
+          {{ form.phone_number(class="form-control form-control-lg", placeholder="np. 500 600 700") }}
+          <div class="form-text">
+            <i class="bi bi-info-circle me-1"></i>
+            Podaj polski numer komórkowy (9 cyfr)
+          </div>
+          {% if form.phone_number.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.phone_number.errors %}
+                {{ error }}
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-update">
+          <i class="bi bi-check-lg me-2"></i>Zapisz numer
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -58,6 +58,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   init('registration_template', 'registration_editor');
   init('cancellation_template', 'cancellation_editor');
+  init('phone_request_template', 'phone_request_editor');
 
   document.querySelectorAll('.insert-var').forEach(btn => {
     btn.addEventListener('click', () => {

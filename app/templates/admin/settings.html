@@ -125,6 +125,26 @@
         </div>
       </div>
     </div>
+    <div class="mb-3">
+      {{ form.phone_request_template.label(class="form-label") }}
+      {{ form.phone_request_template(id="phone_request_template") }}
+      <div id="phone_request_editor" class="quill-wrapper" style="height:200px;"></div>
+      <textarea id="phone_request_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
+      <div class="mt-2">
+        {% for var in ['{first_name}', '{last_name}', '{email}', '{update_link}', '{logo}'] %}
+        <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="phone_request_editor" data-value="{{ var }}">{{ var }}</button>
+        {% endfor %}
+        <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="phone_request" data-editor="phone_request_editor">Podgląd</button>
+        <div class="form-check form-switch d-inline-block ms-2">
+          <input class="form-check-input html-toggle" type="checkbox" role="switch" id="phone_request_html_toggle" data-editor="phone_request_editor">
+          <label class="form-check-label" for="phone_request_html_toggle">Edytuj HTML</label>
+        </div>
+      </div>
+      <div class="form-text mt-2">
+        <strong>Uwaga:</strong> Ten szablon jest używany do wysyłania jednorazowych maili do wolontariuszy bez numeru telefonu.
+        Uruchom komendę <code>flask send-phone-requests</code> aby wysłać kampanię.
+      </div>
+    </div>
   {{ form.submit(class="btn btn-primary") }}
   {{ form.send_test(class="btn btn-secondary ms-2", formaction=url_for('admin.test_email'), formmethod='post') }}
   </form>

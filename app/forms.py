@@ -308,6 +308,7 @@ class SettingsForm(FlaskForm):
     )
     registration_template = HiddenField('Szablon maila zapisu')
     cancellation_template = HiddenField('Szablon maila odwołania')
+    phone_request_template = HiddenField('Szablon maila prośby o telefon')
     test_recipient = StringField(
         'Adres testowy', validators=[Optional(), Email(), Length(max=128)]
     )
@@ -325,3 +326,21 @@ class SettingsForm(FlaskForm):
     )
     submit = SubmitField('Zapisz')
     send_test = SubmitField('Wyślij test')
+
+
+class PhoneUpdateForm(FlaskForm):
+    """Form for volunteers to update their phone number."""
+    phone_number = TelField(
+        'Numer telefonu',
+        validators=[DataRequired(), Length(max=20), validate_polish_phone],
+        render_kw={"placeholder": "np. 500 600 700", "class": "form-control form-control-lg"}
+    )
+    submit = SubmitField('Zapisz numer')
+
+    def validate(self, extra_validators=None):
+        """Sanitize and format phone number."""
+        if self.phone_number.data:
+            self.phone_number.data = sanitize_input(self.phone_number.data)
+            self.phone_number.data = format_phone_number(self.phone_number.data)
+        return super().validate(extra_validators=extra_validators)
+

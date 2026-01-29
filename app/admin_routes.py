@@ -1019,6 +1019,7 @@ def settings():
         settings.sender = form.sender.data.strip()
         settings.registration_template = form.registration_template.data
         settings.cancellation_template = form.cancellation_template.data
+        settings.phone_request_template = form.phone_request_template.data
 
         try:
             attachments_dir.mkdir(parents=True, exist_ok=True)
@@ -1187,24 +1188,35 @@ def preview_template(template):
     if flask.request.method == "POST" and "content" in flask.request.form:
         tpl = flask.request.form.get("content", "")
     else:
-        if template not in ("registration", "cancellation"):
+        if template not in ("registration", "cancellation", "phone_request"):
             abort(404)
         if settings:
             if template == "registration":
                 tpl = settings.registration_template or ""
-            else:  # template == "cancellation"
+            elif template == "cancellation":
                 tpl = settings.cancellation_template or ""
+            else:  # template == "phone_request"
+                tpl = settings.phone_request_template or ""
         else:
             tpl = ""
 
-    data = {
-        "first_name": "Jan",
-        "last_name": "Kowalski",
-        "training": "2024-01-01 10:00 w Warszawie",
-        "cancel_link": "https://example.com/cancel",
-        "date": "2024-01-01 10:00",
-        "location": "Warszawa",
-        "logo": url_for("static", filename="logo.png", _external=True),
-    }
+    if template == "phone_request":
+        data = {
+            "first_name": "Jan",
+            "last_name": "Kowalski",
+            "email": "jan.kowalski@example.com",
+            "update_link": "https://example.com/update-phone/abc123",
+            "logo": url_for("static", filename="logo.png", _external=True),
+        }
+    else:
+        data = {
+            "first_name": "Jan",
+            "last_name": "Kowalski",
+            "training": "2024-01-01 10:00 w Warszawie",
+            "cancel_link": "https://example.com/cancel",
+            "date": "2024-01-01 10:00",
+            "location": "Warszawa",
+            "logo": url_for("static", filename="logo.png", _external=True),
+        }
     html = render_template_string(tpl, data)
     return render_template("admin/preview_email.html", html=html)
