@@ -13,24 +13,25 @@ from .whatsapp_utils import notify_volunteer_reminder, format_phone_display
 @click.command('send-reminders')
 @with_appcontext
 def send_reminders_command():
-    """Send WhatsApp reminders for today's trainings."""
-    today = datetime.now(timezone.utc).date()
-    today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
-    today_end = datetime.combine(today, datetime.max.time()).replace(tzinfo=timezone.utc)
+    """Send WhatsApp reminders for tomorrow's trainings (run daily in evening)."""
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+    tomorrow_start = datetime.combine(tomorrow, datetime.min.time()).replace(tzinfo=timezone.utc)
+    tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
 
     trainings = Training.query.filter(
-        Training.date >= today_start,
-        Training.date <= today_end,
+        Training.date >= tomorrow_start,
+        Training.date <= tomorrow_end,
         Training.is_canceled.is_(False),
         Training.is_deleted.is_(False),
     ).all()
 
     if not trainings:
-        click.echo("No trainings scheduled for today.")
+        click.echo("No trainings scheduled for tomorrow.")
         return
 
     sent_count = 0
     failed_count = 0
+    skipped_count = 0
 
     for training in trainings:
         for booking in training.bookings:
@@ -41,6 +42,17 @@ def send_reminders_command():
                     volunteer.first_name,
                     volunteer.last_name,
                 )
+                skipped_count += 1
+                continue
+
+            # Skip if already confirmed or declined
+            if booking.is_confirmed is not None:
+                current_app.logger.info(
+                    "Booking for %s %s already has confirmation status, skipping",
+                    volunteer.first_name,
+                    volunteer.last_name,
+                )
+                skipped_count += 1
                 continue
 
             volunteer_full_name = f"{volunteer.first_name} {volunteer.last_name}"
@@ -63,7 +75,7 @@ def send_reminders_command():
                 failed_count += 1
                 click.echo(f"✗ Failed to send reminder to {volunteer_full_name}: {error}")
 
-    click.echo(f"\nSummary: {sent_count} sent, {failed_count} failed")
+    click.echo(f"\nSummary: {sent_count} sent, {failed_count} failed, {skipped_count} skipped")
 
 
 def init_app(app):

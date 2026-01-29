@@ -18,6 +18,7 @@ from .template_utils import render_template_string
 from .whatsapp_utils import (
     notify_coach_new_signup,
     notify_coach_volunteer_canceled,
+    notify_volunteer_signup_confirmation,
     format_phone_display,
 )
 
@@ -200,6 +201,20 @@ def index():
                 if error:
                     msg += f": {error}"
                 flash(msg, "danger")
+
+        # Notify volunteer via WhatsApp about successful signup
+        if existing_volunteer.phone_number:
+            volunteer_full_name = f"{existing_volunteer.first_name} {existing_volunteer.last_name}"
+            training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
+            wa_success, wa_error = notify_volunteer_signup_confirmation(
+                volunteer_phone=existing_volunteer.phone_number,
+                volunteer_name=existing_volunteer.first_name,
+                training_date=training_date_str,
+                training_location=training.location.name,
+            )
+            if not wa_success and wa_error:
+                current_app.logger.warning("WhatsApp notification to volunteer failed: %s", wa_error)
+
         flash("Zapisano na trening!", "success")
         return redirect(url_for('routes.index'))
 

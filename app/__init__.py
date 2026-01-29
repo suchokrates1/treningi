@@ -81,11 +81,15 @@ def create_app():
     csrf.init_app(app)
 
     with app.app_context():
-        from . import routes, admin_routes, cli
+        from . import routes, admin_routes, cli, webhook_routes
         from .whatsapp_utils import format_phone_display
         app.register_blueprint(routes.bp)
         app.register_blueprint(admin_routes.admin_bp, url_prefix='/admin')
+        app.register_blueprint(webhook_routes.webhook_bp, url_prefix='/webhook')
         # Blueprints are registered after extensions so migrations can run
+
+        # Exempt webhook from CSRF (it uses API key auth)
+        csrf.exempt(webhook_routes.webhook_bp)
 
         # Register custom Jinja filter for phone formatting
         app.jinja_env.filters['format_phone'] = format_phone_display

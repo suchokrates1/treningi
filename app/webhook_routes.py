@@ -1,0 +1,309 @@
+"""WhatsApp webhook endpoint for receiving messages from WAHA."""
+
+import re
+from flask import Blueprint, request, jsonify, current_app
+from datetime import datetime, timezone, timedelta
+
+from . import db
+from .models import Volunteer, Booking, Training
+from .whatsapp_utils import send_whatsapp_message, normalize_phone_number
+
+webhook_bp = Blueprint('webhook', __name__)
+
+
+# Patterns for confirmation/cancellation detection
+CONFIRM_PATTERNS = [
+    r'\bpotwierdzam\b',
+    r'\bpotwierdz\b',
+    r'\btak\b',
+    r'\bbede\b',
+    r'\bbędę\b',
+    r'\bok\b',
+    r'^\s*\+\s*$',
+    r'^1$',
+]
+
+CANCEL_PATTERNS = [
+    r'\brezygnuj[eę]\b',
+    r'\brezygnacja\b',
+    r'\bnie\s+(bede|będę)\b',
+    r'\bodwo[łl]uj[eę]\b',
+    r'\banuluj[eę]?\b',
+    r'^2$',
+]
+
+
+def normalize_text(text: str) -> str:
+    """Normalize text for pattern matching."""
+    # Remove accents for easier matching
+    replacements = {
+        'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
+        'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+    }
+    text = text.lower().strip()
+    for pl, en in replacements.items():
+        text = text.replace(pl, en)
+    return text
+
+
+def detect_intent(message: str) -> str | None:
+    """Detect user intent from message. Returns 'confirm', 'cancel', or None."""
+    normalized = normalize_text(message)
+    original_lower = message.lower().strip()
+    
+    for pattern in CONFIRM_PATTERNS:
+        if re.search(pattern, normalized) or re.search(pattern, original_lower):
+            return 'confirm'
+    
+    for pattern in CANCEL_PATTERNS:
+        if re.search(pattern, normalized) or re.search(pattern, original_lower):
+            return 'cancel'
+    
+    # Check for number selection (for multiple trainings)
+    number_match = re.match(r'^(\d+)$', message.strip())
+    if number_match:
+        return f'select_{number_match.group(1)}'
+    
+    return None
+
+
+def find_volunteer_by_phone(phone: str) -> Volunteer | None:
+    """Find volunteer by phone number."""
+    normalized = normalize_phone_number(phone)
+    
+    # Try different formats
+    phone_variants = [
+        normalized,
+        normalized.lstrip('+'),
+        normalized.replace('+48', ''),
+    ]
+    
+    for variant in phone_variants:
+        volunteer = Volunteer.query.filter(
+            Volunteer.phone_number.ilike(f'%{variant[-9:]}%')
+        ).first()
+        if volunteer:
+            return volunteer
+    
+    return None
+
+
+def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
+    """Get bookings for tomorrow that haven't been confirmed yet."""
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+    tomorrow_start = datetime.combine(tomorrow, datetime.min.time()).replace(tzinfo=timezone.utc)
+    tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
+    
+    return Booking.query.join(Training).filter(
+        Booking.volunteer_id == volunteer.id,
+        Training.date >= tomorrow_start,
+        Training.date <= tomorrow_end,
+        Training.is_canceled.is_(False),
+        Training.is_deleted.is_(False),
+        Booking.is_confirmed.is_(None),
+    ).order_by(Training.date).all()
+
+
+def send_confirmation_response(phone: str, booking: Booking) -> None:
+    """Send confirmation response to volunteer."""
+    training = booking.training
+    message = (
+        f"✅ Dziękujemy za potwierdzenie!\n\n"
+        f"Do zobaczenia jutro o {training.date.strftime('%H:%M')}\n"
+        f"📍 {training.location.name}\n"
+        f"👨‍🏫 Trener: {training.coach.first_name} {training.coach.last_name}\n"
+        f"📞 Tel: {training.coach.phone_number}"
+    )
+    send_whatsapp_message(phone, message)
+
+
+def send_cancellation_response(phone: str, booking: Booking) -> None:
+    """Send cancellation response to volunteer."""
+    training = booking.training
+    message = (
+        f"❌ Twoja rezygnacja została przyjęta.\n\n"
+        f"Trening: {training.date.strftime('%Y-%m-%d %H:%M')}\n"
+        f"📍 {training.location.name}\n\n"
+        f"Mamy nadzieję, że zobaczysz się z nami innym razem!\n"
+        f"Fundacja Widzimy Inaczej"
+    )
+    send_whatsapp_message(phone, message)
+
+
+def send_selection_prompt(phone: str, bookings: list[Booking]) -> None:
+    """Send message asking user to select which training to confirm."""
+    lines = ["📋 Masz kilka treningów jutro. Który potwierdzasz?\n"]
+    
+    for i, booking in enumerate(bookings, 1):
+        training = booking.training
+        lines.append(
+            f"{i}. {training.date.strftime('%H:%M')} - {training.location.name}"
+        )
+    
+    lines.append("\n✅ Odpisz numer (np. 1) aby potwierdzić")
+    lines.append("❌ Odpisz 'rezygnuję z X' aby zrezygnować")
+    
+    send_whatsapp_message(phone, "\n".join(lines))
+
+
+def send_unknown_response(phone: str) -> None:
+    """Send response when we don't understand the message."""
+    message = (
+        "🤔 Nie rozumiem Twojej wiadomości.\n\n"
+        "Dostępne komendy:\n"
+        "✅ POTWIERDZAM - potwierdź udział w treningu\n"
+        "❌ REZYGNUJĘ - zrezygnuj z treningu\n\n"
+        "Jeśli potrzebujesz pomocy, skontaktuj się z nami."
+    )
+    send_whatsapp_message(phone, message)
+
+
+def send_no_booking_response(phone: str) -> None:
+    """Send response when no pending booking found."""
+    message = (
+        "ℹ️ Nie znaleziono żadnego treningu do potwierdzenia na jutro.\n\n"
+        "Jeśli uważasz, że to błąd, skontaktuj się z nami."
+    )
+    send_whatsapp_message(phone, message)
+
+
+def send_not_found_response(phone: str) -> None:
+    """Send response when phone number not found in database."""
+    message = (
+        "❓ Nie znaleziono Twojego numeru w naszej bazie.\n\n"
+        "Jeśli jesteś zapisany/a na wolontariat, upewnij się, "
+        "że podałeś/aś ten numer telefonu podczas rejestracji."
+    )
+    send_whatsapp_message(phone, message)
+
+
+# Store for multi-step conversations (selection)
+_pending_selections: dict[str, list[Booking]] = {}
+
+
+@webhook_bp.route('/whatsapp', methods=['POST'])
+def whatsapp_webhook():
+    """Handle incoming WhatsApp messages from WAHA."""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'status': 'no data'}), 200
+        
+        # WAHA sends different event types
+        event_type = data.get('event')
+        
+        # We only care about incoming messages
+        if event_type != 'message':
+            return jsonify({'status': 'ignored', 'reason': 'not a message event'}), 200
+        
+        payload = data.get('payload', {})
+        
+        # Skip messages we sent ourselves
+        if payload.get('fromMe'):
+            return jsonify({'status': 'ignored', 'reason': 'own message'}), 200
+        
+        # Get message details
+        message_body = payload.get('body', '').strip()
+        from_field = payload.get('from', '')
+        
+        # Extract phone number from WhatsApp ID (format: 48123456789@c.us)
+        phone_match = re.match(r'(\d+)@', from_field)
+        if not phone_match:
+            current_app.logger.warning(f"Could not extract phone from: {from_field}")
+            return jsonify({'status': 'error', 'reason': 'invalid from field'}), 200
+        
+        phone_number = phone_match.group(1)
+        
+        current_app.logger.info(
+            f"Received WhatsApp message from {phone_number}: {message_body[:50]}..."
+        )
+        
+        # Find volunteer by phone
+        volunteer = find_volunteer_by_phone(phone_number)
+        
+        if not volunteer:
+            send_not_found_response(phone_number)
+            return jsonify({'status': 'ok', 'action': 'not_found'}), 200
+        
+        # Check if we're waiting for a selection from this user
+        if phone_number in _pending_selections:
+            bookings = _pending_selections[phone_number]
+            
+            # Try to parse number
+            try:
+                selection = int(message_body.strip())
+                if 1 <= selection <= len(bookings):
+                    booking = bookings[selection - 1]
+                    booking.is_confirmed = True
+                    db.session.commit()
+                    send_confirmation_response(phone_number, booking)
+                    del _pending_selections[phone_number]
+                    return jsonify({'status': 'ok', 'action': 'confirmed_selection'}), 200
+            except ValueError:
+                pass
+            
+            # Check for cancel with number
+            cancel_match = re.search(r'rezygnuj\w*\s+z?\s*(\d+)', message_body.lower())
+            if cancel_match:
+                try:
+                    selection = int(cancel_match.group(1))
+                    if 1 <= selection <= len(bookings):
+                        booking = bookings[selection - 1]
+                        booking.is_confirmed = False
+                        db.session.commit()
+                        send_cancellation_response(phone_number, booking)
+                        del _pending_selections[phone_number]
+                        return jsonify({'status': 'ok', 'action': 'cancelled_selection'}), 200
+                except ValueError:
+                    pass
+            
+            # Didn't understand, repeat the selection prompt
+            send_selection_prompt(phone_number, bookings)
+            return jsonify({'status': 'ok', 'action': 'selection_repeated'}), 200
+        
+        # Detect intent
+        intent = detect_intent(message_body)
+        
+        if not intent:
+            send_unknown_response(phone_number)
+            return jsonify({'status': 'ok', 'action': 'unknown'}), 200
+        
+        # Get pending bookings for tomorrow
+        pending_bookings = get_pending_bookings(volunteer)
+        
+        if not pending_bookings:
+            send_no_booking_response(phone_number)
+            return jsonify({'status': 'ok', 'action': 'no_booking'}), 200
+        
+        # Handle single booking
+        if len(pending_bookings) == 1:
+            booking = pending_bookings[0]
+            
+            if intent == 'confirm':
+                booking.is_confirmed = True
+                db.session.commit()
+                send_confirmation_response(phone_number, booking)
+                return jsonify({'status': 'ok', 'action': 'confirmed'}), 200
+            
+            elif intent == 'cancel':
+                booking.is_confirmed = False
+                db.session.commit()
+                send_cancellation_response(phone_number, booking)
+                return jsonify({'status': 'ok', 'action': 'cancelled'}), 200
+        
+        # Multiple bookings - need selection
+        else:
+            _pending_selections[phone_number] = pending_bookings
+            send_selection_prompt(phone_number, pending_bookings)
+            return jsonify({'status': 'ok', 'action': 'selection_requested'}), 200
+        
+    except Exception as e:
+        current_app.logger.exception(f"Error processing WhatsApp webhook: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@webhook_bp.route('/whatsapp', methods=['GET'])
+def whatsapp_webhook_verify():
+    """Verify webhook endpoint (for testing)."""
+    return jsonify({'status': 'ok', 'message': 'WhatsApp webhook is active'}), 200
