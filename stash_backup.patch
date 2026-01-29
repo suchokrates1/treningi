@@ -1,0 +1,517 @@
+diff --git a/app/templates/index.html b/app/templates/index.html
+index 26b1ebf..30763a8 100644
+--- a/app/templates/index.html
++++ b/app/templates/index.html
+@@ -1,106 +1,411 @@
+ {% extends "base.html" %}
++{% block extra_head %}
++<style>
++  /* Hero Banner */
++  .hero-banner {
++    position: relative;
++    background: linear-gradient(135deg, rgba(102, 51, 153, 0.85), rgba(30, 60, 114, 0.9)),
++                url("https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=1600&q=80") center/cover no-repeat;
++    color: white;
++    padding: 4rem 2rem;
++    margin: -1rem -0.75rem 2rem -0.75rem;
++    border-radius: 0 0 1.5rem 1.5rem;
++    text-align: center;
++    box-shadow: 0 10px 40px rgba(102, 51, 153, 0.3);
++  }
++  .hero-banner h1 {
++    font-size: 2.75rem;
++    font-weight: 800;
++    margin-bottom: 1rem;
++    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
++  }
++  .hero-banner p {
++    font-size: 1.25rem;
++    max-width: 600px;
++    margin: 0 auto 1.5rem auto;
++    opacity: 0.95;
++  }
++  .hero-badge {
++    display: inline-block;
++    background: rgba(255,255,255,0.2);
++    backdrop-filter: blur(10px);
++    padding: 0.75rem 1.75rem;
++    border-radius: 2rem;
++    font-size: 1rem;
++    border: 1px solid rgba(255,255,255,0.3);
++    animation: pulse 2s infinite;
++  }
++  .hero-badge i { color: #ffc107; }
++
++  @keyframes pulse {
++    0%, 100% { transform: scale(1); }
++    50% { transform: scale(1.02); }
++  }
++
++  /* Section Headers */
++  .section-header {
++    display: flex;
++    align-items: center;
++    gap: 1rem;
++    margin-bottom: 1.5rem;
++  }
++  .section-header h2 {
++    margin: 0;
++    font-weight: 700;
++    color: #663399;
++  }
++  .section-header::after {
++    content: "";
++    flex: 1;
++    height: 3px;
++    background: linear-gradient(90deg, #663399, transparent);
++    border-radius: 2px;
++  }
++  body.dark-mode .section-header h2 { color: #a855f7; }
++  body.dark-mode .section-header::after { background: linear-gradient(90deg, #a855f7, transparent); }
++
++  /* Month Headers */
++  .month-header {
++    background: linear-gradient(135deg, #663399, #1e3c72);
++    color: white;
++    padding: 0.75rem 1.5rem;
++    border-radius: 1rem;
++    display: inline-flex;
++    align-items: center;
++    gap: 0.5rem;
++    font-weight: 600;
++    margin: 1.5rem 0 1rem 0;
++    box-shadow: 0 4px 15px rgba(102, 51, 153, 0.3);
++  }
++  .month-header i { font-size: 1.25rem; }
++
++  /* Training Cards */
++  .training-card {
++    background: white;
++    border-radius: 1rem;
++    padding: 1.25rem;
++    margin-bottom: 1rem;
++    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
++    border-left: 4px solid #663399;
++    transition: all 0.3s ease;
++    display: grid;
++    grid-template-columns: auto 1fr auto;
++    gap: 1.25rem;
++    align-items: center;
++  }
++  .training-card:hover {
++    transform: translateY(-3px);
++    box-shadow: 0 8px 30px rgba(102, 51, 153, 0.15);
++  }
++  .training-card.canceled {
++    border-left-color: #dc3545;
++    opacity: 0.7;
++  }
++  .training-card.full {
++    border-left-color: #6c757d;
++  }
++  body.dark-mode .training-card {
++    background: #2a2a40;
++    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
++  }
++
++  .training-date {
++    text-align: center;
++    min-width: 70px;
++  }
++  .training-date .day {
++    font-size: 2rem;
++    font-weight: 800;
++    color: #663399;
++    line-height: 1;
++  }
++  .training-date .month-year {
++    font-size: 0.85rem;
++    color: #6c757d;
++    text-transform: uppercase;
++  }
++  .training-date .time {
++    font-size: 1rem;
++    font-weight: 600;
++    color: #333;
++    margin-top: 0.25rem;
++  }
++  body.dark-mode .training-date .day { color: #a855f7; }
++  body.dark-mode .training-date .time { color: #f0f0f0; }
++
++  .training-info h5 {
++    margin: 0 0 0.5rem 0;
++    font-weight: 600;
++    color: #333;
++  }
++  body.dark-mode .training-info h5 { color: #f0f0f0; }
++
++  .training-info .detail {
++    display: flex;
++    align-items: center;
++    gap: 0.5rem;
++    font-size: 0.9rem;
++    color: #666;
++    margin-bottom: 0.25rem;
++  }
++  .training-info .detail i { color: #663399; width: 16px; }
++  body.dark-mode .training-info .detail { color: #aaa; }
++  body.dark-mode .training-info .detail i { color: #a855f7; }
++
++  .training-volunteers {
++    display: flex;
++    gap: 0.5rem;
++    margin-top: 0.75rem;
++  }
++  .volunteer-badge {
++    background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
++    color: #2e7d32;
++    padding: 0.25rem 0.75rem;
++    border-radius: 1rem;
++    font-size: 0.8rem;
++    font-weight: 500;
++  }
++  .volunteer-empty {
++    background: #f5f5f5;
++    color: #999;
++    padding: 0.25rem 0.75rem;
++    border-radius: 1rem;
++    font-size: 0.8rem;
++    border: 1px dashed #ccc;
++  }
++  body.dark-mode .volunteer-badge {
++    background: linear-gradient(135deg, #1b5e20, #2e7d32);
++    color: #a5d6a7;
++  }
++  body.dark-mode .volunteer-empty {
++    background: #3a3a50;
++    color: #888;
++    border-color: #555;
++  }
++
++  .training-action {
++    text-align: center;
++  }
++  .btn-signup {
++    background: linear-gradient(135deg, #663399, #1e3c72);
++    border: none;
++    color: white;
++    padding: 0.75rem 1.5rem;
++    border-radius: 2rem;
++    font-weight: 600;
++    transition: all 0.3s ease;
++    box-shadow: 0 4px 15px rgba(102, 51, 153, 0.3);
++  }
++  .btn-signup:hover {
++    transform: translateY(-2px);
++    box-shadow: 0 6px 20px rgba(102, 51, 153, 0.4);
++    color: white;
++  }
++  .btn-cancel {
++    font-size: 0.8rem;
++    margin-top: 0.5rem;
++  }
++  .status-badge {
++    display: inline-block;
++    padding: 0.5rem 1rem;
++    border-radius: 1rem;
++    font-weight: 500;
++    font-size: 0.9rem;
++  }
++  .status-canceled {
++    background: #ffebee;
++    color: #c62828;
++  }
++  .status-full {
++    background: #f5f5f5;
++    color: #666;
++  }
++  body.dark-mode .status-canceled { background: #4a1c1c; color: #ef9a9a; }
++  body.dark-mode .status-full { background: #3a3a50; color: #aaa; }
++
++  /* Modal Improvements */
++  .modal-content {
++    border: none;
++    border-radius: 1rem;
++    overflow: hidden;
++  }
++  .modal-header {
++    background: linear-gradient(135deg, #663399, #1e3c72);
++    color: white;
++    border: none;
++    padding: 1.25rem 1.5rem;
++  }
++  .modal-header .btn-close {
++    filter: brightness(0) invert(1);
++  }
++  .modal-title {
++    font-weight: 700;
++  }
++  .modal-body {
++    padding: 1.5rem;
++  }
++  .modal-footer {
++    border: none;
++    padding: 1rem 1.5rem 1.5rem;
++  }
++  .modal-footer .btn-primary {
++    background: linear-gradient(135deg, #663399, #1e3c72);
++    border: none;
++    padding: 0.75rem 2rem;
++    border-radius: 2rem;
++    font-weight: 600;
++  }
++  body.dark-mode .modal-content {
++    background: #2a2a40;
++  }
++
++  /* Responsive */
++  @media (max-width: 768px) {
++    .hero-banner { padding: 2.5rem 1rem; }
++    .hero-banner h1 { font-size: 1.75rem; }
++    .hero-banner p { font-size: 1rem; }
++    .training-card {
++      grid-template-columns: 1fr;
++      text-align: center;
++    }
++    .training-date {
++      display: flex;
++      align-items: center;
++      justify-content: center;
++      gap: 0.5rem;
++    }
++    .training-volunteers { justify-content: center; flex-wrap: wrap; }
++  }
++</style>
++{% endblock %}
+ {% block content %}
+ <div class="container mt-4">
+-  <h2 class="mb-4">Nadchodzące treningi</h2>
++  <!-- Hero Banner -->
++  <div class="hero-banner">
++    <h1><i class="bi bi-heart-fill me-2"></i>Witaj, Wolontariuszu!</h1>
++    <p>Dołącz do naszej drużyny i pomagaj osobom niewidomym w treningach Blind Tenisa. Wybierz termin poniżej i zapisz się!</p>
++    <div class="hero-badge">
++      <i class="bi bi-star-fill me-2"></i>
++      Nie potrzebujesz doświadczenia – wszystkiego Cię nauczymy!
++    </div>
++  </div>
++
++  <!-- Section Header -->
++  <div class="section-header">
++    <h2><i class="bi bi-calendar-event me-2"></i>Nadchodzące treningi</h2>
++  </div>
+ 
+   {% for month, trainings in trainings_by_month.items() %}
+-    <h4 class="mt-4">{{ month|replace("-", " / ") }}</h4>
+-    <table class="table table-bordered table-sm equal-width-5">
+-      <thead class="table-light">
+-        <tr>
+-          <th>Data</th>
+-          <th>Miejsce</th>
+-          <th>Trener</th>
+-          <th class="volunteers-col">Wolontariusze</th>
+-          <th>Akcja</th>
+-        </tr>
+-      </thead>
+-      <tbody>
+-      {% for training in trainings %}
+-        <tr class="{% if training.is_canceled %}table-danger{% endif %}">
+-          <td>{{ training.date.strftime('%Y-%m-%d %H:%M') }}</td>
+-          <td>{{ training.location.name }}</td>
+-          <td>{{ training.coach.first_name }} {{ training.coach.last_name }}<br><small><a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a></small></td>
+-          <td class="volunteers-col">
+-            <ul class="mb-0">
+-              {% for booking in training.bookings %}
+-                <li>{{ booking.volunteer.first_name }} {{ booking.volunteer.last_name }}</li>
+-              {% endfor %}
+-            </ul>
+-          </td>
+-        <td class="text-center">
+-          {% if training.is_canceled %}
+-            <span class="text-danger">Odwołany</span>
+-          {% elif training.bookings|length < 2 %}
+-            <button type="button" class="btn btn-sm btn-primary signup-btn" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
+-              Zapisz się
+-            </button>
+-          {% else %}
+-            <span class="text-muted">Brak miejsc</span>
+-          {% endif %}
+-          <div class="mt-1">
+-            <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="btn btn-sm btn-outline-danger">Wypisz się</a>
+-          </div>
+-        </td>
+-      </tr>
+-      {% endfor %}
+-    </tbody>
+-    </table>
+-    {% endfor %}
+-  </div>
+-
+-  <!-- Modal for volunteer sign-up -->
+-  <div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
+-    <div class="modal-dialog">
+-      <div class="modal-content">
+-        <form method="post">
+-          {{ form.csrf_token }}
+-          <div class="modal-header">
+-            <h5 class="modal-title">Zapisz się na trening</h5>
+-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+-          </div>
+-          <div class="modal-body">
+-            <div class="mb-3">
+-              {{ form.first_name.label(class="form-label") }}
+-              {{ form.first_name(class="form-control") }}
+-            </div>
+-            <div class="mb-3">
+-              {{ form.last_name.label(class="form-label") }}
+-              {{ form.last_name(class="form-control") }}
+-            </div>
+-            <div class="mb-3">
+-              {{ form.email.label(class="form-label") }}
+-              {{ form.email(class="form-control") }}
+-            </div>
+-            <div class="mb-3">
+-              {{ form.is_adult.label(class="form-label d-block") }}
+-              {% for subfield in form.is_adult %}
+-              <div class="form-check">
+-                {{ subfield(class="form-check-input", id=subfield.id) }}
+-                <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+-              </div>
+-              {% endfor %}
+-            </div>
+-            <p class="text-muted small">Dane potrzebne są do dokumentacji.</p>
+-            {{ form.training_id }}
+-          </div>
+-          <div class="modal-footer">
+-            <button type="submit" class="btn btn-primary">Zapisz się</button>
+-          </div>
+-        </form>
+-      </div>
+-    </div>
+-  </div>
+-
+-  <script>
+-    document.addEventListener('DOMContentLoaded', function () {
+-      var signupModal = document.getElementById('signupModal');
+-      signupModal.addEventListener('show.bs.modal', function (event) {
+-        var button = event.relatedTarget;
+-        var trainingId = button.getAttribute('data-training-id');
+-        signupModal.querySelector('input[name="training_id"]').value = trainingId;
+-      });
+-    });
+-  </script>
+-
+-  {% endblock %}
++    <div class="month-header">
++      <i class="bi bi-calendar3"></i>
++      {{ month|replace("-", " / ") }}
++    </div>
++
++    {% for training in trainings %}
++    <div class="training-card {% if training.is_canceled %}canceled{% elif training.bookings|length >= 2 %}full{% endif %}">
++      <div class="training-date">
++        <div class="day">{{ training.date.strftime('%d') }}</div>
++        <div class="month-year">{{ training.date.strftime('%b %Y') }}</div>
++        <div class="time"><i class="bi bi-clock me-1"></i>{{ training.date.strftime('%H:%M') }}</div>
++      </div>
++
++      <div class="training-info">
++        <h5><i class="bi bi-geo-alt-fill me-2"></i>{{ training.location.name }}</h5>
++        <div class="detail">
++          <i class="bi bi-person-fill"></i>
++          <span>{{ training.coach.first_name }} {{ training.coach.last_name }}</span>
++        </div>
++        <div class="detail">
++          <i class="bi bi-telephone-fill"></i>
++          <a href="tel:{{ training.coach.phone_number }}">{{ training.coach.phone_number }}</a>
++        </div>
++        <div class="training-volunteers">
++          {% for booking in training.bookings %}
++            <span class="volunteer-badge"><i class="bi bi-person-check me-1"></i>{{ booking.volunteer.first_name }}</span>
++          {% endfor %}
++          {% for i in range(2 - training.bookings|length) %}
++            <span class="volunteer-empty"><i class="bi bi-person-plus me-1"></i>Wolne miejsce</span>
++          {% endfor %}
++        </div>
++      </div>
++
++      <div class="training-action">
++        {% if training.is_canceled %}
++          <span class="status-badge status-canceled"><i class="bi bi-x-circle me-1"></i>Odwołany</span>
++        {% elif training.bookings|length < 2 %}
++          <button type="button" class="btn btn-signup" data-bs-toggle="modal" data-bs-target="#signupModal" data-training-id="{{ training.id }}">
++            <i class="bi bi-pencil-square me-1"></i>Zapisz się
++          </button>
++          <div class="btn-cancel">
++            <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="text-muted"><i class="bi bi-x-circle me-1"></i>Wypisz się</a>
++          </div>
++        {% else %}
++          <span class="status-badge status-full"><i class="bi bi-people-fill me-1"></i>Komplet</span>
++          <div class="btn-cancel">
++            <a href="{{ url_for('routes.cancel_booking', training_id=training.id) }}" class="text-muted"><i class="bi bi-x-circle me-1"></i>Wypisz się</a>
++          </div>
++        {% endif %}
++      </div>
++    </div>
++    {% endfor %}
++  {% endfor %}
++</div>
++
++<!-- Modal for volunteer sign-up -->
++<div class="modal fade" id="signupModal" tabindex="-1" aria-hidden="true">
++  <div class="modal-dialog modal-dialog-centered">
++    <div class="modal-content">
++      <form method="post">
++        {{ form.csrf_token }}
++        <div class="modal-header">
++          <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Zapisz się na trening</h5>
++          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
++        </div>
++        <div class="modal-body">
++          <div class="mb-3">
++            {{ form.first_name.label(class="form-label fw-semibold") }}
++            {{ form.first_name(class="form-control form-control-lg", placeholder="Twoje imię") }}
++          </div>
++          <div class="mb-3">
++            {{ form.last_name.label(class="form-label fw-semibold") }}
++            {{ form.last_name(class="form-control form-control-lg", placeholder="Twoje nazwisko") }}
++          </div>
++          <div class="mb-3">
++            {{ form.email.label(class="form-label fw-semibold") }}
++            {{ form.email(class="form-control form-control-lg", placeholder="twoj@email.pl") }}
++          </div>
++          <div class="mb-3">
++            {{ form.is_adult.label(class="form-label fw-semibold d-block") }}
++            {% for subfield in form.is_adult %}
++            <div class="form-check">
++              {{ subfield(class="form-check-input", id=subfield.id) }}
++              <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
++            </div>
++            {% endfor %}
++          </div>
++          <div class="alert alert-light border-0 bg-light">
++            <i class="bi bi-info-circle me-2 text-primary"></i>
++            <small class="text-muted">Dane potrzebne są do dokumentacji i kontaktu w razie zmian.</small>
++          </div>
++          {{ form.training_id }}
++        </div>
++        <div class="modal-footer">
++          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
++          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Zapisz się</button>
++        </div>
++      </form>
++    </div>
++  </div>
++</div>
++
++<script>
++  document.addEventListener('DOMContentLoaded', function () {
++    var signupModal = document.getElementById('signupModal');
++    signupModal.addEventListener('show.bs.modal', function (event) {
++      var button = event.relatedTarget;
++      var trainingId = button.getAttribute('data-training-id');
++      signupModal.querySelector('input[name="training_id"]').value = trainingId;
++    });
++  });
++</script>
++{% endblock %}
