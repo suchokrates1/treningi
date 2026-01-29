@@ -10,6 +10,11 @@ from .models import Training, Booking
 from .whatsapp_utils import notify_volunteer_reminder, format_phone_display
 
 
+# Minimum hours since signup before sending reminder
+# (to avoid sending reminder right after signup confirmation)
+MIN_HOURS_SINCE_SIGNUP = 4
+
+
 @click.command('send-reminders')
 @with_appcontext
 def send_reminders_command():
@@ -17,6 +22,9 @@ def send_reminders_command():
     tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
     tomorrow_start = datetime.combine(tomorrow, datetime.min.time()).replace(tzinfo=timezone.utc)
     tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
+    
+    # Cutoff time: don't send reminders to people who signed up less than MIN_HOURS ago
+    signup_cutoff = datetime.now(timezone.utc) - timedelta(hours=MIN_HOURS_SINCE_SIGNUP)
 
     trainings = Training.query.filter(
         Training.date >= tomorrow_start,
@@ -51,6 +59,17 @@ def send_reminders_command():
                     "Booking for %s %s already has confirmation status, skipping",
                     volunteer.first_name,
                     volunteer.last_name,
+                )
+                skipped_count += 1
+                continue
+            
+            # Skip if signed up recently (already got signup confirmation)
+            if booking.timestamp and booking.timestamp > signup_cutoff:
+                current_app.logger.info(
+                    "Booking for %s %s is too recent (signed up %s), skipping reminder",
+                    volunteer.first_name,
+                    volunteer.last_name,
+                    booking.timestamp.strftime('%Y-%m-%d %H:%M'),
                 )
                 skipped_count += 1
                 continue

@@ -15,6 +15,25 @@ import requests
 from typing import Optional
 
 
+# Max length for user-provided text in WhatsApp messages
+MAX_NAME_LENGTH = 100
+MAX_LOCATION_LENGTH = 200
+
+
+def sanitize_for_whatsapp(text: str, max_length: int = 200) -> str:
+    """Sanitize text for safe inclusion in WhatsApp messages.
+    
+    Removes control characters and truncates to max length.
+    """
+    if not text:
+        return ""
+    # Remove null bytes and control characters
+    text = text.replace('\x00', '')
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    # Truncate
+    return text[:max_length].strip()
+
+
 def normalize_phone_number(phone: str) -> str:
     """Normalize phone number to international format for WhatsApp.
     
@@ -152,6 +171,10 @@ def notify_coach_new_signup(
     training_location: str,
 ) -> tuple[bool, Optional[str]]:
     """Notify a coach about a new volunteer signup."""
+    # Sanitize user-provided data
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    
     message = (
         f"📋 Nowy wolontariusz zapisał się na trening!\n\n"
         f"👤 Wolontariusz: {volunteer_name}\n"
@@ -172,6 +195,11 @@ def notify_volunteer_reminder(
     coach_phone: str,
 ) -> tuple[bool, Optional[str]]:
     """Send a reminder to a volunteer about their upcoming training (day before)."""
+    # Sanitize user-provided data
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    coach_name = sanitize_for_whatsapp(coach_name, MAX_NAME_LENGTH)
+    
     formatted_coach_phone = format_phone_display(coach_phone)
     message = (
         f"🎾 Przypomnienie o jutrzejszym wolontariacie!\n\n"
@@ -194,6 +222,10 @@ def notify_volunteer_training_canceled(
     training_location: str,
 ) -> tuple[bool, Optional[str]]:
     """Notify a volunteer that their training has been canceled."""
+    # Sanitize user-provided data
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    
     message = (
         f"⚠️ Trening został odwołany\n\n"
         f"Cześć {volunteer_name}!\n\n"
@@ -215,6 +247,10 @@ def notify_coach_volunteer_canceled(
     training_location: str,
 ) -> tuple[bool, Optional[str]]:
     """Notify a coach that a volunteer has canceled their booking."""
+    # Sanitize user-provided data
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    
     message = (
         f"⚠️ Wolontariusz wypisał się z treningu\n\n"
         f"👤 Wolontariusz: {volunteer_name}\n"
@@ -232,6 +268,10 @@ def notify_volunteer_signup_confirmation(
     training_location: str,
 ) -> tuple[bool, Optional[str]]:
     """Send signup confirmation to volunteer with a note to check email."""
+    # Sanitize user-provided data
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    
     message = (
         f"✅ Dziękujemy za zapisanie się!\n\n"
         f"Cześć {volunteer_name}!\n\n"

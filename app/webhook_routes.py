@@ -1,6 +1,7 @@
 """WhatsApp webhook endpoint for receiving messages from WAHA."""
 
 import re
+import html
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timezone, timedelta
 
@@ -9,6 +10,47 @@ from .models import Volunteer, Booking, Training
 from .whatsapp_utils import send_whatsapp_message, normalize_phone_number
 
 webhook_bp = Blueprint('webhook', __name__)
+
+
+# Security: Max message length to process
+MAX_MESSAGE_LENGTH = 500
+
+# Security: Rate limiting (simple in-memory, per phone)
+_rate_limit_cache: dict[str, list[datetime]] = {}
+RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_MAX_REQUESTS = 10
+
+
+def is_rate_limited(phone: str) -> bool:
+    """Check if phone number has exceeded rate limit."""
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(seconds=RATE_LIMIT_WINDOW)
+    
+    if phone not in _rate_limit_cache:
+        _rate_limit_cache[phone] = []
+    
+    # Clean old entries
+    _rate_limit_cache[phone] = [
+        ts for ts in _rate_limit_cache[phone] if ts > window_start
+    ]
+    
+    if len(_rate_limit_cache[phone]) >= RATE_LIMIT_MAX_REQUESTS:
+        return True
+    
+    _rate_limit_cache[phone].append(now)
+    return False
+
+
+def sanitize_message(text: str) -> str:
+    """Sanitize incoming message for safety."""
+    if not text:
+        return ""
+    # Truncate to max length
+    text = text[:MAX_MESSAGE_LENGTH]
+    # Remove null bytes and control characters
+    text = text.replace('\x00', '')
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    return text.strip()
 
 
 # Patterns for confirmation/cancellation detection
@@ -204,16 +246,21 @@ def whatsapp_webhook():
             return jsonify({'status': 'ignored', 'reason': 'own message'}), 200
         
         # Get message details
-        message_body = payload.get('body', '').strip()
+        message_body = sanitize_message(payload.get('body', ''))
         from_field = payload.get('from', '')
         
         # Extract phone number from WhatsApp ID (format: 48123456789@c.us)
-        phone_match = re.match(r'(\d+)@', from_field)
+        phone_match = re.match(r'^(\d{9,15})@', from_field)
         if not phone_match:
             current_app.logger.warning(f"Could not extract phone from: {from_field}")
             return jsonify({'status': 'error', 'reason': 'invalid from field'}), 200
         
         phone_number = phone_match.group(1)
+        
+        # Rate limiting
+        if is_rate_limited(phone_number):
+            current_app.logger.warning(f"Rate limit exceeded for {phone_number}")
+            return jsonify({'status': 'rate_limited'}), 429
         
         current_app.logger.info(
             f"Received WhatsApp message from {phone_number}: {message_body[:50]}..."

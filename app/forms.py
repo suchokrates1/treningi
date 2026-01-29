@@ -1,4 +1,6 @@
 from datetime import timedelta
+import re
+import html
 
 from flask_wtf import FlaskForm
 from wtforms import (
@@ -25,6 +27,38 @@ from wtforms.fields import HiddenField, TelField
 from wtforms import IntegerField
 from wtforms.fields import DateField
 from wtforms import SelectMultipleField, widgets
+
+
+def sanitize_input(text: str) -> str:
+    """Sanitize user input to prevent XSS and injection attacks."""
+    if not text:
+        return text
+    # Remove null bytes
+    text = text.replace('\x00', '')
+    # Escape HTML entities
+    text = html.escape(text, quote=True)
+    # Remove control characters except newlines and tabs
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    return text.strip()
+
+
+def validate_no_html(form, field):
+    """Reject input containing HTML/script tags."""
+    if field.data:
+        # Check for potential HTML/script injection
+        dangerous_patterns = [
+            r'<[^>]*script',
+            r'javascript:',
+            r'on\w+\s*=',
+            r'<[^>]*iframe',
+            r'<[^>]*object',
+            r'<[^>]*embed',
+            r'<[^>]*form',
+        ]
+        text_lower = field.data.lower()
+        for pattern in dangerous_patterns:
+            if re.search(pattern, text_lower):
+                raise ValidationError('Niedozwolone znaki w polu.')
 
 
 def validate_polish_phone(form, field):
@@ -57,15 +91,23 @@ class MultiCheckboxField(SelectMultipleField):
 
 class CoachForm(FlaskForm):
     first_name = StringField(
-        'Imię', validators=[DataRequired(), Length(max=64)]
+        'Imię', validators=[DataRequired(), Length(max=64), validate_no_html]
     )
     last_name = StringField(
-        'Nazwisko', validators=[DataRequired(), Length(max=64)]
+        'Nazwisko', validators=[DataRequired(), Length(max=64), validate_no_html]
     )
     phone_number = TelField(
         'Telefon', validators=[DataRequired(), Length(max=20), validate_polish_phone]
     )
     submit = SubmitField('Zapisz')
+
+    def validate(self, extra_validators=None):
+        """Sanitize inputs before validation."""
+        if self.first_name.data:
+            self.first_name.data = sanitize_input(self.first_name.data)
+        if self.last_name.data:
+            self.last_name.data = sanitize_input(self.last_name.data)
+        return super().validate(extra_validators=extra_validators)
 
 
 class TrainingForm(FlaskForm):
@@ -177,10 +219,10 @@ class TrainingSeriesForm(FlaskForm):
 
 class VolunteerForm(FlaskForm):
     first_name = StringField(
-        'Imię', validators=[DataRequired(), Length(max=64)]
+        'Imię', validators=[DataRequired(), Length(max=64), validate_no_html]
     )
     last_name = StringField(
-        'Nazwisko', validators=[DataRequired(), Length(max=64)]
+        'Nazwisko', validators=[DataRequired(), Length(max=64), validate_no_html]
     )
     email = StringField(
         'Email', validators=[DataRequired(), Email(), Length(max=128)]
@@ -188,6 +230,15 @@ class VolunteerForm(FlaskForm):
     phone_number = TelField(
         'Telefon', validators=[DataRequired(), Length(max=20), validate_polish_phone]
     )
+
+    def validate(self, extra_validators=None):
+        """Sanitize inputs before validation."""
+        # Sanitize text fields
+        if self.first_name.data:
+            self.first_name.data = sanitize_input(self.first_name.data)
+        if self.last_name.data:
+            self.last_name.data = sanitize_input(self.last_name.data)
+        return super().validate(extra_validators=extra_validators)
     is_adult = RadioField(
         'Czy jesteś pełnoletni?',
         choices=[('true', 'Tak'), ('false', 'Nie')],
@@ -218,8 +269,14 @@ class ImportTrainingsForm(FlaskForm):
 class LocationForm(FlaskForm):
     """Simple form for adding or editing locations."""
 
-    name = StringField('Nazwa', validators=[DataRequired(), Length(max=128)])
+    name = StringField('Nazwa', validators=[DataRequired(), Length(max=128), validate_no_html])
     submit = SubmitField('Zapisz')
+
+    def validate(self, extra_validators=None):
+        """Sanitize inputs before validation."""
+        if self.name.data:
+            self.name.data = sanitize_input(self.name.data)
+        return super().validate(extra_validators=extra_validators)
 
 
 class CancelForm(FlaskForm):
