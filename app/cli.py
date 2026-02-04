@@ -178,7 +178,107 @@ def send_phone_requests_command(base_url):
     click.echo(f"\nSummary: {sent_count} sent, {failed_count} failed")
 
 
+@click.command("send-coach-summary")
+@with_appcontext
+def send_coach_summary_command():
+    """Send WhatsApp summary to coaches about todays trainings (run daily in morning)."""
+    from .whatsapp_utils import send_whatsapp_message, format_phone_display
+    from .models import Coach
+
+    today = datetime.now(timezone.utc).date()
+    today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+    today_end = datetime.combine(today, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    # Get all trainings for today grouped by coach
+    trainings = Training.query.filter(
+        Training.date >= today_start,
+        Training.date <= today_end,
+        Training.is_canceled.is_(False),
+        Training.is_deleted.is_(False),
+    ).order_by(Training.date).all()
+
+    if not trainings:
+        click.echo("No trainings scheduled for today.")
+        return
+
+    # Group trainings by coach
+    coach_trainings = {}
+    for training in trainings:
+        coach_id = training.coach_id
+        if coach_id not in coach_trainings:
+            coach_trainings[coach_id] = []
+        coach_trainings[coach_id].append(training)
+
+    sent_count = 0
+    failed_count = 0
+    skipped_count = 0
+
+    for coach_id, coach_trainings_list in coach_trainings.items():
+        coach = Coach.query.get(coach_id)
+        if not coach or not coach.phone_number:
+            current_app.logger.info(
+                "Coach %s has no phone number, skipping summary",
+                coach.first_name if coach else "Unknown",
+            )
+            skipped_count += 1
+            continue
+
+        # Build summary message
+        message_lines = [
+            f"Dzien dobry {coach.first_name}!",
+            "",
+            "Podsumowanie dzisiejszych treningow:",
+            "",
+        ]
+
+        for training in coach_trainings_list:
+            time_str = training.date.strftime("%H:%M")
+            location = training.location.name
+
+            # Get confirmed and pending volunteers
+            confirmed_bookings = [b for b in training.bookings if b.is_confirmed is True]
+            pending_bookings = [b for b in training.bookings if b.is_confirmed is None]
+
+            message_lines.append(f"--- {time_str} - {location} ---")
+
+            if confirmed_bookings:
+                for booking in confirmed_bookings:
+                    vol = booking.volunteer
+                    phone_str = format_phone_display(vol.phone_number) if vol.phone_number else "brak tel."
+                    message_lines.append(f"[OK] {vol.first_name} {vol.last_name} ({phone_str})")
+
+            if pending_bookings:
+                for booking in pending_bookings:
+                    vol = booking.volunteer
+                    phone_str = format_phone_display(vol.phone_number) if vol.phone_number else "brak tel."
+                    message_lines.append(f"[?] {vol.first_name} {vol.last_name} ({phone_str})")
+
+            if not confirmed_bookings and not pending_bookings:
+                message_lines.append("  Brak zapisanych wolontariuszy")
+
+            message_lines.append("")
+
+        # Legenda
+        message_lines.append("Legenda: [OK] potwierdzony, [?] oczekuje")
+        message_lines.append("")
+        message_lines.append("System zapisow Blind Tenis")
+        message = "\n".join(message_lines)
+
+        success, error = send_whatsapp_message(coach.phone_number, message)
+        coach_name = f"{coach.first_name} {coach.last_name}"
+
+        if success:
+            sent_count += 1
+            click.echo(f"OK Podsumowanie wyslane do {coach_name}")
+        else:
+            failed_count += 1
+            click.echo(f"BLAD Nie udalo sie wyslac do {coach_name}: {error}")
+
+    click.echo(f"\nPodsumowanie: {sent_count} wyslanych, {failed_count} bledow, {skipped_count} pominietych")
+
+
 def init_app(app):
     """Register CLI commands with the app."""
     app.cli.add_command(send_reminders_command)
     app.cli.add_command(send_phone_requests_command)
+    app.cli.add_command(send_coach_summary_command)
