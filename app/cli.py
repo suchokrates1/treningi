@@ -179,13 +179,22 @@ def send_phone_requests_command(base_url):
 
 
 @click.command("send-coach-summary")
+@click.option("--hours-before", default=1, help="Send summary this many hours before first training")
+@click.option("--window-minutes", default=30, help="Time window in minutes (run cron at this interval)")
 @with_appcontext
-def send_coach_summary_command():
-    """Send WhatsApp summary to coaches about todays trainings (run daily in morning)."""
-    from .whatsapp_utils import send_whatsapp_message, format_phone_display
+def send_coach_summary_command(hours_before, window_minutes):
+    """Send WhatsApp summary to coaches about todays trainings.
+    
+    Sends to coaches whose first training is approximately --hours-before from now.
+    Run this command every --window-minutes via cron.
+    
+    Example cron (every 30 min): */30 * * * * cd /app && flask send-coach-summary
+    """
+    from .whatsapp_utils import send_whatsapp_message, format_phone_display, normalize_phone_number
     from .models import Coach
 
-    today = datetime.now(timezone.utc).date()
+    now = datetime.now(timezone.utc)
+    today = now.date()
     today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
     today_end = datetime.combine(today, datetime.max.time()).replace(tzinfo=timezone.utc)
 
@@ -201,17 +210,23 @@ def send_coach_summary_command():
         click.echo("No trainings scheduled for today.")
         return
 
-    # Group trainings by coach
+    # Group trainings by coach and find first training time for each
     coach_trainings = {}
+    coach_first_training = {}
     for training in trainings:
         coach_id = training.coach_id
         if coach_id not in coach_trainings:
             coach_trainings[coach_id] = []
+            coach_first_training[coach_id] = training.date
         coach_trainings[coach_id].append(training)
+        # Track earliest training
+        if training.date < coach_first_training[coach_id]:
+            coach_first_training[coach_id] = training.date
 
     sent_count = 0
     failed_count = 0
     skipped_count = 0
+    not_yet_count = 0
 
     for coach_id, coach_trainings_list in coach_trainings.items():
         coach = Coach.query.get(coach_id)
@@ -221,6 +236,36 @@ def send_coach_summary_command():
                 coach.first_name if coach else "Unknown",
             )
             skipped_count += 1
+            continue
+
+        # Check if it's time to send (first training is hours_before +/- window_minutes/2)
+        first_training_time = coach_first_training[coach_id]
+        time_until_training = (first_training_time - now).total_seconds() / 60  # in minutes
+        
+        target_minutes = hours_before * 60
+        window_half = window_minutes / 2
+        
+        # Send if we're within the window (e.g., 45-75 min before for 1h with 30min window)
+        if time_until_training < (target_minutes - window_half):
+            # Too late, training is too soon or already started
+            current_app.logger.info(
+                "Coach %s first training at %s - too late to send (%d min away)",
+                coach.first_name,
+                first_training_time.strftime("%H:%M"),
+                int(time_until_training),
+            )
+            skipped_count += 1
+            continue
+        
+        if time_until_training > (target_minutes + window_half):
+            # Too early, will send later
+            current_app.logger.info(
+                "Coach %s first training at %s - too early (%d min away, waiting)",
+                coach.first_name,
+                first_training_time.strftime("%H:%M"),
+                int(time_until_training),
+            )
+            not_yet_count += 1
             continue
 
         # Build summary message
@@ -244,13 +289,19 @@ def send_coach_summary_command():
             if confirmed_bookings:
                 for booking in confirmed_bookings:
                     vol = booking.volunteer
-                    phone_str = format_phone_display(vol.phone_number) if vol.phone_number else "brak tel."
+                    if vol.phone_number:
+                        phone_str = normalize_phone_number(vol.phone_number)
+                    else:
+                        phone_str = "brak tel."
                     message_lines.append(f"[OK] {vol.first_name} {vol.last_name} ({phone_str})")
 
             if pending_bookings:
                 for booking in pending_bookings:
                     vol = booking.volunteer
-                    phone_str = format_phone_display(vol.phone_number) if vol.phone_number else "brak tel."
+                    if vol.phone_number:
+                        phone_str = normalize_phone_number(vol.phone_number)
+                    else:
+                        phone_str = "brak tel."
                     message_lines.append(f"[?] {vol.first_name} {vol.last_name} ({phone_str})")
 
             if not confirmed_bookings and not pending_bookings:
@@ -269,12 +320,12 @@ def send_coach_summary_command():
 
         if success:
             sent_count += 1
-            click.echo(f"OK Podsumowanie wyslane do {coach_name}")
+            click.echo(f"OK Podsumowanie wyslane do {coach_name} (trening o {first_training_time.strftime('%H:%M')})")
         else:
             failed_count += 1
             click.echo(f"BLAD Nie udalo sie wyslac do {coach_name}: {error}")
 
-    click.echo(f"\nPodsumowanie: {sent_count} wyslanych, {failed_count} bledow, {skipped_count} pominietych")
+    click.echo(f"\nPodsumowanie: {sent_count} wyslanych, {failed_count} bledow, {skipped_count} pominietych, {not_yet_count} za wczesnie")
 
 
 def init_app(app):
