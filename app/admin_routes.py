@@ -1452,6 +1452,7 @@ def whatsapp_api_messages(chat_id):
                 "body": m.get("body", ""),
                 "fromMe": m.get("fromMe", False),
                 "timestamp": m.get("timestamp", 0),
+                "ack": m.get("ack", 0),
             })
         # Sort by timestamp asc (oldest first)
         messages.sort(key=lambda x: x["timestamp"])
