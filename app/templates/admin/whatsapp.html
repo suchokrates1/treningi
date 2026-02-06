@@ -466,7 +466,24 @@ function handleMsgKey(e) {
 }
 
 // Init
-loadChats();
+loadChats().then(() => {
+  // Auto-open chat if ?phone= parameter present
+  const params = new URLSearchParams(window.location.search);
+  const phone = params.get('phone');
+  if (phone) {
+    let digits = phone.replace(/[\s\-\+]/g, '');
+    if (digits.length === 9) digits = '48' + digits;
+    if (!digits.startsWith('48') && digits.length < 11) digits = '48' + digits;
+    const chatId = digits + '@c.us';
+    // Try to find in loaded chats
+    const existing = allChats.find(c => c.id === chatId || (c.phone && c.phone.replace(/\D/g, '') === digits));
+    if (existing) {
+      openChat(existing.id, existing.name, existing.phone);
+    } else {
+      openChat(chatId, '+' + digits, '+' + digits);
+    }
+  }
+});
 // Refresh chat list every 30s
 setInterval(loadChats, 30000);
 </script>
