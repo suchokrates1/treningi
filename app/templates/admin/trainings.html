@@ -177,7 +177,7 @@
             {{ b1.first_name }} {{ b1.last_name }}
             <br><small class="text-muted">{{ b1.email }}</small>
             {% if b1.phone_number %}
-              <br><a href="tel:{{ b1.phone_number }}"><i class="bi bi-telephone"></i> {{ b1.phone_number|format_phone }}</a>
+              <br><a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ b1.phone_number }}" title="Otwórz czat WhatsApp"><i class="bi bi-whatsapp" style="color:#25D366;"></i> {{ b1.phone_number|format_phone }}</a>
             {% endif %}
           {% endif %}
         </td>
@@ -186,7 +186,7 @@
             {{ b2.first_name }} {{ b2.last_name }}
             <br><small class="text-muted">{{ b2.email }}</small>
             {% if b2.phone_number %}
-              <br><a href="tel:{{ b2.phone_number }}"><i class="bi bi-telephone"></i> {{ b2.phone_number|format_phone }}</a>
+              <br><a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ b2.phone_number }}" title="Otwórz czat WhatsApp"><i class="bi bi-whatsapp" style="color:#25D366;"></i> {{ b2.phone_number|format_phone }}</a>
             {% endif %}
           {% endif %}
         </td>
