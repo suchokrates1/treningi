@@ -5,6 +5,7 @@ import secrets
 from flask import current_app
 from flask.cli import with_appcontext
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from . import db
 from .models import Training, Booking, Volunteer, EmailSettings
@@ -193,10 +194,14 @@ def send_coach_summary_command(hours_before, window_minutes):
     from .whatsapp_utils import send_whatsapp_message, format_phone_display, normalize_phone_number
     from .models import Coach
 
-    now = datetime.now(timezone.utc)
+    # Use Warsaw timezone consistently
+    warsaw_tz = ZoneInfo("Europe/Warsaw")
+    now = datetime.now(warsaw_tz)
     today = now.date()
-    today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
-    today_end = datetime.combine(today, datetime.max.time()).replace(tzinfo=timezone.utc)
+    
+    # Create naive datetimes for DB filtering (assuming DB stores naive datetimes)
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today, datetime.max.time())
 
     # Get all trainings for today grouped by coach
     trainings = Training.query.filter(
@@ -217,11 +222,18 @@ def send_coach_summary_command(hours_before, window_minutes):
         coach_id = training.coach_id
         if coach_id not in coach_trainings:
             coach_trainings[coach_id] = []
-            coach_first_training[coach_id] = training.date
+            # Make training.date timezone-aware (it's stored as naive in DB)
+            training_dt = training.date
+            if training_dt.tzinfo is None:
+                training_dt = training_dt.replace(tzinfo=warsaw_tz)
+            coach_first_training[coach_id] = training_dt
         coach_trainings[coach_id].append(training)
         # Track earliest training
-        if training.date < coach_first_training[coach_id]:
-            coach_first_training[coach_id] = training.date
+        training_dt = training.date
+        if training_dt.tzinfo is None:
+            training_dt = training_dt.replace(tzinfo=warsaw_tz)
+        if training_dt < coach_first_training[coach_id]:
+            coach_first_training[coach_id] = training_dt
 
     sent_count = 0
     failed_count = 0
