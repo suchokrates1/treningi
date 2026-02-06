@@ -7,8 +7,11 @@ from flask import (
     session,
     current_app,
     abort,
+    jsonify,
+    request as flask_request,
 )
 import flask
+import requests as http_requests
 from functools import wraps
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,6 +48,25 @@ from .models import (
 )
 
 admin_bp = Blueprint("admin", __name__)
+
+
+def _get_waha_headers():
+    """Return headers for WAHA API requests."""
+    api_key = current_app.config.get('WHATSAPP_API_KEY')
+    headers = {'Content-Type': 'application/json'}
+    if api_key:
+        headers['X-Api-Key'] = api_key
+    return headers
+
+
+def _get_waha_url():
+    """Return WAHA base URL."""
+    return current_app.config.get('WHATSAPP_API_URL', 'http://waha:3000')
+
+
+def _get_waha_session():
+    """Return WAHA session name."""
+    return current_app.config.get('WHATSAPP_SESSION', 'default')
 
 
 def _normalise_schedule_datetime(value):
@@ -1295,3 +1317,126 @@ def preview_template(template):
         }
     html = render_template_string(tpl, data)
     return render_template("admin/preview_email.html", html=html)
+
+
+# ── WhatsApp Chat Interface ──────────────────────────────────────────────
+
+
+@admin_bp.route("/whatsapp")
+@login_required
+def whatsapp_chat():
+    """WhatsApp chat interface."""
+    return render_template("admin/whatsapp.html")
+
+
+@admin_bp.route("/whatsapp/api/chats")
+@login_required
+def whatsapp_api_chats():
+    """Return list of WhatsApp chats from WAHA."""
+    try:
+        waha_session = _get_waha_session()
+        r = http_requests.get(
+            f"{_get_waha_url()}/api/{waha_session}/chats",
+            headers=_get_waha_headers(),
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return jsonify([])
+        raw = r.json()
+        chats = []
+        for c in raw:
+            chat_id = c.get("id", {}).get("_serialized", "")
+            name = c.get("name", "")
+            phone = ""
+            # Extract phone from chat_id (format: 48XXXXXXXXX@c.us)
+            if "@c.us" in chat_id:
+                digits = chat_id.split("@")[0]
+                if digits.isdigit():
+                    phone = f"+{digits}"
+            last_msg = ""
+            last_data = c.get("lastMessage", {})
+            if isinstance(last_data, dict):
+                body = last_data.get("body", "")
+                if not body:
+                    _data = last_data.get("_data", {})
+                    if isinstance(_data, dict):
+                        body = _data.get("body", "")
+                last_msg = body
+            chats.append({
+                "id": chat_id,
+                "name": name or phone,
+                "phone": phone,
+                "timestamp": c.get("timestamp", 0),
+                "unreadCount": c.get("unreadCount", 0),
+                "lastMessage": last_msg[:80],
+            })
+        # Sort by timestamp desc
+        chats.sort(key=lambda x: x["timestamp"], reverse=True)
+        return jsonify(chats)
+    except Exception as e:
+        current_app.logger.exception("Failed to fetch WAHA chats: %s", e)
+        return jsonify([])
+
+
+@admin_bp.route("/whatsapp/api/messages/<path:chat_id>")
+@login_required
+def whatsapp_api_messages(chat_id):
+    """Return messages for a specific chat from WAHA."""
+    try:
+        waha_session = _get_waha_session()
+        limit = flask_request.args.get("limit", 50, type=int)
+        r = http_requests.get(
+            f"{_get_waha_url()}/api/{waha_session}/chats/{chat_id}/messages?limit={limit}",
+            headers=_get_waha_headers(),
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return jsonify([])
+        raw = r.json()
+        messages = []
+        for m in raw:
+            messages.append({
+                "id": m.get("id", ""),
+                "body": m.get("body", ""),
+                "fromMe": m.get("fromMe", False),
+                "timestamp": m.get("timestamp", 0),
+            })
+        # Sort by timestamp asc (oldest first)
+        messages.sort(key=lambda x: x["timestamp"])
+        return jsonify(messages)
+    except Exception as e:
+        current_app.logger.exception("Failed to fetch messages: %s", e)
+        return jsonify([])
+
+
+@admin_bp.route("/whatsapp/api/send", methods=["POST"])
+@login_required
+def whatsapp_api_send():
+    """Send a WhatsApp message via WAHA."""
+    data = flask_request.get_json()
+    chat_id = data.get("chatId", "")
+    message = data.get("message", "").strip()
+
+    if not chat_id or not message:
+        return jsonify({"error": "Missing chatId or message"}), 400
+
+    try:
+        waha_session = _get_waha_session()
+        payload = {
+            "chatId": chat_id,
+            "text": message,
+            "session": waha_session,
+        }
+        r = http_requests.post(
+            f"{_get_waha_url()}/api/sendText",
+            json=payload,
+            headers=_get_waha_headers(),
+            timeout=30,
+        )
+        if r.status_code in (200, 201):
+            return jsonify({"ok": True})
+        else:
+            return jsonify({"error": r.text}), r.status_code
+    except Exception as e:
+        current_app.logger.exception("Failed to send message: %s", e)
+        return jsonify({"error": str(e)}), 500

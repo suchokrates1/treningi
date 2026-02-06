@@ -1,0 +1,473 @@
+{% extends "admin/admin_base.html" %}
+{% block extra_head %}
+{{ super() }}
+<style>
+  .chat-container {
+    display: flex;
+    height: calc(100vh - 200px);
+    min-height: 500px;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    overflow: hidden;
+  }
+  .chat-list {
+    width: 320px;
+    min-width: 280px;
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+    background: #f8f9fa;
+  }
+  .chat-list-item {
+    display: flex;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background 0.15s;
+    text-decoration: none;
+    color: inherit;
+  }
+  .chat-list-item:hover, .chat-list-item.active {
+    background: #e3f2fd;
+  }
+  .chat-list-item .chat-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #25D366;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-right: 12px;
+  }
+  .chat-list-item .chat-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .chat-list-item .chat-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chat-list-item .chat-preview {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chat-list-item .chat-time {
+    font-size: 11px;
+    color: #999;
+    white-space: nowrap;
+    margin-left: 8px;
+  }
+  .chat-list-item .unread-badge {
+    background: #25D366;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+  }
+  .chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #e5ddd5;
+  }
+  .chat-header {
+    padding: 12px 20px;
+    background: #f0f2f5;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+  }
+  .chat-header .chat-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #25D366;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 12px;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .msg-bubble {
+    max-width: 65%;
+    padding: 8px 14px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    position: relative;
+  }
+  .msg-bubble.sent {
+    background: #d9fdd3;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+  }
+  .msg-bubble.received {
+    background: white;
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+  }
+  .msg-time {
+    font-size: 11px;
+    color: #999;
+    text-align: right;
+    margin-top: 4px;
+  }
+  .chat-input-area {
+    padding: 12px 20px;
+    background: #f0f2f5;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .chat-input-area textarea {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 10px 16px;
+    resize: none;
+    font-size: 14px;
+    max-height: 120px;
+    outline: none;
+  }
+  .chat-input-area textarea:focus {
+    border-color: #25D366;
+  }
+  .chat-input-area button {
+    background: #25D366;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .chat-input-area button:hover {
+    background: #128C7E;
+  }
+  .chat-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #888;
+    font-size: 16px;
+  }
+  .chat-search {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+  }
+  .chat-search input {
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    outline: none;
+  }
+  .new-chat-section {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+    background: #f0f2f5;
+  }
+  .new-chat-section .input-group {
+    display: flex;
+    gap: 6px;
+  }
+  .new-chat-section input {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .new-chat-section button {
+    background: #25D366;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #999;
+  }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid mt-3">
+  <h2 class="mb-3"><i class="bi bi-whatsapp" style="color: #25D366;"></i> WhatsApp</h2>
+
+  <div class="chat-container" id="chatContainer">
+    <!-- Left: Chat list -->
+    <div class="chat-list">
+      <div class="new-chat-section">
+        <div class="input-group">
+          <input type="text" id="newChatPhone" placeholder="Nr telefonu (np. 697495755)">
+          <button onclick="openNewChat()">Nowy</button>
+        </div>
+      </div>
+      <div class="chat-search">
+        <input type="text" id="chatSearch" placeholder="Szukaj..." oninput="filterChats()">
+      </div>
+      <div id="chatListItems">
+        <div class="loading-spinner">Ładowanie czatów...</div>
+      </div>
+    </div>
+
+    <!-- Right: Chat panel -->
+    <div class="chat-panel" id="chatPanel">
+      <div class="chat-empty" id="chatEmpty">
+        <div class="text-center">
+          <div style="font-size: 64px;">💬</div>
+          <p class="mt-2">Wybierz czat lub rozpocznij nowy</p>
+        </div>
+      </div>
+
+      <div id="chatView" style="display: none; flex: 1; display: none; flex-direction: column; height: 100%;">
+        <div class="chat-header" id="chatHeader">
+          <div class="chat-avatar" id="chatAvatar">?</div>
+          <div>
+            <div class="fw-bold" id="chatName">-</div>
+            <div class="small text-muted" id="chatPhone">-</div>
+          </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="loading-spinner">Ładowanie wiadomości...</div>
+        </div>
+        <div class="chat-input-area">
+          <textarea id="msgInput" rows="1" placeholder="Napisz wiadomość..." onkeydown="handleMsgKey(event)"></textarea>
+          <button onclick="sendMessage()" title="Wyślij">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CSRF_TOKEN = '{{ csrf_token() }}';
+let allChats = [];
+let activeChatId = null;
+let messagesInterval = null;
+
+// Format timestamp
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return d.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+  return d.toLocaleDateString('pl-PL', {day: '2-digit', month: '2-digit'}) + ' ' + d.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+}
+
+function getInitial(name) {
+  if (!name) return '?';
+  // If it's a phone number
+  if (name.startsWith('+')) return '📱';
+  return name.charAt(0).toUpperCase();
+}
+
+// Load chats
+async function loadChats() {
+  try {
+    const r = await fetch('/admin/whatsapp/api/chats');
+    allChats = await r.json();
+    renderChats(allChats);
+  } catch(e) {
+    document.getElementById('chatListItems').innerHTML = '<div class="p-3 text-danger">Błąd ładowania czatów</div>';
+  }
+}
+
+function renderChats(chats) {
+  const container = document.getElementById('chatListItems');
+  if (!chats.length) {
+    container.innerHTML = '<div class="p-3 text-muted">Brak czatów</div>';
+    return;
+  }
+  container.innerHTML = chats.map(c => {
+    const isActive = c.id === activeChatId ? 'active' : '';
+    const initial = getInitial(c.name);
+    const preview = c.lastMessage ? c.lastMessage.substring(0, 40) + (c.lastMessage.length > 40 ? '...' : '') : '';
+    const time = fmtTime(c.timestamp);
+    const unread = c.unreadCount > 0 ? `<div class="unread-badge">${c.unreadCount}</div>` : '';
+    return `<div class="chat-list-item ${isActive}" onclick="openChat('${c.id}', '${(c.name||'').replace(/'/g, "\\'")}', '${c.phone||''}')">
+      <div class="chat-avatar">${initial}</div>
+      <div class="chat-info">
+        <div class="chat-name">${c.name || c.phone || c.id}</div>
+        <div class="chat-preview">${preview}</div>
+      </div>
+      <div>
+        <div class="chat-time">${time}</div>
+        ${unread}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterChats() {
+  const q = document.getElementById('chatSearch').value.toLowerCase();
+  if (!q) { renderChats(allChats); return; }
+  const filtered = allChats.filter(c => 
+    (c.name || '').toLowerCase().includes(q) || 
+    (c.phone || '').includes(q) ||
+    (c.id || '').includes(q)
+  );
+  renderChats(filtered);
+}
+
+// Open chat
+async function openChat(chatId, name, phone) {
+  activeChatId = chatId;
+  
+  // Update header
+  document.getElementById('chatEmpty').style.display = 'none';
+  const chatView = document.getElementById('chatView');
+  chatView.style.display = 'flex';
+  document.getElementById('chatAvatar').textContent = getInitial(name);
+  document.getElementById('chatName').textContent = name || phone || chatId;
+  document.getElementById('chatPhone').textContent = phone || chatId;
+  
+  // Highlight in list
+  document.querySelectorAll('.chat-list-item').forEach(el => el.classList.remove('active'));
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+
+  // Load messages
+  await loadMessages(chatId);
+
+  // Auto-refresh messages
+  if (messagesInterval) clearInterval(messagesInterval);
+  messagesInterval = setInterval(() => loadMessages(chatId, true), 10000);
+}
+
+async function loadMessages(chatId, silent) {
+  const container = document.getElementById('chatMessages');
+  if (!silent) container.innerHTML = '<div class="loading-spinner">Ładowanie...</div>';
+
+  try {
+    const r = await fetch(`/admin/whatsapp/api/messages/${encodeURIComponent(chatId)}`);
+    const msgs = await r.json();
+    
+    const wasAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+
+    container.innerHTML = msgs.map(m => {
+      const cls = m.fromMe ? 'sent' : 'received';
+      const time = fmtTime(m.timestamp);
+      const body = escapeHtml(m.body || '');
+      return `<div class="msg-bubble ${cls}"><div>${body}</div><div class="msg-time">${time}</div></div>`;
+    }).join('');
+
+    if (!silent || wasAtBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  } catch(e) {
+    if (!silent) container.innerHTML = '<div class="p-3 text-danger">Błąd ładowania wiadomości</div>';
+  }
+}
+
+function escapeHtml(t) {
+  const div = document.createElement('div');
+  div.textContent = t;
+  return div.innerHTML.replace(/\n/g, '<br>');
+}
+
+// Send message
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text || !activeChatId) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Optimistic add
+  const container = document.getElementById('chatMessages');
+  const now = Math.floor(Date.now() / 1000);
+  container.innerHTML += `<div class="msg-bubble sent"><div>${escapeHtml(text)}</div><div class="msg-time">${fmtTime(now)} ⏳</div></div>`;
+  container.scrollTop = container.scrollHeight;
+
+  try {
+    await fetch('/admin/whatsapp/api/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+      body: JSON.stringify({chatId: activeChatId, message: text})
+    });
+    // Reload to get confirmed message
+    setTimeout(() => loadMessages(activeChatId, true), 1500);
+  } catch(e) {
+    alert('Błąd wysyłania wiadomości');
+  }
+}
+
+// New chat
+function openNewChat() {
+  let phone = document.getElementById('newChatPhone').value.trim();
+  if (!phone) return;
+  
+  // Normalize
+  phone = phone.replace(/[\s\-]/g, '');
+  if (phone.length === 9) phone = '48' + phone;
+  if (phone.startsWith('+')) phone = phone.substring(1);
+  
+  const chatId = phone + '@c.us';
+  openChat(chatId, '+' + phone, '+' + phone);
+  document.getElementById('newChatPhone').value = '';
+}
+
+function handleMsgKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+  // Auto-resize textarea
+  const ta = e.target;
+  setTimeout(() => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  }, 0);
+}
+
+// Init
+loadChats();
+// Refresh chat list every 30s
+setInterval(loadChats, 30000);
+</script>
+{% endblock %}
