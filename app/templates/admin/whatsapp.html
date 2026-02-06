@@ -139,6 +139,13 @@
     text-align: right;
     margin-top: 4px;
   }
+  .msg-ticks {
+    margin-left: 4px;
+    font-size: 12px;
+  }
+  .msg-ticks.ack-1 { color: #999; }
+  .msg-ticks.ack-2 { color: #999; }
+  .msg-ticks.ack-3 { color: #53bdeb; }
   .chat-input-area {
     padding: 12px 20px;
     background: #f0f2f5;
@@ -392,7 +399,8 @@ async function loadMessages(chatId, silent) {
       const cls = m.fromMe ? 'sent' : 'received';
       const time = fmtTime(m.timestamp);
       const body = escapeHtml(m.body || '');
-      return `<div class="msg-bubble ${cls}"><div>${body}</div><div class="msg-time">${time}</div></div>`;
+      const ticks = m.fromMe ? ackTicks(m.ack) : '';
+      return `<div class="msg-bubble ${cls}"><div>${body}</div><div class="msg-time">${time}${ticks}</div></div>`;
     }).join('');
 
     if (!silent || wasAtBottom) {
@@ -401,6 +409,14 @@ async function loadMessages(chatId, silent) {
   } catch(e) {
     if (!silent) container.innerHTML = '<div class="p-3 text-danger">Błąd ładowania wiadomości</div>';
   }
+}
+
+function ackTicks(ack) {
+  // 0=pending, 1=sent(server), 2=delivered, 3=read
+  if (ack >= 3) return ' <span class="msg-ticks ack-3">✓✓</span>';
+  if (ack >= 2) return ' <span class="msg-ticks ack-2">✓✓</span>';
+  if (ack >= 1) return ' <span class="msg-ticks ack-1">✓</span>';
+  return ' <span class="msg-ticks">⌛</span>';
 }
 
 function escapeHtml(t) {
