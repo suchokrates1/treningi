@@ -1341,17 +1341,24 @@ def whatsapp_api_chats():
     known_phones = set()
     phone_to_name = {}
 
+    # Also build name→phone mapping for contacts saved by name (not number)
+    name_to_phone = {}
+
     for vol in Volunteer.query.filter(Volunteer.phone_number.isnot(None)).all():
         normalized = normalize_phone_number(vol.phone_number).lstrip('+')
         if normalized:
             known_phones.add(normalized)
-            phone_to_name[normalized] = f"{vol.first_name} {vol.last_name} (wolontariusz)"
+            full_name = f"{vol.first_name} {vol.last_name}"
+            phone_to_name[normalized] = f"{full_name} (wolontariusz)"
+            name_to_phone[full_name.lower()] = normalized
 
     for coach in Coach.query.filter(Coach.phone_number.isnot(None)).all():
         normalized = normalize_phone_number(coach.phone_number).lstrip('+')
         if normalized:
             known_phones.add(normalized)
-            phone_to_name[normalized] = f"{coach.first_name} {coach.last_name} (trener)"
+            full_name = f"{coach.first_name} {coach.last_name}"
+            phone_to_name[normalized] = f"{full_name} (trener)"
+            name_to_phone[full_name.lower()] = normalized
 
     try:
         waha_session = _get_waha_session()
@@ -1373,12 +1380,18 @@ def whatsapp_api_chats():
             # WAHA uses @lid IDs (not @c.us).  The phone number
             # appears in the chat "name" field (e.g. "+48 515 183 807").
             name_digits = re.sub(r'\D', '', name)  # strip non-digits
-            if name_digits:
+            if name_digits and name_digits in known_phones:
                 digits = name_digits
                 phone = f"+{digits}"
+            else:
+                # Fallback: match by contact name (e.g. "Mariusz Appel")
+                matched_digits = name_to_phone.get(name.strip().lower(), "")
+                if matched_digits:
+                    digits = matched_digits
+                    phone = f"+{digits}"
 
             # Skip chats not matching known contacts
-            if not digits or digits not in known_phones:
+            if not digits:
                 continue
 
             # Use DB name if available
