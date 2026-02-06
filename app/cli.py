@@ -66,6 +66,16 @@ def send_reminders_command():
                 )
                 skipped_count += 1
                 continue
+
+            # Skip if volunteer was already notified about time change (that message asks for confirmation)
+            if booking.time_change_notified:
+                current_app.logger.info(
+                    "Booking for %s %s already got time-change notification, skipping reminder",
+                    volunteer.first_name,
+                    volunteer.last_name,
+                )
+                skipped_count += 1
+                continue
             
             # Skip if signed up recently (already got signup confirmation)
             if booking.timestamp and booking.timestamp > signup_cutoff:

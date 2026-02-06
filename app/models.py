@@ -150,6 +150,12 @@ class Booking(db.Model):
         nullable=True,
         default=None,
     )
+    time_change_notified = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        server_default='0',
+    )
 
     training = db.relationship(
         'Training',
