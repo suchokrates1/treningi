@@ -42,7 +42,12 @@ window.addEventListener('DOMContentLoaded', () => {
         initialized = true;
       };
       toggleSwitch.addEventListener('change', update);
-      if (toggleSwitch.checked) {
+
+      // Auto-switch to HTML mode when template contains complex HTML
+      // that Quill would strip (styled divs, tables, images, etc.)
+      const hasComplexHtml = /<(div|table|td|tr|img|style)\b[^>]*>/i.test(field.value);
+      if (hasComplexHtml || toggleSwitch.checked) {
+        toggleSwitch.checked = true;
         update();
       }
     }
