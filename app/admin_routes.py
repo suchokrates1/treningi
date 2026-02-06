@@ -45,6 +45,7 @@ from .models import (
     EmailSettings,
     StoredFile,
     TrainingSeries,
+    Volunteer,
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -1332,7 +1333,25 @@ def whatsapp_chat():
 @admin_bp.route("/whatsapp/api/chats")
 @login_required
 def whatsapp_api_chats():
-    """Return list of WhatsApp chats from WAHA."""
+    """Return list of WhatsApp chats from WAHA, filtered to known contacts."""
+    from .whatsapp_utils import normalize_phone_number
+
+    # Build set of known phone numbers (volunteers + coaches) as bare digits
+    known_phones = set()
+    phone_to_name = {}
+
+    for vol in Volunteer.query.filter(Volunteer.phone_number.isnot(None)).all():
+        normalized = normalize_phone_number(vol.phone_number).lstrip('+')
+        if normalized:
+            known_phones.add(normalized)
+            phone_to_name[normalized] = f"{vol.first_name} {vol.last_name} (wolontariusz)"
+
+    for coach in Coach.query.filter(Coach.phone_number.isnot(None)).all():
+        normalized = normalize_phone_number(coach.phone_number).lstrip('+')
+        if normalized:
+            known_phones.add(normalized)
+            phone_to_name[normalized] = f"{coach.first_name} {coach.last_name} (trener)"
+
     try:
         waha_session = _get_waha_session()
         r = http_requests.get(
@@ -1348,11 +1367,21 @@ def whatsapp_api_chats():
             chat_id = c.get("id", {}).get("_serialized", "")
             name = c.get("name", "")
             phone = ""
+            digits = ""
             # Extract phone from chat_id (format: 48XXXXXXXXX@c.us)
             if "@c.us" in chat_id:
                 digits = chat_id.split("@")[0]
                 if digits.isdigit():
                     phone = f"+{digits}"
+
+            # Skip chats not matching known contacts
+            if not digits or digits not in known_phones:
+                continue
+
+            # Use DB name if available
+            db_name = phone_to_name.get(digits, "")
+            display_name = db_name or name or phone
+
             last_msg = ""
             last_data = c.get("lastMessage", {})
             if isinstance(last_data, dict):
@@ -1364,7 +1393,7 @@ def whatsapp_api_chats():
                 last_msg = body
             chats.append({
                 "id": chat_id,
-                "name": name or phone,
+                "name": display_name,
                 "phone": phone,
                 "timestamp": c.get("timestamp", 0),
                 "unreadCount": c.get("unreadCount", 0),
