@@ -61,6 +61,10 @@ def create_app():
     app.config['WHATSAPP_SESSION'] = os.environ.get('WHATSAPP_SESSION', 'default')
     app.config['WHATSAPP_API_KEY'] = os.environ.get('WHATSAPP_API_KEY')
 
+    # Gemini AI configuration
+    app.config['GEMINI_API_KEY'] = os.environ.get('GEMINI_API_KEY')
+    app.config['GEMINI_MODEL'] = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+
     log_level = os.environ.get("LOG_LEVEL")
     if log_level:
         level_value = _resolve_log_level(log_level)
