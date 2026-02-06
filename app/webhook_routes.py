@@ -2,6 +2,8 @@
 
 import re
 import html
+import json
+import urllib.request
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timezone, timedelta
 
@@ -26,6 +28,42 @@ def _find_volunteer_by_name(name: str) -> Volunteer | None:
         ).first()
         if vol:
             return vol
+    return None
+
+
+def _extract_phone_from_lid(lid_id: str) -> str | None:
+    """Resolve @lid chat ID to phone number via WAHA chat name.
+
+    WAHA stores the phone number (e.g. '+48 519 179 904') in the chat
+    ``name`` field even when the chat ID uses the @lid format.
+    """
+    waha_url = current_app.config.get('WAHA_API_URL', 'http://waha:3000')
+    waha_key = current_app.config.get('WAHA_API_KEY', '')
+    session = current_app.config.get('WAHA_SESSION', 'default')
+    try:
+        req = urllib.request.Request(
+            f'{waha_url}/api/{session}/chats',
+            headers={'X-Api-Key': waha_key},
+        )
+        chats = json.loads(urllib.request.urlopen(req, timeout=5).read())
+        for chat in chats:
+            cid = chat.get('id', '')
+            # id can be a dict (WEBJS) or a string
+            if isinstance(cid, dict):
+                serialized = cid.get('_serialized', '')
+            else:
+                serialized = str(cid)
+            if serialized == lid_id:
+                name = chat.get('name', '')
+                # Name is often the phone in format "+48 519 179 904"
+                digits = re.sub(r'\D', '', name)
+                if len(digits) >= 9:
+                    current_app.logger.info(
+                        f'Resolved @lid {lid_id} to phone {digits} via chat name "{name}"'
+                    )
+                    return digits
+    except Exception as exc:
+        current_app.logger.warning(f'Failed to resolve @lid via WAHA chats: {exc}')
     return None
 
 
@@ -312,6 +350,10 @@ def whatsapp_webhook():
                         current_app.logger.info(
                             f"Matched @lid chat to {vol.first_name} {vol.last_name} via notifyName={notify_name}"
                         )
+
+            # Last resort: look up @lid in WAHA chat list (name often has phone)
+            if not phone_number:
+                phone_number = _extract_phone_from_lid(from_field)
         
         if not phone_number:
             current_app.logger.warning(f"Could not extract phone from: {from_field}")
@@ -399,11 +441,21 @@ def whatsapp_webhook():
                 send_cancellation_response(phone_number, booking)
                 return jsonify({'status': 'ok', 'action': 'cancelled'}), 200
         
-        # Multiple bookings - need selection
+        # Multiple bookings
         else:
-            _pending_selections[phone_number] = pending_bookings
-            send_selection_prompt(phone_number, pending_bookings)
-            return jsonify({'status': 'ok', 'action': 'selection_requested'}), 200
+            if intent == 'confirm':
+                # Confirm ALL pending bookings at once
+                for booking in pending_bookings:
+                    booking.is_confirmed = True
+                db.session.commit()
+                send_confirmation_response(phone_number, pending_bookings[0])
+                return jsonify({'status': 'ok', 'action': 'confirmed_all'}), 200
+
+            elif intent == 'cancel':
+                # For cancellation, ask which one
+                _pending_selections[phone_number] = pending_bookings
+                send_selection_prompt(phone_number, pending_bookings)
+                return jsonify({'status': 'ok', 'action': 'selection_requested'}), 200
         
     except Exception as e:
         current_app.logger.exception(f"Error processing WhatsApp webhook: {e}")
