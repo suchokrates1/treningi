@@ -6,10 +6,27 @@ from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timezone, timedelta
 
 from . import db
-from .models import Volunteer, Booking, Training
+from .models import Volunteer, Booking, Training, Coach
 from .whatsapp_utils import send_whatsapp_message, normalize_phone_number
 
 webhook_bp = Blueprint('webhook', __name__)
+
+
+def _find_volunteer_by_name(name: str) -> Volunteer | None:
+    """Find a volunteer or coach by display name (for @lid contacts)."""
+    if not name:
+        return None
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        first = parts[0]
+        last = parts[-1]
+        vol = Volunteer.query.filter(
+            Volunteer.first_name.ilike(first),
+            Volunteer.last_name.ilike(last),
+        ).first()
+        if vol:
+            return vol
+    return None
 
 
 # Security: Max message length to process
@@ -131,14 +148,14 @@ def find_volunteer_by_phone(phone: str) -> Volunteer | None:
 
 
 def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
-    """Get bookings for tomorrow that haven't been confirmed yet."""
-    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
-    tomorrow_start = datetime.combine(tomorrow, datetime.min.time()).replace(tzinfo=timezone.utc)
+    """Get bookings for today and tomorrow that haven't been confirmed yet."""
+    now = datetime.now(timezone.utc)
+    tomorrow = now.date() + timedelta(days=1)
     tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
     
     return Booking.query.join(Training).filter(
         Booking.volunteer_id == volunteer.id,
-        Training.date >= tomorrow_start,
+        Training.date >= now,
         Training.date <= tomorrow_end,
         Training.is_canceled.is_(False),
         Training.is_deleted.is_(False),
@@ -149,9 +166,12 @@ def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
 def send_confirmation_response(phone: str, booking: Booking) -> None:
     """Send confirmation response to volunteer."""
     training = booking.training
+    today = datetime.now(timezone.utc).date()
+    training_date = training.date.date() if hasattr(training.date, 'date') else training.date
+    day_word = "dzisiaj" if training_date == today else "jutro"
     message = (
         f"✅ Dziękujemy za potwierdzenie!\n\n"
-        f"Do zobaczenia jutro o {training.date.strftime('%H:%M')}\n"
+        f"Do zobaczenia {day_word} o {training.date.strftime('%H:%M')}\n"
         f"📍 {training.location.name}\n"
         f"👨‍🏫 Trener: {training.coach.first_name} {training.coach.last_name}\n"
         f"📞 Tel: {training.coach.phone_number}"
@@ -249,13 +269,53 @@ def whatsapp_webhook():
         message_body = sanitize_message(payload.get('body', ''))
         from_field = payload.get('from', '')
         
-        # Extract phone number from WhatsApp ID (format: 48123456789@c.us)
-        phone_match = re.match(r'^(\d{9,15})@', from_field)
-        if not phone_match:
+        # Log raw payload for debugging
+        current_app.logger.info(f"Webhook payload from={from_field}, body={message_body[:80]}")
+        
+        # Extract phone number from WhatsApp ID
+        phone_number = None
+        
+        # Format 1: 48123456789@c.us (standard)
+        phone_match = re.match(r'^(\d{9,15})@c\.us$', from_field)
+        if phone_match:
+            phone_number = phone_match.group(1)
+        
+        # Format 2: XXXXX@lid (linked device ID - phone not in ID)
+        # Try to get phone from _data.from or participant fields
+        if not phone_number and '@lid' in from_field:
+            _data = payload.get('_data', {})
+            # Try author field
+            author = _data.get('author', '')
+            if author:
+                author_match = re.match(r'^(\d{9,15})@', author)
+                if author_match:
+                    phone_number = author_match.group(1)
+            # Try participant
+            if not phone_number:
+                participant = _data.get('participant', '') or payload.get('participant', '')
+                if participant:
+                    part_match = re.match(r'^(\d{9,15})@', participant)
+                    if part_match:
+                        phone_number = part_match.group(1)
+            # Try chatId field
+            if not phone_number:
+                chat_id = payload.get('chatId', '') or payload.get('from', '')
+                # For @lid chats, we need to look up which phone this lid maps to
+                # Use WAHA contacts API or match by notify name
+                notify_name = _data.get('notifyName', '') or payload.get('notifyName', '')
+                if notify_name:
+                    # Try to find volunteer by name
+                    vol = _find_volunteer_by_name(notify_name)
+                    if vol and vol.phone_number:
+                        from .whatsapp_utils import normalize_phone_number
+                        phone_number = normalize_phone_number(vol.phone_number).lstrip('+')
+                        current_app.logger.info(
+                            f"Matched @lid chat to {vol.first_name} {vol.last_name} via notifyName={notify_name}"
+                        )
+        
+        if not phone_number:
             current_app.logger.warning(f"Could not extract phone from: {from_field}")
             return jsonify({'status': 'error', 'reason': 'invalid from field'}), 200
-        
-        phone_number = phone_match.group(1)
         
         # Rate limiting
         if is_rate_limited(phone_number):
