@@ -16,7 +16,6 @@ from . import db
 from .email_utils import send_email
 from .template_utils import render_template_string
 from .whatsapp_utils import (
-    notify_coach_new_signup,
     notify_coach_volunteer_canceled,
     notify_volunteer_signup_confirmation,
     format_phone_display,
@@ -96,19 +95,8 @@ def index():
         db.session.add(booking)
         db.session.commit()
 
-        # Notify coach via WhatsApp about new signup
-        if training.coach.phone_number:
-            volunteer_full_name = f"{existing_volunteer.first_name} {existing_volunteer.last_name}"
-            training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
-            wa_success, wa_error = notify_coach_new_signup(
-                coach_phone=training.coach.phone_number,
-                coach_name=f"{training.coach.first_name} {training.coach.last_name}",
-                volunteer_name=volunteer_full_name,
-                training_date=training_date_str,
-                training_location=training.location.name,
-            )
-            if not wa_success and wa_error:
-                current_app.logger.warning("WhatsApp notification failed: %s", wa_error)
+        # Coach receives daily summary before training (send-coach-summary),
+        # no individual signup notifications via WhatsApp.
 
         settings = db.session.get(EmailSettings, 1)
         if settings and settings.registration_template:
