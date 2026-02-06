@@ -20,7 +20,7 @@ from werkzeug.utils import secure_filename
 from . import db, csrf
 from sqlalchemy.orm import joinedload
 from . import email_utils
-from .whatsapp_utils import notify_volunteer_training_canceled
+from .whatsapp_utils import notify_volunteer_training_canceled, notify_volunteer_training_time_changed
 
 # Alias retained for compatibility with tests that monkeypatch the function.
 send_email = email_utils.send_email
@@ -501,11 +501,86 @@ def edit_training(training_id):
         (loc.id, loc.name) for loc in Location.query.order_by(Location.name).all()
     ]
     if form.validate_on_submit():
-        training.date = form.date.data
+        old_date = training.date
+        new_date = form.date.data
+        time_changed = (
+            old_date is not None
+            and new_date is not None
+            and old_date.strftime("%H:%M") != new_date.strftime("%H:%M")
+        )
+        booked_volunteers = [
+            b.volunteer for b in training.bookings
+        ] if time_changed else []
+
+        # If time changed and has bookings, require confirmation
+        if time_changed and booked_volunteers and not flask.request.form.get("confirm_time_change"):
+            volunteer_names = ", ".join(
+                f"{v.first_name} {v.last_name}" for v in booked_volunteers
+            )
+            return render_template(
+                "admin/edit_training.html",
+                form=form,
+                training=training,
+                confirm_time_change=True,
+                old_time=old_date.strftime("%H:%M"),
+                new_time=new_date.strftime("%H:%M"),
+                affected_volunteers=volunteer_names,
+            )
+
+        training.date = new_date
         training.location_id = form.location_id.data
         training.coach_id = form.coach_id.data
         training.max_volunteers = form.max_volunteers.data
         db.session.commit()
+
+        # Send notifications if time changed
+        if time_changed and booked_volunteers:
+            old_time_str = old_date.strftime("%H:%M")
+            new_time_str = new_date.strftime("%H:%M")
+            date_str = new_date.strftime("%Y-%m-%d")
+            location_name = training.location.name
+
+            settings = db.session.get(EmailSettings, 1)
+            for vol in booked_volunteers:
+                vol_name = f"{vol.first_name} {vol.last_name}"
+                # WhatsApp notification
+                if vol.phone_number:
+                    wa_ok, wa_err = notify_volunteer_training_time_changed(
+                        volunteer_phone=vol.phone_number,
+                        volunteer_name=vol_name,
+                        training_old_time=old_time_str,
+                        training_new_time=new_time_str,
+                        training_date=date_str,
+                        training_location=location_name,
+                    )
+                    if not wa_ok:
+                        current_app.logger.warning(
+                            "WhatsApp time-change to %s failed: %s",
+                            vol_name, wa_err,
+                        )
+                # Email notification
+                email_body = (
+                    f"<p>Cześć {vol.first_name}!</p>"
+                    f"<p>Informujemy, że godzina Twojego treningu została zmieniona:</p>"
+                    f"<p>📅 Data: <strong>{date_str}</strong><br>"
+                    f"❌ Stara godzina: <strong>{old_time_str}</strong><br>"
+                    f"✅ Nowa godzina: <strong>{new_time_str}</strong><br>"
+                    f"📍 Miejsce: <strong>{location_name}</strong></p>"
+                    f"<p>Jeśli nie możesz uczestniczyć o nowej godzinie, "
+                    f"prosimy o wypisanie się z treningu.</p>"
+                    f"<p>Pozdrawiamy,<br>Fundacja Widzimy Inaczej</p>"
+                )
+                send_email(
+                    "Zmiana godziny treningu",
+                    None,
+                    [vol.email],
+                    html_body=email_body,
+                )
+            flash(
+                f"Powiadomiono {len(booked_volunteers)} wolontariuszy o zmianie godziny.",
+                "info",
+            )
+
         flash("Zaktualizowano trening.", "success")
         return redirect(url_for("admin.manage_trainings"))
     return render_template(

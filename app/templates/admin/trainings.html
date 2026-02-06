@@ -157,8 +157,8 @@
         <th>Miejsce</th>
         <th>Trener</th>
         <th>Telefon trenera</th>
-        <th>Wolontariusz 1 (Email)</th>
-        <th>Wolontariusz 2 (Email)</th>
+        <th>Wolontariusz 1</th>
+        <th>Wolontariusz 2</th>
         <th>Akcje</th>
       </tr>
     </thead>
@@ -173,10 +173,22 @@
         {% set b1 = t.bookings[0].volunteer if t.bookings|length > 0 else None %}
         {% set b2 = t.bookings[1].volunteer if t.bookings|length > 1 else None %}
         <td>
-          {% if b1 %}{{ b1.first_name }} {{ b1.last_name }} <small class="text-muted">({{ b1.email }})</small>{% endif %}
+          {% if b1 %}
+            {{ b1.first_name }} {{ b1.last_name }}
+            <br><small class="text-muted">{{ b1.email }}</small>
+            {% if b1.phone_number %}
+              <br><a href="tel:{{ b1.phone_number }}"><i class="bi bi-telephone"></i> {{ b1.phone_number|format_phone }}</a>
+            {% endif %}
+          {% endif %}
         </td>
         <td>
-          {% if b2 %}{{ b2.first_name }} {{ b2.last_name }} <small class="text-muted">({{ b2.email }})</small>{% endif %}
+          {% if b2 %}
+            {{ b2.first_name }} {{ b2.last_name }}
+            <br><small class="text-muted">{{ b2.email }}</small>
+            {% if b2.phone_number %}
+              <br><a href="tel:{{ b2.phone_number }}"><i class="bi bi-telephone"></i> {{ b2.phone_number|format_phone }}</a>
+            {% endif %}
+          {% endif %}
         </td>
         <td>
           <a href="{{ url_for('admin.edit_training', training_id=t.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edytuj">

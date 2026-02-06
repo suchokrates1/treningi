@@ -239,6 +239,33 @@ def notify_volunteer_training_canceled(
     return send_whatsapp_message(volunteer_phone, message)
 
 
+def notify_volunteer_training_time_changed(
+    volunteer_phone: str,
+    volunteer_name: str,
+    training_old_time: str,
+    training_new_time: str,
+    training_date: str,
+    training_location: str,
+) -> tuple[bool, Optional[str]]:
+    """Notify a volunteer that their training time has been changed."""
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+
+    message = (
+        f"\u23f0 Zmiana godziny treningu!\n\n"
+        f"Cze\u015b\u0107 {volunteer_name}!\n\n"
+        f"Informujemy, \u017ce godzina Twojego treningu zosta\u0142a zmieniona:\n\n"
+        f"\ud83d\udcc5 Data: {training_date}\n"
+        f"\u274c Stara godzina: {training_old_time}\n"
+        f"\u2705 Nowa godzina: {training_new_time}\n"
+        f"\ud83d\udccd Miejsce: {training_location}\n\n"
+        f"\u2705 Odpisz POTWIERDZAM je\u015bli b\u0119dziesz o nowej godzinie\n"
+        f"\u274c Odpisz REZYGNUJ\u0118 je\u015bli nie mo\u017cesz\n\n"
+        f"Fundacja Widzimy Inaczej"
+    )
+    return send_whatsapp_message(volunteer_phone, message)
+
+
 def notify_coach_volunteer_canceled(
     coach_phone: str,
     coach_name: str,

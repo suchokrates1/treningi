@@ -2,8 +2,11 @@
 {% block admin_content %}
 <div class="container mt-4">
   <h2>Edytuj trening</h2>
-  <form method="POST">
+  <form method="POST" id="edit-training-form">
     {{ form.hidden_tag() }}
+    {% if confirm_time_change %}
+    <input type="hidden" name="confirm_time_change" value="1">
+    {% endif %}
     <div class="row g-2 align-items-end row-cols-lg-auto mb-3">
       <div class="col-auto col-lg-3">
         {{ form.date.label(class="form-label") }}
@@ -27,5 +30,26 @@
       </div>
     </div>
   </form>
+
+  {% if confirm_time_change %}
+  <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title">⏰ Zmiana godziny treningu</h5>
+        </div>
+        <div class="modal-body">
+          <p>Czy na pewno chcesz zmienić godzinę treningu z <strong>{{ old_time }}</strong> na <strong>{{ new_time }}</strong>?</p>
+          <p>Zapisani wolontariusze zostaną powiadomieni (WhatsApp + e-mail):</p>
+          <p class="fw-bold">{{ affected_volunteers }}</p>
+        </div>
+        <div class="modal-footer">
+          <a href="{{ url_for('admin.edit_training', training_id=training.id) }}" class="btn btn-secondary">Anuluj</a>
+          <button type="submit" form="edit-training-form" class="btn btn-warning">Tak, zmień i powiadom</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
