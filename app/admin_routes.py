@@ -1334,6 +1334,7 @@ def whatsapp_chat():
 @login_required
 def whatsapp_api_chats():
     """Return list of WhatsApp chats from WAHA, filtered to known contacts."""
+    import re
     from .whatsapp_utils import normalize_phone_number
 
     # Build set of known phone numbers (volunteers + coaches) as bare digits
@@ -1368,11 +1369,13 @@ def whatsapp_api_chats():
             name = c.get("name", "")
             phone = ""
             digits = ""
-            # Extract phone from chat_id (format: 48XXXXXXXXX@c.us)
-            if "@c.us" in chat_id:
-                digits = chat_id.split("@")[0]
-                if digits.isdigit():
-                    phone = f"+{digits}"
+
+            # WAHA uses @lid IDs (not @c.us).  The phone number
+            # appears in the chat "name" field (e.g. "+48 515 183 807").
+            name_digits = re.sub(r'\D', '', name)  # strip non-digits
+            if name_digits:
+                digits = name_digits
+                phone = f"+{digits}"
 
             # Skip chats not matching known contacts
             if not digits or digits not in known_phones:

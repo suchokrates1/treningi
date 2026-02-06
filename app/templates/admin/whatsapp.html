@@ -474,12 +474,13 @@ loadChats().then(() => {
     let digits = phone.replace(/[\s\-\+]/g, '');
     if (digits.length === 9) digits = '48' + digits;
     if (!digits.startsWith('48') && digits.length < 11) digits = '48' + digits;
-    const chatId = digits + '@c.us';
-    // Try to find in loaded chats
-    const existing = allChats.find(c => c.id === chatId || (c.phone && c.phone.replace(/\D/g, '') === digits));
+    // Find chat by matching phone digits (phone field is "+48XXXXXXXXX")
+    const existing = allChats.find(c => c.phone && c.phone.replace(/\D/g, '') === digits);
     if (existing) {
       openChat(existing.id, existing.name, existing.phone);
     } else {
+      // No existing chat – use @c.us format for new conversations
+      const chatId = digits + '@c.us';
       openChat(chatId, '+' + digits, '+' + digits);
     }
   }
