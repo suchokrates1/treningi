@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from . import db
 from .models import Volunteer, Booking, Training, Coach
 from .whatsapp_utils import send_whatsapp_message, normalize_phone_number
+from .ai_assistant import ask_gemini
 
 webhook_bp = Blueprint('webhook', __name__)
 
@@ -37,9 +38,9 @@ def _extract_phone_from_lid(lid_id: str) -> str | None:
     WAHA stores the phone number (e.g. '+48 519 179 904') in the chat
     ``name`` field even when the chat ID uses the @lid format.
     """
-    waha_url = current_app.config.get('WAHA_API_URL', 'http://waha:3000')
-    waha_key = current_app.config.get('WAHA_API_KEY', '')
-    session = current_app.config.get('WAHA_SESSION', 'default')
+    waha_url = current_app.config.get('WHATSAPP_API_URL') or 'http://waha:3000'
+    waha_key = current_app.config.get('WHATSAPP_API_KEY') or ''
+    session = current_app.config.get('WHATSAPP_SESSION') or 'default'
     try:
         req = urllib.request.Request(
             f'{waha_url}/api/{session}/chats',
@@ -201,19 +202,37 @@ def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
     ).order_by(Training.date).all()
 
 
-def send_confirmation_response(phone: str, booking: Booking) -> None:
-    """Send confirmation response to volunteer."""
-    training = booking.training
+def send_confirmation_response(phone: str, booking: Booking | list[Booking]) -> None:
+    """Send confirmation response to volunteer.
+
+    Accepts a single Booking or a list of Bookings (for multi-confirm).
+    """
+    bookings = booking if isinstance(booking, list) else [booking]
     today = datetime.now(timezone.utc).date()
-    training_date = training.date.date() if hasattr(training.date, 'date') else training.date
-    day_word = "dzisiaj" if training_date == today else "jutro"
-    message = (
-        f"✅ Dziękujemy za potwierdzenie!\n\n"
-        f"Do zobaczenia {day_word} o {training.date.strftime('%H:%M')}\n"
-        f"📍 {training.location.name}\n"
-        f"👨‍🏫 Trener: {training.coach.first_name} {training.coach.last_name}\n"
-        f"📞 Tel: {training.coach.phone_number}"
-    )
+
+    if len(bookings) == 1:
+        training = bookings[0].training
+        training_date = training.date.date() if hasattr(training.date, 'date') else training.date
+        day_word = "dzisiaj" if training_date == today else "jutro"
+        message = (
+            f"✅ Dziękujemy za potwierdzenie!\n\n"
+            f"Do zobaczenia {day_word} o {training.date.strftime('%H:%M')}\n"
+            f"📍 {training.location.name}\n"
+            f"👨‍🏫 Trener: {training.coach.first_name} {training.coach.last_name}\n"
+            f"📞 Tel: {training.coach.phone_number}"
+        )
+    else:
+        training_date = bookings[0].training.date.date()
+        day_word = "dzisiaj" if training_date == today else "jutro"
+        lines = [f"✅ Dziękujemy za potwierdzenie!\n\nDo zobaczenia {day_word}:\n"]
+        for b in bookings:
+            t = b.training
+            lines.append(
+                f"🕐 {t.date.strftime('%H:%M')} - 📍 {t.location.name} "
+                f"(🏫 {t.coach.first_name} {t.coach.last_name}, 📞 {t.coach.phone_number})"
+            )
+        message = "\n".join(lines)
+
     send_whatsapp_message(phone, message)
 
 
@@ -246,16 +265,27 @@ def send_selection_prompt(phone: str, bookings: list[Booking]) -> None:
     send_whatsapp_message(phone, "\n".join(lines))
 
 
-def send_unknown_response(phone: str) -> None:
-    """Send response when we don't understand the message."""
-    message = (
-        "🤔 Nie rozumiem Twojej wiadomości.\n\n"
+def send_unknown_response(phone: str, message: str = "", volunteer: Volunteer | None = None) -> None:
+    """Send response when we don't understand the message.
+
+    First tries Gemini AI for a conversational reply.  Falls back to a
+    static help message when the AI is unavailable.
+    """
+    # Try AI response first
+    if message:
+        ai_reply = ask_gemini(message, volunteer=volunteer)
+        if ai_reply:
+            send_whatsapp_message(phone, ai_reply)
+            return
+
+    # Fallback: static help message
+    fallback = (
         "Dostępne komendy:\n"
         "✅ POTWIERDZAM - potwierdź udział w treningu\n"
         "❌ REZYGNUJĘ - zrezygnuj z treningu\n\n"
-        "Jeśli potrzebujesz pomocy, skontaktuj się z nami."
+        "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
     )
-    send_whatsapp_message(phone, message)
+    send_whatsapp_message(phone, fallback)
 
 
 def send_no_booking_response(phone: str) -> None:
@@ -415,7 +445,7 @@ def whatsapp_webhook():
         intent = detect_intent(message_body)
         
         if not intent:
-            send_unknown_response(phone_number)
+            send_unknown_response(phone_number, message_body, volunteer)
             return jsonify({'status': 'ok', 'action': 'unknown'}), 200
         
         # Get pending bookings for tomorrow
@@ -448,7 +478,7 @@ def whatsapp_webhook():
                 for booking in pending_bookings:
                     booking.is_confirmed = True
                 db.session.commit()
-                send_confirmation_response(phone_number, pending_bookings[0])
+                send_confirmation_response(phone_number, pending_bookings)
                 return jsonify({'status': 'ok', 'action': 'confirmed_all'}), 200
 
             elif intent == 'cancel':
