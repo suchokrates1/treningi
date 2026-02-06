@@ -567,6 +567,11 @@ def edit_training(training_id):
             for vol in booked_volunteers:
                 vol_name = f"{vol.first_name} {vol.last_name}"
                 # WhatsApp notification
+                # Mark booking so 18:00 reminder is skipped (time change msg already asks for confirmation)
+                booking_obj = next((b for b in training.bookings if b.volunteer_id == vol.id), None)
+                if booking_obj:
+                    booking_obj.time_change_notified = True
+
                 if vol.phone_number:
                     wa_ok, wa_err = notify_volunteer_training_time_changed(
                         volunteer_phone=vol.phone_number,
@@ -603,6 +608,8 @@ def edit_training(training_id):
                 f"Powiadomiono {len(booked_volunteers)} wolontariuszy o zmianie godziny.",
                 "info",
             )
+            # Persist the time_change_notified flags
+            db.session.commit()
 
         flash("Zaktualizowano trening.", "success")
         return redirect(url_for("admin.manage_trainings"))
