@@ -209,14 +209,24 @@
   </div>
 </div>
 
+<!-- Month Tabs -->
+{% set month_names_admin = {'01': 'Styczeń', '02': 'Luty', '03': 'Marzec', '04': 'Kwiecień', '05': 'Maj', '06': 'Czerwiec', '07': 'Lipiec', '08': 'Sierpień', '09': 'Wrzesień', '10': 'Październik', '11': 'Listopad', '12': 'Grudzień'} %}
+{% set now_key = now().strftime('%Y-%m') %}
+<div class="admin-month-tabs" id="adminMonthTabs">
+  {% for month, ts in trainings_by_month.items() %}
+    {% set parts = month.split('-') %}
+    <button type="button" class="admin-month-tab {% if month == now_key or (loop.first and now_key not in trainings_by_month) %}active{% endif %}" data-month="{{ month }}">
+      <span class="tab-month">{{ month_names_admin[parts[1]] }}</span>
+      <span class="tab-year">{{ parts[0] }}</span>
+      <span class="tab-count">{{ ts|length }}</span>
+    </button>
+  {% endfor %}
+</div>
+
 <!-- TABLE VIEW -->
 <div id="tableView">
 {% for month, ts in trainings_by_month.items() %}
-<div class="admin-card">
-  <div class="admin-card-header">
-    <h4><i class="bi bi-calendar3"></i>{{ month|replace("-", " / ") }}</h4>
-    <span class="badge bg-secondary ms-auto">{{ ts|length }} treningów</span>
-  </div>
+<div class="admin-month-content {% if month == now_key or (loop.first and now_key not in trainings_by_month) %}active{% endif %}" data-month="{{ month }}">
   <div class="table-scroll">
     <table class="admin-table">
       <thead>

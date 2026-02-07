@@ -98,9 +98,10 @@
     </table>
   </div>
   {% else %}
-  <div class="text-center text-muted py-4">
-    <i class="bi bi-calendar-x" style="font-size:2rem;"></i>
-    <p class="mt-2 mb-0">Ten wolontariusz nie ma jeszcze żadnych zapisów.</p>
+  <div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-calendar-x"></i></div>
+    <h5>Brak zapisów</h5>
+    <p>Ten wolontariusz nie ma jeszcze żadnych zapisów na zajęcia.</p>
   </div>
   {% endif %}
 </div>
