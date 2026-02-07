@@ -216,6 +216,24 @@ class StoredFile(db.Model):
     data = db.Column(LargeBinary, nullable=False)
 
 
+class WhatsAppTemplate(db.Model):
+    """Editable WhatsApp message templates."""
+
+    __tablename__ = "whatsapp_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(64), unique=True, nullable=False)
+    name = db.Column(db.String(128), nullable=False)
+    icon = db.Column(db.String(10), nullable=False, default="📋")
+    description = db.Column(db.String(256), nullable=True)
+    recipient = db.Column(db.String(64), nullable=False, default="Wolontariusz")
+    body = db.Column(db.Text, nullable=False)
+    variables = db.Column(db.JSON, nullable=False, default=list)
+
+    def __repr__(self):
+        return f"<WhatsAppTemplate {self.key}>"
+
+
 @event.listens_for(Training.__table__, "before_create")
 def _skip_sqlite_check(table, connection, **kw):
     if connection.dialect.name == "sqlite":

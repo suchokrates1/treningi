@@ -67,9 +67,11 @@ def _get_volunteer_context(volunteer: Volunteer) -> str:
         status = "potwierdzony" if b.is_confirmed is True else (
             "odwołany" if b.is_confirmed is False else "oczekuje potwierdzenia"
         )
+        coach_phone = t.coach.phone_number or "brak"
         lines.append(
             f"- {t.date.strftime('%Y-%m-%d %H:%M')} w {t.location.name}, "
-            f"trener: {t.coach.first_name} {t.coach.last_name}, status: {status}"
+            f"trener: {t.coach.first_name} {t.coach.last_name} (tel: {coach_phone}), "
+            f"status: {status}"
         )
     return "\n".join(lines)
 

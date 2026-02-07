@@ -1,14 +1,25 @@
 {% extends "admin/admin_base.html" %}
-{% block admin_content %}
-<div class="container mt-5" style="max-width: 500px;">
-  <h2 class="mb-3">Logowanie administratora</h2>
-  <form method="POST">
-    {{ form.hidden_tag() }}
-    <div class="mb-3">
-      {{ form.password.label(class="form-label") }}
-      {{ form.password(class="form-control", required=True) }}
+{% block admin_content_public %}
+<div class="container">
+  <div class="admin-login-container">
+    <div class="admin-login-card">
+      <div class="login-icon">
+        <i class="bi bi-shield-lock-fill"></i>
+      </div>
+      <h2 class="mb-1 fw-bold">Panel administracyjny</h2>
+      <p class="text-muted mb-4">Zaloguj się aby zarządzać treningami</p>
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3 text-start">
+          {{ form.password.label(class="form-label fw-semibold") }}
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+            {{ form.password(class="form-control form-control-lg", required=True, placeholder="Wprowadź hasło") }}
+          </div>
+        </div>
+        {{ form.submit(class="btn btn-admin-primary w-100 py-2 mt-2") }}
+      </form>
     </div>
-    {{ form.submit(class="btn btn-primary w-100") }}
-  </form>
+  </div>
 </div>
 {% endblock %}

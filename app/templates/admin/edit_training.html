@@ -1,55 +1,57 @@
 {% extends "admin/admin_base.html" %}
 {% block admin_content %}
-<div class="container mt-4">
-  <h2>Edytuj trening</h2>
+<div class="admin-page-header">
+  <h2><i class="bi bi-pencil-square"></i>Edytuj trening</h2>
+</div>
+<div class="admin-card admin-form">
   <form method="POST" id="edit-training-form">
     {{ form.hidden_tag() }}
     {% if confirm_time_change %}
     <input type="hidden" name="confirm_time_change" value="1">
     {% endif %}
-    <div class="row g-2 align-items-end row-cols-lg-auto mb-3">
-      <div class="col-auto col-lg-3">
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
         {{ form.date.label(class="form-label") }}
         {{ form.date(class="form-control") }}
       </div>
-      <div class="col-auto col-lg-3">
+      <div class="col-md-3">
         {{ form.location_id.label(class="form-label") }}
         {{ form.location_id(class="form-select") }}
       </div>
-      <div class="col-auto col-lg-3">
+      <div class="col-md-3">
         {{ form.coach_id.label(class="form-label") }}
         {{ form.coach_id(class="form-select") }}
       </div>
-      <div class="col-auto col-lg-2">
+      <div class="col-md-2">
         {{ form.max_volunteers.label(class="form-label") }}
         {{ form.max_volunteers(class="form-control") }}
       </div>
-      <div class="col-auto">
-        <button class="btn btn-primary">Zapisz zmiany</button>
-        <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-secondary ms-2">Anuluj</a>
-      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-admin-primary"><i class="bi bi-check-lg me-1"></i>Zapisz zmiany</button>
+      <a href="{{ url_for('admin.manage_trainings') }}" class="btn btn-outline-secondary">Anuluj</a>
     </div>
   </form>
+</div>
 
-  {% if confirm_time_change %}
-  <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header bg-warning">
-          <h5 class="modal-title">⏰ Zmiana godziny treningu</h5>
-        </div>
-        <div class="modal-body">
-          <p>Czy na pewno chcesz zmienić godzinę treningu z <strong>{{ old_time }}</strong> na <strong>{{ new_time }}</strong>?</p>
-          <p>Zapisani wolontariusze zostaną powiadomieni (WhatsApp + e-mail):</p>
-          <p class="fw-bold">{{ affected_volunteers }}</p>
-        </div>
-        <div class="modal-footer">
-          <a href="{{ url_for('admin.edit_training', training_id=training.id) }}" class="btn btn-secondary">Anuluj</a>
-          <button type="submit" form="edit-training-form" class="btn btn-warning">Tak, zmień i powiadom</button>
-        </div>
+{% if confirm_time_change %}
+<div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius: 1rem; overflow: hidden;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fd7e14, #e85d04); color: white;">
+        <h5 class="modal-title"><i class="bi bi-clock me-1"></i> Zmiana godziny treningu</h5>
+      </div>
+      <div class="modal-body">
+        <p>Czy na pewno chcesz zmienić godzinę treningu z <strong>{{ old_time }}</strong> na <strong>{{ new_time }}</strong>?</p>
+        <p>Zapisani wolontariusze zostaną powiadomieni (WhatsApp + e-mail):</p>
+        <p class="fw-bold text-primary">{{ affected_volunteers }}</p>
+      </div>
+      <div class="modal-footer">
+        <a href="{{ url_for('admin.edit_training', training_id=training.id) }}" class="btn btn-outline-secondary">Anuluj</a>
+        <button type="submit" form="edit-training-form" class="btn btn-warning"><i class="bi bi-send me-1"></i>Tak, zmień i powiadom</button>
       </div>
     </div>
   </div>
-  {% endif %}
 </div>
+{% endif %}
 {% endblock %}

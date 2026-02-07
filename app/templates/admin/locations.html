@@ -1,40 +1,54 @@
 {% extends "admin/admin_base.html" %}
 {% block admin_content %}
-<div class="container mt-4">
-  <h2>Miejsca</h2>
-  <form method="POST" class="mb-4">
+<div class="admin-page-header">
+  <h2><i class="bi bi-geo-alt-fill"></i>Miejsca</h2>
+</div>
+
+<div class="admin-card admin-form">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-plus-circle"></i>Dodaj miejsce</h4>
+  </div>
+  <form method="POST">
     {{ form.hidden_tag() }}
-    <div class="row g-2">
+    <div class="row g-2 align-items-end">
       <div class="col-md-9">
         {{ form.name.label(class="form-label") }}
         {{ form.name(class="form-control") }}
       </div>
       <div class="col-md-3">
-        <button class="btn btn-success w-100">Dodaj miejsce</button>
+        <button class="btn btn-admin-success w-100"><i class="bi bi-plus-lg me-1"></i>Dodaj miejsce</button>
       </div>
     </div>
   </form>
+</div>
 
-  <table class="table table-striped">
-    <thead><tr><th>Nazwa</th><th>Akcje</th></tr></thead>
-    <tbody>
-      {% for location in locations %}
-      <tr>
-        <td>{{ location.name }}</td>
-        <td>
-          <a href="{{ url_for('admin.edit_location', location_id=location.id) }}" class="btn btn-sm btn-outline-primary" title="Edytuj">
-            <i class="bi bi-pencil"></i>
-          </a>
-          <form method="post" action="{{ url_for('admin.delete_location', location_id=location.id) }}" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-outline-secondary" title="Usuń">
-              <i class="bi bi-trash"></i>
-            </button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-list-ul"></i>Lista miejsc</h4>
+    <span class="badge bg-secondary ms-auto">{{ locations|length }}</span>
+  </div>
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead><tr><th>Nazwa</th><th class="text-end">Akcje</th></tr></thead>
+      <tbody>
+        {% for location in locations %}
+        <tr>
+          <td><i class="bi bi-geo-alt me-1 text-muted"></i><strong>{{ location.name }}</strong></td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.edit_location', location_id=location.id) }}" class="btn btn-icon btn-outline-primary" title="Edytuj">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{{ url_for('admin.delete_location', location_id=location.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-icon btn-outline-secondary" title="Usuń" data-confirm="Czy na pewno chcesz usunąć miejsce {{ location.name }}?" data-confirm-label="Tak, usuń">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

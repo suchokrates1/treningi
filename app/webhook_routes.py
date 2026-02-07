@@ -118,7 +118,6 @@ CONFIRM_PATTERNS = [
     r'\bbędę\b',
     r'\bok\b',
     r'^\s*\+\s*$',
-    r'^1$',
 ]
 
 CANCEL_PATTERNS = [
@@ -127,7 +126,7 @@ CANCEL_PATTERNS = [
     r'\bnie\s+(bede|będę)\b',
     r'\bodwo[łl]uj[eę]\b',
     r'\banuluj[eę]?\b',
-    r'^2$',
+
 ]
 
 
@@ -145,23 +144,49 @@ def normalize_text(text: str) -> str:
 
 
 def detect_intent(message: str) -> str | None:
-    """Detect user intent from message. Returns 'confirm', 'cancel', or None."""
+    """Detect user intent from message.
+
+    Returns:
+        'confirm'          – confirm all
+        'confirm_N'        – confirm training number N (1-based)
+        'cancel'           – cancel all
+        'cancel_N'         – cancel training number N
+        None               – unknown intent
+    """
     normalized = normalize_text(message)
     original_lower = message.lower().strip()
-    
+
+    # --- Specific training number: "potwierdzam 1", "potwierdzam 2" ---
+    num_confirm = re.search(r'potwierdzam\s+(\d+)', normalized) or re.search(r'potwierdzam\s+(\d+)', original_lower)
+    if num_confirm:
+        return f'confirm_{num_confirm.group(1)}'
+
+    num_cancel = (
+        re.search(r'rezygnuje?\s+z?\s*(\d+)', normalized)
+        or re.search(r'rezygnuj[eę]\s+z?\s*(\d+)', original_lower)
+    )
+    if num_cancel:
+        return f'cancel_{num_cancel.group(1)}'
+
+    # --- "potwierdzam oba / wszystkie" → confirm all ---
+    if re.search(r'potwierdzam\s+(oba|obydwa|wszystk)', normalized) or re.search(r'potwierdzam\s+(oba|obydwa|wszystk)', original_lower):
+        return 'confirm'
+
+    # --- Generic confirm ---
     for pattern in CONFIRM_PATTERNS:
         if re.search(pattern, normalized) or re.search(pattern, original_lower):
             return 'confirm'
-    
+
+    # --- Generic cancel ---
     for pattern in CANCEL_PATTERNS:
         if re.search(pattern, normalized) or re.search(pattern, original_lower):
             return 'cancel'
-    
-    # Check for number selection (for multiple trainings)
-    number_match = re.match(r'^(\d+)$', message.strip())
-    if number_match:
-        return f'select_{number_match.group(1)}'
-    
+
+    # --- Bare number → confirm that training (e.g. user replies "1" or "2") ---
+    bare_num = re.match(r'^(\d+)$', normalized)
+    if bare_num:
+        return f'confirm_{bare_num.group(1)}'
+
     return None
 
 
@@ -202,10 +227,11 @@ def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
     ).order_by(Training.date).all()
 
 
-def send_confirmation_response(phone: str, booking: Booking | list[Booking]) -> None:
+def send_confirmation_response(chat_id: str, booking: Booking | list[Booking]) -> None:
     """Send confirmation response to volunteer.
 
     Accepts a single Booking or a list of Bookings (for multi-confirm).
+    ``chat_id`` is the raw WhatsApp chatId (``@c.us`` or ``@lid``).
     """
     bookings = booking if isinstance(booking, list) else [booking]
     today = datetime.now(timezone.utc).date()
@@ -233,10 +259,10 @@ def send_confirmation_response(phone: str, booking: Booking | list[Booking]) -> 
             )
         message = "\n".join(lines)
 
-    send_whatsapp_message(phone, message)
+    send_whatsapp_message('', message, chat_id=chat_id)
 
 
-def send_cancellation_response(phone: str, booking: Booking) -> None:
+def send_cancellation_response(chat_id: str, booking: Booking) -> None:
     """Send cancellation response to volunteer."""
     training = booking.training
     message = (
@@ -246,10 +272,10 @@ def send_cancellation_response(phone: str, booking: Booking) -> None:
         f"Mamy nadzieję, że zobaczysz się z nami innym razem!\n"
         f"Fundacja Widzimy Inaczej"
     )
-    send_whatsapp_message(phone, message)
+    send_whatsapp_message('', message, chat_id=chat_id)
 
 
-def send_selection_prompt(phone: str, bookings: list[Booking]) -> None:
+def send_selection_prompt(chat_id: str, bookings: list[Booking]) -> None:
     """Send message asking user to select which training to confirm."""
     lines = ["📋 Masz kilka treningów jutro. Który potwierdzasz?\n"]
     
@@ -262,20 +288,23 @@ def send_selection_prompt(phone: str, bookings: list[Booking]) -> None:
     lines.append("\n✅ Odpisz numer (np. 1) aby potwierdzić")
     lines.append("❌ Odpisz 'rezygnuję z X' aby zrezygnować")
     
-    send_whatsapp_message(phone, "\n".join(lines))
+    send_whatsapp_message('', "\n".join(lines), chat_id=chat_id)
 
 
-def send_unknown_response(phone: str, message: str = "", volunteer: Volunteer | None = None) -> None:
+def send_unknown_response(chat_id: str, message: str = "", volunteer: Volunteer | None = None) -> None:
     """Send response when we don't understand the message.
 
     First tries Gemini AI for a conversational reply.  Falls back to a
     static help message when the AI is unavailable.
+    ``chat_id`` is the raw WhatsApp chatId (``@c.us`` or ``@lid``).
     """
     # Try AI response first
     if message:
+        print(f"[WEBHOOK] Calling ask_gemini with message={message[:50]}", flush=True)
         ai_reply = ask_gemini(message, volunteer=volunteer)
+        print(f"[WEBHOOK] AI reply: {str(ai_reply)[:100] if ai_reply else 'None'}", flush=True)
         if ai_reply:
-            send_whatsapp_message(phone, ai_reply)
+            send_whatsapp_message('', ai_reply, chat_id=chat_id)
             return
 
     # Fallback: static help message
@@ -285,129 +314,137 @@ def send_unknown_response(phone: str, message: str = "", volunteer: Volunteer | 
         "❌ REZYGNUJĘ - zrezygnuj z treningu\n\n"
         "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
     )
-    send_whatsapp_message(phone, fallback)
+    send_whatsapp_message('', fallback, chat_id=chat_id)
 
 
-def send_no_booking_response(phone: str) -> None:
+def send_no_booking_response(chat_id: str) -> None:
     """Send response when no pending booking found."""
     message = (
         "ℹ️ Nie znaleziono żadnego treningu do potwierdzenia na jutro.\n\n"
         "Jeśli uważasz, że to błąd, skontaktuj się z nami."
     )
-    send_whatsapp_message(phone, message)
+    send_whatsapp_message('', message, chat_id=chat_id)
 
 
-def send_not_found_response(phone: str) -> None:
-    """Send response when phone number not found in database."""
+def send_not_found_response(chat_id: str) -> None:
+    """Send response when volunteer not found in database."""
     message = (
-        "❓ Nie znaleziono Twojego numeru w naszej bazie.\n\n"
-        "Jeśli jesteś zapisany/a na wolontariat, upewnij się, "
-        "że podałeś/aś ten numer telefonu podczas rejestracji."
+        "❓ Nie znaleziono Cię w naszej bazie.\n\n"
+        "Jeśli jesteś zapisany/a na wolontariat, skontaktuj się z nami: "
+        "biuro@widzimyinaczej.org.pl"
     )
-    send_whatsapp_message(phone, message)
+    send_whatsapp_message('', message, chat_id=chat_id)
 
 
 # Store for multi-step conversations (selection)
 _pending_selections: dict[str, list[Booking]] = {}
+
+# Deduplication: track recently processed message IDs
+_processed_msg_ids: dict[str, float] = {}
+DEDUP_WINDOW = 30  # seconds
 
 
 @webhook_bp.route('/whatsapp', methods=['POST'])
 def whatsapp_webhook():
     """Handle incoming WhatsApp messages from WAHA."""
     try:
-        data = request.get_json()
+        import sys, json as _json
+        print(f"[WEBHOOK] Request received", flush=True)
+        data = request.get_json(force=True, silent=True)
         
         if not data:
+            print("[WEBHOOK] No JSON data!", flush=True)
             return jsonify({'status': 'no data'}), 200
         
-        # WAHA sends different event types
         event_type = data.get('event')
+        print(f"[WEBHOOK] event={event_type}", flush=True)
         
-        # We only care about incoming messages
         if event_type != 'message':
+            print(f"[WEBHOOK] Ignoring non-message event: {event_type}", flush=True)
             return jsonify({'status': 'ignored', 'reason': 'not a message event'}), 200
         
         payload = data.get('payload', {})
+        from_me = payload.get('fromMe')
+        from_field = payload.get('from', '')
+        message_body = sanitize_message(payload.get('body', ''))
+        msg_id = payload.get('id', '')
+        
+        # --- Deduplication: WAHA often sends the same message twice ---
+        import time
+        now_ts = time.time()
+        # Clean old entries
+        _processed_msg_ids.update({k: v for k, v in _processed_msg_ids.items() if now_ts - v < DEDUP_WINDOW})
+        if msg_id and msg_id in _processed_msg_ids:
+            print(f"[WEBHOOK] Duplicate msg_id={msg_id}, skipping", flush=True)
+            return jsonify({'status': 'ignored', 'reason': 'duplicate'}), 200
+        if msg_id:
+            _processed_msg_ids[msg_id] = now_ts
+        
+        # Dump full payload keys for debugging
+        print(f"[WEBHOOK] fromMe={from_me}, from={from_field}, body={message_body[:80]}, id={msg_id}", flush=True)
+        print(f"[WEBHOOK] payload keys: {list(payload.keys())}", flush=True)
+        _data = payload.get('_data', {})
+        if _data:
+            print(f"[WEBHOOK] _data keys: {list(_data.keys())}", flush=True)
+            print(f"[WEBHOOK] _data.notifyName={_data.get('notifyName')}, author={_data.get('author')}, participant={_data.get('participant')}", flush=True)
         
         # Skip messages we sent ourselves
-        if payload.get('fromMe'):
+        if from_me:
+            print(f"[WEBHOOK] Skipping own message", flush=True)
             return jsonify({'status': 'ignored', 'reason': 'own message'}), 200
         
-        # Get message details
-        message_body = sanitize_message(payload.get('body', ''))
-        from_field = payload.get('from', '')
+        # Skip empty messages (e.g. user just opened the chat)
+        if not message_body:
+            print(f"[WEBHOOK] Skipping empty message", flush=True)
+            return jsonify({'status': 'ignored', 'reason': 'empty message'}), 200
         
-        # Log raw payload for debugging
-        current_app.logger.info(f"Webhook payload from={from_field}, body={message_body[:80]}")
+        # chat_id is the raw 'from' field – we'll use it to reply
+        chat_id = from_field
+        volunteer = None
         
-        # Extract phone number from WhatsApp ID
-        phone_number = None
-        
-        # Format 1: 48123456789@c.us (standard)
-        phone_match = re.match(r'^(\d{9,15})@c\.us$', from_field)
-        if phone_match:
-            phone_number = phone_match.group(1)
-        
-        # Format 2: XXXXX@lid (linked device ID - phone not in ID)
-        # Try to get phone from _data.from or participant fields
-        if not phone_number and '@lid' in from_field:
-            _data = payload.get('_data', {})
-            # Try author field
-            author = _data.get('author', '')
-            if author:
-                author_match = re.match(r'^(\d{9,15})@', author)
-                if author_match:
-                    phone_number = author_match.group(1)
-            # Try participant
-            if not phone_number:
-                participant = _data.get('participant', '') or payload.get('participant', '')
-                if participant:
-                    part_match = re.match(r'^(\d{9,15})@', participant)
-                    if part_match:
-                        phone_number = part_match.group(1)
-            # Try chatId field
-            if not phone_number:
-                chat_id = payload.get('chatId', '') or payload.get('from', '')
-                # For @lid chats, we need to look up which phone this lid maps to
-                # Use WAHA contacts API or match by notify name
-                notify_name = _data.get('notifyName', '') or payload.get('notifyName', '')
-                if notify_name:
-                    # Try to find volunteer by name
-                    vol = _find_volunteer_by_name(notify_name)
-                    if vol and vol.phone_number:
-                        from .whatsapp_utils import normalize_phone_number
-                        phone_number = normalize_phone_number(vol.phone_number).lstrip('+')
-                        current_app.logger.info(
-                            f"Matched @lid chat to {vol.first_name} {vol.last_name} via notifyName={notify_name}"
-                        )
-
-            # Last resort: look up @lid in WAHA chat list (name often has phone)
-            if not phone_number:
+        # --- Identify the volunteer ---
+        if '@c.us' in from_field:
+            # Standard format: 48123456789@c.us → extract phone, find volunteer
+            phone_match = re.match(r'^(\d{9,15})@c\.us$', from_field)
+            if phone_match:
+                phone_number = phone_match.group(1)
+                print(f"[WEBHOOK] Phone from @c.us: {phone_number}", flush=True)
+                volunteer = find_volunteer_by_phone(phone_number)
+        elif '@lid' in from_field:
+            # Linked device format – find volunteer by display name
+            print(f"[WEBHOOK] @lid detected, resolving volunteer...", flush=True)
+            notify_name = _data.get('notifyName', '') or payload.get('notifyName', '')
+            print(f"[WEBHOOK] notifyName={notify_name}", flush=True)
+            if notify_name:
+                volunteer = _find_volunteer_by_name(notify_name)
+                print(f"[WEBHOOK] Volunteer by name: {volunteer}", flush=True)
+            if not volunteer:
+                # Try resolving @lid → phone → volunteer
                 phone_number = _extract_phone_from_lid(from_field)
+                if phone_number:
+                    print(f"[WEBHOOK] Phone from lid lookup: {phone_number}", flush=True)
+                    volunteer = find_volunteer_by_phone(phone_number)
+        else:
+            print(f"[WEBHOOK] Unknown from format: {from_field}", flush=True)
+            return jsonify({'status': 'error', 'reason': 'unknown from format'}), 200
         
-        if not phone_number:
-            current_app.logger.warning(f"Could not extract phone from: {from_field}")
-            return jsonify({'status': 'error', 'reason': 'invalid from field'}), 200
-        
-        # Rate limiting
-        if is_rate_limited(phone_number):
-            current_app.logger.warning(f"Rate limit exceeded for {phone_number}")
-            return jsonify({'status': 'rate_limited'}), 429
-        
-        current_app.logger.info(
-            f"Received WhatsApp message from {phone_number}: {message_body[:50]}..."
-        )
-        
-        # Find volunteer by phone
-        volunteer = find_volunteer_by_phone(phone_number)
+        print(f"[WEBHOOK] Volunteer resolved: {volunteer}", flush=True)
         
         if not volunteer:
-            send_not_found_response(phone_number)
+            print(f"[WEBHOOK] Volunteer not found, sending not_found response to {chat_id}", flush=True)
+            send_not_found_response(chat_id)
             return jsonify({'status': 'ok', 'action': 'not_found'}), 200
         
+        # Rate limiting (use chat_id as key)
+        if is_rate_limited(chat_id):
+            print(f"[WEBHOOK] Rate limited: {chat_id}", flush=True)
+            return jsonify({'status': 'rate_limited'}), 429
+        
+        print(f"[WEBHOOK] Processing: vol={volunteer.first_name} {volunteer.last_name}, msg={message_body[:50]}", flush=True)
+        
         # Check if we're waiting for a selection from this user
-        if phone_number in _pending_selections:
-            bookings = _pending_selections[phone_number]
+        if chat_id in _pending_selections:
+            bookings = _pending_selections[chat_id]
             
             # Try to parse number
             try:
@@ -416,8 +453,8 @@ def whatsapp_webhook():
                     booking = bookings[selection - 1]
                     booking.is_confirmed = True
                     db.session.commit()
-                    send_confirmation_response(phone_number, booking)
-                    del _pending_selections[phone_number]
+                    send_confirmation_response(chat_id, booking)
+                    del _pending_selections[chat_id]
                     return jsonify({'status': 'ok', 'action': 'confirmed_selection'}), 200
             except ValueError:
                 pass
@@ -431,30 +468,58 @@ def whatsapp_webhook():
                         booking = bookings[selection - 1]
                         booking.is_confirmed = False
                         db.session.commit()
-                        send_cancellation_response(phone_number, booking)
-                        del _pending_selections[phone_number]
+                        send_cancellation_response(chat_id, booking)
+                        del _pending_selections[chat_id]
                         return jsonify({'status': 'ok', 'action': 'cancelled_selection'}), 200
                 except ValueError:
                     pass
             
             # Didn't understand, repeat the selection prompt
-            send_selection_prompt(phone_number, bookings)
+            send_selection_prompt(chat_id, bookings)
             return jsonify({'status': 'ok', 'action': 'selection_repeated'}), 200
         
         # Detect intent
         intent = detect_intent(message_body)
+        print(f"[WEBHOOK] Intent: {intent}", flush=True)
         
         if not intent:
-            send_unknown_response(phone_number, message_body, volunteer)
+            print(f"[WEBHOOK] No intent detected, calling AI...", flush=True)
+            send_unknown_response(chat_id, message_body, volunteer)
+            print(f"[WEBHOOK] AI response sent", flush=True)
             return jsonify({'status': 'ok', 'action': 'unknown'}), 200
         
         # Get pending bookings for tomorrow
         pending_bookings = get_pending_bookings(volunteer)
         
         if not pending_bookings:
-            send_no_booking_response(phone_number)
+            send_no_booking_response(chat_id)
             return jsonify({'status': 'ok', 'action': 'no_booking'}), 200
         
+        # --- Helper: confirm/cancel Nth booking -----------------------
+        def _handle_nth(n: int, confirm: bool):
+            """Confirm or cancel booking number *n* (1-based)."""
+            if 1 <= n <= len(pending_bookings):
+                bk = pending_bookings[n - 1]
+                bk.is_confirmed = confirm
+                db.session.commit()
+                if confirm:
+                    send_confirmation_response(chat_id, bk)
+                else:
+                    send_cancellation_response(chat_id, bk)
+                return True
+            return False
+
+        # --- Handle confirm_N / cancel_N intents ----------------------
+        num_match = re.match(r'(confirm|cancel)_(\d+)', intent or '')
+        if num_match:
+            action, idx = num_match.group(1), int(num_match.group(2))
+            if _handle_nth(idx, confirm=(action == 'confirm')):
+                return jsonify({'status': 'ok', 'action': f'{action}_{idx}'}), 200
+            # Invalid number — fall through to selection prompt
+            _pending_selections[chat_id] = pending_bookings
+            send_selection_prompt(chat_id, pending_bookings)
+            return jsonify({'status': 'ok', 'action': 'bad_number'}), 200
+
         # Handle single booking
         if len(pending_bookings) == 1:
             booking = pending_bookings[0]
@@ -462,13 +527,13 @@ def whatsapp_webhook():
             if intent == 'confirm':
                 booking.is_confirmed = True
                 db.session.commit()
-                send_confirmation_response(phone_number, booking)
+                send_confirmation_response(chat_id, booking)
                 return jsonify({'status': 'ok', 'action': 'confirmed'}), 200
             
             elif intent == 'cancel':
                 booking.is_confirmed = False
                 db.session.commit()
-                send_cancellation_response(phone_number, booking)
+                send_cancellation_response(chat_id, booking)
                 return jsonify({'status': 'ok', 'action': 'cancelled'}), 200
         
         # Multiple bookings
@@ -478,16 +543,19 @@ def whatsapp_webhook():
                 for booking in pending_bookings:
                     booking.is_confirmed = True
                 db.session.commit()
-                send_confirmation_response(phone_number, pending_bookings)
+                send_confirmation_response(chat_id, pending_bookings)
                 return jsonify({'status': 'ok', 'action': 'confirmed_all'}), 200
 
             elif intent == 'cancel':
                 # For cancellation, ask which one
-                _pending_selections[phone_number] = pending_bookings
-                send_selection_prompt(phone_number, pending_bookings)
+                _pending_selections[chat_id] = pending_bookings
+                send_selection_prompt(chat_id, pending_bookings)
                 return jsonify({'status': 'ok', 'action': 'selection_requested'}), 200
         
     except Exception as e:
+        import traceback
+        print(f"[WEBHOOK] EXCEPTION: {e}", flush=True)
+        traceback.print_exc()
         current_app.logger.exception(f"Error processing WhatsApp webhook: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

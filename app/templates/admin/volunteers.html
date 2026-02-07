@@ -1,0 +1,86 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="admin-page-header">
+  <h2><i class="bi bi-person-lines-fill"></i>Wolontariusze</h2>
+  <div class="header-actions">
+    <span class="badge bg-secondary" style="font-size:0.9rem;">{{ volunteers|length }} osób</span>
+  </div>
+</div>
+
+<!-- Search -->
+<div class="admin-card" style="padding: 0.75rem 1.25rem;">
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-search text-muted"></i>
+    <input type="text" id="volunteerSearch" class="form-control form-control-sm border-0" placeholder="Szukaj wolontariusza po imieniu, nazwisku, e-mailu lub telefonie..." style="box-shadow:none;">
+  </div>
+</div>
+
+<div class="admin-card">
+  <div class="table-scroll">
+    <table class="admin-table" id="volunteersTable">
+      <thead>
+        <tr>
+          <th>Imię i nazwisko</th>
+          <th>E-mail</th>
+          <th>Telefon</th>
+          <th class="text-center">Zajęć</th>
+          <th class="text-end">Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for vol, count in volunteers %}
+        <tr class="volunteer-row">
+          <td>
+            <strong>{{ vol.first_name }} {{ vol.last_name }}</strong>
+            {% if vol.is_adult == false %}
+              <span class="badge bg-warning text-dark ms-1" title="Nieletni">U18</span>
+            {% endif %}
+          </td>
+          <td><a href="mailto:{{ vol.email }}">{{ vol.email }}</a></td>
+          <td>
+            {% if vol.phone_number %}
+              <a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ vol.phone_number }}" style="color:#25D366;" title="Czat WhatsApp">
+                <i class="bi bi-whatsapp me-1"></i>{{ vol.phone_number|format_phone }}
+              </a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <span class="badge {% if count > 5 %}bg-success{% elif count > 0 %}bg-primary{% else %}bg-secondary{% endif %}">{{ count }}</span>
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.volunteer_detail', volunteer_id=vol.id) }}" class="btn btn-icon btn-outline-primary" title="Szczegóły">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="noResults" class="text-center text-muted py-3 d-none">
+    <i class="bi bi-search me-1"></i>Brak wyników dla podanego zapytania
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var search = document.getElementById('volunteerSearch');
+  var rows = document.querySelectorAll('.volunteer-row');
+  var noResults = document.getElementById('noResults');
+
+  search.addEventListener('input', function() {
+    var q = search.value.toLowerCase();
+    var anyVisible = false;
+    rows.forEach(function(row) {
+      var text = row.textContent.toLowerCase();
+      var match = !q || text.indexOf(q) !== -1;
+      row.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+    noResults.classList.toggle('d-none', anyVisible);
+  });
+});
+</script>
+{% endblock %}

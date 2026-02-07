@@ -12,6 +12,7 @@ services:
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
       - WHATSAPP_API_URL=http://waha:3000
       - WHATSAPP_SESSION=default
       - WHATSAPP_API_KEY=blindtenis2026
@@ -42,6 +43,8 @@ services:
       - WAHA_API_KEY=blindtenis2026
       - WAHA_DASHBOARD_USERNAME=admin
       - WAHA_DASHBOARD_PASSWORD=blindtenis2026
+      - WHATSAPP_HOOK_URL=http://web:8000/webhook/whatsapp
+      - WHATSAPP_HOOK_EVENTS=message
     volumes:
       - waha_sessions:/app/.sessions
     labels:

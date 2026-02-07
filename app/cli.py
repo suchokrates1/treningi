@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from . import db
 from .models import Training, Booking, Volunteer, EmailSettings
-from .whatsapp_utils import notify_volunteer_reminder, format_phone_display
+from .whatsapp_utils import notify_volunteer_reminder, notify_volunteer_reminder_multi, format_phone_display
 from .email_utils import send_email
 from .template_utils import render_template_string
 
@@ -45,6 +45,10 @@ def send_reminders_command():
     failed_count = 0
     skipped_count = 0
 
+    # Group bookings by volunteer so we can send one combined message
+    from collections import defaultdict
+    volunteer_bookings: dict[int, list] = defaultdict(list)  # vol_id -> [(training, booking)]
+    
     for training in trainings:
         for booking in training.bookings:
             volunteer = booking.volunteer
@@ -78,19 +82,32 @@ def send_reminders_command():
                 continue
             
             # Skip if signed up recently (already got signup confirmation)
-            if booking.timestamp and booking.timestamp > signup_cutoff:
-                current_app.logger.info(
-                    "Booking for %s %s is too recent (signed up %s), skipping reminder",
-                    volunteer.first_name,
-                    volunteer.last_name,
-                    booking.timestamp.strftime('%Y-%m-%d %H:%M'),
-                )
-                skipped_count += 1
-                continue
+            if booking.timestamp:
+                ts = booking.timestamp
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if ts > signup_cutoff:
+                    current_app.logger.info(
+                        "Booking for %s %s is too recent (signed up %s), skipping reminder",
+                        volunteer.first_name,
+                        volunteer.last_name,
+                        booking.timestamp.strftime('%Y-%m-%d %H:%M'),
+                    )
+                    skipped_count += 1
+                    continue
 
-            volunteer_full_name = f"{volunteer.first_name} {volunteer.last_name}"
+            volunteer_bookings[volunteer.id].append((training, booking))
+
+    # Now send one message per volunteer
+    for vol_id, items in volunteer_bookings.items():
+        # Sort by training time
+        items.sort(key=lambda x: x[0].date)
+        volunteer = items[0][1].volunteer
+        volunteer_full_name = f"{volunteer.first_name} {volunteer.last_name}"
+
+        if len(items) == 1:
+            training, booking = items[0]
             coach_full_name = f"{training.coach.first_name} {training.coach.last_name}"
-
             success, error = notify_volunteer_reminder(
                 volunteer_phone=volunteer.phone_number,
                 volunteer_name=volunteer.first_name,
@@ -100,13 +117,28 @@ def send_reminders_command():
                 coach_name=coach_full_name,
                 coach_phone=training.coach.phone_number,
             )
+        else:
+            trainings_info = []
+            for training, booking in items:
+                coach_full_name = f"{training.coach.first_name} {training.coach.last_name}"
+                trainings_info.append({
+                    'time': training.date.strftime('%H:%M'),
+                    'location': training.location.name,
+                    'coach_name': coach_full_name,
+                    'coach_phone': training.coach.phone_number,
+                })
+            success, error = notify_volunteer_reminder_multi(
+                volunteer_phone=volunteer.phone_number,
+                volunteer_name=volunteer.first_name,
+                trainings_info=trainings_info,
+            )
 
-            if success:
-                sent_count += 1
-                click.echo(f"✓ Reminder sent to {volunteer_full_name}")
-            else:
-                failed_count += 1
-                click.echo(f"✗ Failed to send reminder to {volunteer_full_name}: {error}")
+        if success:
+            sent_count += 1
+            click.echo(f"✓ Reminder sent to {volunteer_full_name} ({len(items)} training(s))")
+        else:
+            failed_count += 1
+            click.echo(f"✗ Failed to send reminder to {volunteer_full_name}: {error}")
 
     click.echo(f"\nSummary: {sent_count} sent, {failed_count} failed, {skipped_count} skipped")
 

@@ -39,6 +39,7 @@ from .forms import (
     TrainingSeriesForm,
 )
 from .models import (
+    Booking,
     Coach,
     Training,
     Location,
@@ -46,6 +47,7 @@ from .models import (
     StoredFile,
     TrainingSeries,
     Volunteer,
+    WhatsAppTemplate,
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -307,6 +309,55 @@ def delete_location(location_id):
     return redirect(url_for("admin.manage_locations"))
 
 
+# ── Volunteers ───────────────────────────────────────────────────────────
+
+
+@admin_bp.route("/volunteers")
+@login_required
+def manage_volunteers():
+    """List all volunteers with booking counts."""
+    volunteers = (
+        db.session.query(
+            Volunteer,
+            db.func.count(Booking.id).label("booking_count"),
+        )
+        .outerjoin(Booking, Volunteer.id == Booking.volunteer_id)
+        .group_by(Volunteer.id)
+        .order_by(Volunteer.last_name, Volunteer.first_name)
+        .all()
+    )
+    return render_template(
+        "admin/volunteers.html",
+        volunteers=volunteers,
+    )
+
+
+@admin_bp.route("/volunteers/<int:volunteer_id>")
+@login_required
+def volunteer_detail(volunteer_id):
+    """Show volunteer detail with all their bookings."""
+    volunteer = db.session.get(Volunteer, volunteer_id)
+    if volunteer is None:
+        abort(404)
+
+    bookings = (
+        Booking.query
+        .filter_by(volunteer_id=volunteer_id)
+        .join(Training)
+        .options(
+            joinedload(Booking.training).joinedload(Training.coach),
+            joinedload(Booking.training).joinedload(Training.location),
+        )
+        .order_by(Training.date.desc())
+        .all()
+    )
+    return render_template(
+        "admin/volunteer_detail.html",
+        volunteer=volunteer,
+        bookings=bookings,
+    )
+
+
 @admin_bp.route("/trainings", methods=["GET", "POST"])
 @login_required
 def manage_trainings():
@@ -391,6 +442,30 @@ def manage_trainings():
     for t in trainings:
         month_key = t.date.strftime("%Y-%m")
         trainings_by_month.setdefault(month_key, []).append(t)
+
+    # ── Dashboard stats ────────────────────────────
+    now = datetime.now()
+    current_month_key = now.strftime("%Y-%m")
+    this_month_trainings = trainings_by_month.get(current_month_key, [])
+    stats_total_month = len(this_month_trainings)
+    stats_today = sum(
+        1 for t in trainings if t.date.date() == now.date() and not t.is_canceled
+    )
+    all_bookings = []
+    for t in trainings:
+        all_bookings.extend(t.bookings)
+    stats_volunteers = len(all_bookings)
+    confirmed_count = sum(1 for b in all_bookings if b.is_confirmed is True)
+    stats_confirmed_pct = (
+        round(confirmed_count * 100 / stats_volunteers) if stats_volunteers else 0
+    )
+
+    stats = {
+        "total_month": stats_total_month,
+        "today": stats_today,
+        "volunteers": stats_volunteers,
+        "confirmed_pct": stats_confirmed_pct,
+    }
 
     if form.validate_on_submit():
         planned_dates = []
@@ -503,6 +578,9 @@ def manage_trainings():
         trainings_by_month=trainings_by_month,
         repeat_feedback=repeat_feedback,
         series_summary=series_summary,
+        stats=stats,
+        coaches=Coach.query.order_by(Coach.last_name).all(),
+        locations=Location.query.order_by(Location.name).all(),
     )
 
 
@@ -1328,6 +1406,181 @@ def preview_template(template):
 
 
 # ── WhatsApp Chat Interface ──────────────────────────────────────────────
+
+
+@admin_bp.route("/whatsapp-templates")
+@login_required
+def whatsapp_templates():
+    """Display and edit WhatsApp message templates."""
+    # Default templates – seeded on first visit
+    DEFAULT_TEMPLATES = [
+        {
+            "key": "signup_confirmation",
+            "name": "Potwierdzenie zapisu",
+            "icon": "✅",
+            "description": "Wysyłana do wolontariusza po zapisaniu się na trening.",
+            "recipient": "Wolontariusz",
+            "body": (
+                "✅ Dziękujemy za zapisanie się!\n\n"
+                "Cześć {imię}!\n\n"
+                "Twój zapis na wolontariat został przyjęty:\n\n"
+                "📅 Data: {data}\n"
+                "📍 Miejsce: {miejsce}\n\n"
+                "📧 Sprawdź swoją skrzynkę e-mail — wysłaliśmy Ci szczegółowe informacje oraz potrzebne dokumenty.\n\n"
+                "Do zobaczenia! 🎾\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{imię}", "{data}", "{miejsce}"],
+        },
+        {
+            "key": "volunteer_reminder",
+            "name": "Przypomnienie (1 trening)",
+            "icon": "🎾",
+            "description": "Wysyłana dzień przed treningiem — pojedynczy wolontariat.",
+            "recipient": "Wolontariusz",
+            "body": (
+                "🎾 Przypomnienie o jutrzejszym wolontariacie!\n\n"
+                "Cześć {imię}!\n\n"
+                "Przypominamy, że jutro o {godzina} masz wolontariat:\n\n"
+                "📍 Miejsce: {miejsce}\n"
+                "👨‍🏫 Trener: {trener}\n"
+                "📞 Telefon do trenera: {telefon}\n\n"
+                "✅ Odpisz POTWIERDZAM jeśli będziesz\n"
+                "❌ Odpisz REZYGNUJĘ jeśli nie możesz\n\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{imię}", "{godzina}", "{miejsce}", "{trener}", "{telefon}"],
+        },
+        {
+            "key": "volunteer_reminder_multi",
+            "name": "Przypomnienie (kilka treningów)",
+            "icon": "🎾",
+            "description": "Wysyłana dzień przed, gdy wolontariusz ma kilka wolontariatów.",
+            "recipient": "Wolontariusz",
+            "body": (
+                "🎾 Przypomnienie o jutrzejszych wolontariatach!\n\n"
+                "Cześć {imię}!\n\n"
+                "Jutro masz {liczba} wolontariaty:\n\n"
+                "1. 🕐 {godzina} — 📍 {miejsce}\n"
+                "   👨‍🏫 {trener}, 📞 {telefon}\n\n"
+                "✅ POTWIERDZAM — potwierdź wszystkie\n"
+                "✅ POTWIERDZAM 1 — potwierdź tylko pierwszy\n"
+                "❌ REZYGNUJĘ — zrezygnuj ze wszystkich\n\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{imię}", "{liczba}", "{godzina}", "{miejsce}", "{trener}", "{telefon}"],
+        },
+        {
+            "key": "training_canceled",
+            "name": "Odwołanie treningu",
+            "icon": "⚠️",
+            "description": "Wysyłana do wolontariusza, gdy trening zostaje odwołany.",
+            "recipient": "Wolontariusz",
+            "body": (
+                "⚠️ Trening został odwołany\n\n"
+                "Cześć {imię}!\n\n"
+                "Niestety informujemy, że trening zaplanowany na:\n\n"
+                "📅 Data: {data}\n"
+                "📍 Miejsce: {miejsce}\n\n"
+                "został odwołany.\n\n"
+                "Przepraszamy za utrudnienia.\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{imię}", "{data}", "{miejsce}"],
+        },
+        {
+            "key": "time_changed",
+            "name": "Zmiana godziny",
+            "icon": "⏰",
+            "description": "Wysyłana, gdy administrator zmieni godzinę treningu.",
+            "recipient": "Wolontariusz",
+            "body": (
+                "⏰ Zmiana godziny treningu!\n\n"
+                "Cześć {imię}!\n\n"
+                "Informujemy, że godzina Twojego treningu została zmieniona:\n\n"
+                "📅 Data: {data}\n"
+                "❌ Stara godzina: {stara_godzina}\n"
+                "✅ Nowa godzina: {nowa_godzina}\n"
+                "📍 Miejsce: {miejsce}\n\n"
+                "✅ Odpisz POTWIERDZAM jeśli będziesz o nowej godzinie\n"
+                "❌ Odpisz REZYGNUJĘ jeśli nie możesz\n\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{imię}", "{data}", "{stara_godzina}", "{nowa_godzina}", "{miejsce}"],
+        },
+        {
+            "key": "coach_new_signup",
+            "name": "Nowy zapis — trener",
+            "icon": "📋",
+            "description": "Wysyłana do trenera, gdy nowy wolontariusz zapisze się na trening.",
+            "recipient": "Trener",
+            "body": (
+                "📋 Nowy wolontariusz zapisał się na trening!\n\n"
+                "Cześć {trener}!\n\n"
+                "👤 Wolontariusz: {wolontariusz}\n"
+                "📅 Data: {data}\n"
+                "📍 Miejsce: {miejsce}\n\n"
+                "Pozdrawiamy,\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{trener}", "{wolontariusz}", "{data}", "{miejsce}"],
+        },
+        {
+            "key": "coach_volunteer_canceled",
+            "name": "Wypisanie — trener",
+            "icon": "⚠️",
+            "description": "Wysyłana do trenera, gdy wolontariusz wypisze się z treningu.",
+            "recipient": "Trener",
+            "body": (
+                "⚠️ Wolontariusz wypisał się z treningu\n\n"
+                "Cześć {trener}!\n\n"
+                "👤 Wolontariusz: {wolontariusz}\n"
+                "📅 Data: {data}\n"
+                "📍 Miejsce: {miejsce}\n\n"
+                "Pozdrawiamy,\n"
+                "Fundacja Widzimy Inaczej"
+            ),
+            "variables": ["{trener}", "{wolontariusz}", "{data}", "{miejsce}"],
+        },
+    ]
+
+    # Seed defaults if table is empty
+    if WhatsAppTemplate.query.count() == 0:
+        for tpl_data in DEFAULT_TEMPLATES:
+            tpl = WhatsAppTemplate(
+                key=tpl_data["key"],
+                name=tpl_data["name"],
+                icon=tpl_data["icon"],
+                description=tpl_data["description"],
+                recipient=tpl_data["recipient"],
+                body=tpl_data["body"],
+                variables=tpl_data["variables"],
+            )
+            db.session.add(tpl)
+        db.session.commit()
+
+    templates = WhatsAppTemplate.query.order_by(WhatsAppTemplate.id).all()
+    return render_template("admin/whatsapp_templates.html", templates=templates)
+
+
+@admin_bp.route("/whatsapp-templates/save", methods=["POST"])
+@login_required
+def whatsapp_templates_save():
+    """Save edited WhatsApp template body."""
+    tpl_id = flask_request.form.get("template_id", type=int)
+    new_body = flask_request.form.get("body", "").strip()
+    if not tpl_id or not new_body:
+        flash("Nieprawidłowe dane szablonu.", "danger")
+        return redirect(url_for("admin.whatsapp_templates"))
+
+    tpl = db.session.get(WhatsAppTemplate, tpl_id)
+    if tpl is None:
+        abort(404)
+
+    tpl.body = new_body
+    db.session.commit()
+    flash(f'Szablon "{tpl.name}" został zapisany.', "success")
+    return redirect(url_for("admin.whatsapp_templates"))
 
 
 @admin_bp.route("/whatsapp")
