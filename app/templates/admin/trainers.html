@@ -1,10 +1,16 @@
 {% extends "admin/admin_base.html" %}
 {% block admin_content %}
-<div class="container mt-4">
-  <h2>Trenerzy</h2>
-  <form method="POST" class="mb-4">
+<div class="admin-page-header">
+  <h2><i class="bi bi-people-fill"></i>Trenerzy</h2>
+</div>
+
+<div class="admin-card admin-form">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-person-plus"></i>Dodaj trenera</h4>
+  </div>
+  <form method="POST">
     {{ form.hidden_tag() }}
-    <div class="row g-2">
+    <div class="row g-2 align-items-end">
       <div class="col-md-3">
         {{ form.first_name.label(class="form-label") }}
         {{ form.first_name(class="form-control") }}
@@ -18,32 +24,40 @@
         {{ form.phone_number(class="form-control") }}
       </div>
       <div class="col-md-3">
-        <button class="btn btn-success w-100">Dodaj trenera</button>
+        <button class="btn btn-admin-success w-100"><i class="bi bi-plus-lg me-1"></i>Dodaj trenera</button>
       </div>
     </div>
   </form>
+</div>
 
-  <table class="table table-striped">
-    <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th>Akcje</th></tr></thead>
-    <tbody>
-      {% for coach in coaches %}
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-list-ul"></i>Lista trenerów</h4>
+    <span class="badge bg-secondary ms-auto">{{ coaches|length }}</span>
+  </div>
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th class="text-end">Akcje</th></tr></thead>
+      <tbody>
+        {% for coach in coaches %}
         <tr>
-          <td>{{ coach.first_name }} {{ coach.last_name }}</td>
-          <td><a href="tel:{{ coach.phone_number }}">{{ coach.phone_number|format_phone }}</a></td>
-          <td>
-            <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-sm btn-outline-primary" title="Edytuj">
+          <td><strong>{{ coach.first_name }} {{ coach.last_name }}</strong></td>
+          <td><a href="tel:{{ coach.phone_number }}"><i class="bi bi-telephone me-1"></i>{{ coach.phone_number|format_phone }}</a></td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-icon btn-outline-primary" title="Edytuj">
               <i class="bi bi-pencil"></i>
             </a>
             <form method="POST" action="{{ url_for('admin.delete_trainer', coach_id=coach.id) }}" class="d-inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-secondary" title="Usuń">
+              <button class="btn btn-icon btn-outline-secondary" title="Usuń" data-confirm="Czy na pewno chcesz usunąć trenera {{ coach.first_name }} {{ coach.last_name }}?" data-confirm-label="Tak, usuń">
                 <i class="bi bi-trash"></i>
               </button>
             </form>
           </td>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

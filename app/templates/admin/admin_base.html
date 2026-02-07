@@ -1,34 +1,252 @@
 {% extends "base.html" %}
 {% block extra_head %}
 <link href="{{ url_for('static', filename='vendor/quill/quill.snow.css') }}" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 {% endblock %}
 
 {% block content %}
 {% if session.get('admin_logged_in') %}
-<nav class="container mt-4">
-  <ul class="nav nav-tabs">
-    <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/trainings') %}active{% endif %}" href="{{ url_for('admin.manage_trainings') }}">Treningi</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/trainers') %}active{% endif %}" href="{{ url_for('admin.manage_trainers') }}">Trenerzy</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/locations') %}active{% endif %}" href="/admin/locations">Miejsca</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/history') %}active{% endif %}" href="/admin/history">Historia</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/settings') %}active{% endif %}" href="/admin/settings">Ustawienia</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if request.path.startswith('/admin/whatsapp') %}active{% endif %}" href="/admin/whatsapp" style="color: #25D366;"><i class="bi bi-whatsapp"></i> WhatsApp</a>
-    </li>
-  </ul>
-</nav>
+<!-- Admin Layout: Sidebar + Content -->
+<div class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar" id="adminSidebar">
+    <div class="sidebar-header">
+      <i class="bi bi-shield-lock-fill"></i>
+      <span>Panel admina</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('admin.manage_trainings') }}" class="sidebar-link {% if request.path.startswith('/admin/trainings') or request.path == '/admin/' %}active{% endif %}">
+        <i class="bi bi-calendar-event"></i>
+        <span>Treningi</span>
+      </a>
+      <a href="{{ url_for('admin.manage_trainers') }}" class="sidebar-link {% if '/admin/trainers' in request.path %}active{% endif %}">
+        <i class="bi bi-people-fill"></i>
+        <span>Trenerzy</span>
+      </a>
+      <a href="/admin/locations" class="sidebar-link {% if '/admin/locations' in request.path %}active{% endif %}">
+        <i class="bi bi-geo-alt-fill"></i>
+        <span>Miejsca</span>
+      </a>
+      <a href="/admin/volunteers" class="sidebar-link {% if '/admin/volunteers' in request.path %}active{% endif %}">
+        <i class="bi bi-person-lines-fill"></i>
+        <span>Wolontariusze</span>
+      </a>
+      <a href="/admin/history" class="sidebar-link {% if '/admin/history' in request.path %}active{% endif %}">
+        <i class="bi bi-clock-history"></i>
+        <span>Historia</span>
+      </a>
+      <div class="sidebar-divider"></div>
+      <a href="/admin/settings" class="sidebar-link {% if '/admin/settings' in request.path %}active{% endif %}">
+        <i class="bi bi-gear-fill"></i>
+        <span>Ustawienia e-mail</span>
+      </a>
+      <a href="/admin/whatsapp-templates" class="sidebar-link {% if '/admin/whatsapp-templates' in request.path %}active{% endif %}">
+        <i class="bi bi-chat-dots-fill"></i>
+        <span>Szablony WhatsApp</span>
+      </a>
+      <a href="/admin/whatsapp" class="sidebar-link whatsapp-link {% if request.path == '/admin/whatsapp' %}active{% endif %}">
+        <i class="bi bi-whatsapp"></i>
+        <span>Czat WhatsApp</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="{{ url_for('routes.index') }}" class="sidebar-link">
+        <i class="bi bi-arrow-left-circle"></i>
+        <span>Strona główna</span>
+      </a>
+      <a href="{{ url_for('admin.logout') }}" class="sidebar-link" style="color: #f87171;">
+        <i class="bi bi-box-arrow-left"></i>
+        <span>Wyloguj</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main content area -->
+  <div class="admin-main">
+    <!-- Mobile sidebar toggle -->
+    <button class="sidebar-toggle d-lg-none" id="sidebarToggle" aria-label="Menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    {% block admin_content %}{% endblock %}
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content" style="border-radius:1rem; overflow:hidden;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #dc3545, #a71d2a); color:white; border:0;">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Potwierdzenie</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+        <p id="confirmMessage" class="mb-0 fw-500">Czy na pewno chcesz to zrobić?</p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Anuluj</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmAction">Tak, usuń</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+  {% block admin_content_public %}{% endblock %}
 {% endif %}
-{% block admin_content %}{% endblock %}
+
 <script src="{{ url_for('static', filename='vendor/quill/quill.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/email_editor.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // ── Sidebar toggle ──
+  var toggle = document.getElementById('sidebarToggle');
+  var sidebar = document.getElementById('adminSidebar');
+  if (toggle && sidebar) {
+    toggle.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function(e) {
+      if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && e.target !== toggle && !toggle.contains(e.target)) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // ── Confirmation Modal ──
+  var confirmModal = document.getElementById('confirmModal');
+  if (confirmModal) {
+    var bsModal = new bootstrap.Modal(confirmModal);
+    var pendingForm = null;
+    document.querySelectorAll('[data-confirm]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var msg = btn.getAttribute('data-confirm') || 'Czy na pewno chcesz to zrobić?';
+        var label = btn.getAttribute('data-confirm-label') || 'Tak, usuń';
+        document.getElementById('confirmMessage').textContent = msg;
+        document.getElementById('confirmAction').textContent = label;
+        pendingForm = btn.closest('form');
+        bsModal.show();
+      });
+    });
+    document.getElementById('confirmAction').addEventListener('click', function() {
+      if (pendingForm) { pendingForm.submit(); }
+      bsModal.hide();
+    });
+  }
+
+  // ── Training Filtering ──
+  var filterCoach = document.getElementById('filterCoach');
+  var filterLocation = document.getElementById('filterLocation');
+  if (filterCoach && filterLocation) {
+    function applyFilters() {
+      var coach = filterCoach.value;
+      var loc = filterLocation.value;
+      document.querySelectorAll('.training-row').forEach(function(row) {
+        var matchCoach = !coach || row.getAttribute('data-coach') === coach;
+        var matchLoc = !loc || row.getAttribute('data-location') === loc;
+        row.style.display = (matchCoach && matchLoc) ? '' : 'none';
+      });
+      // Hide empty month cards
+      document.querySelectorAll('#tableView > .admin-card').forEach(function(card) {
+        var rows = card.querySelectorAll('.training-row');
+        if (rows.length === 0) return;
+        var anyVisible = Array.from(rows).some(function(r) { return r.style.display !== 'none'; });
+        card.style.display = anyVisible ? '' : 'none';
+      });
+    }
+    filterCoach.addEventListener('change', applyFilters);
+    filterLocation.addEventListener('change', applyFilters);
+  }
+
+  // ── View Toggle (Table / Calendar) ──
+  var viewTable = document.getElementById('viewTable');
+  var viewCalendar = document.getElementById('viewCalendar');
+  var tableView = document.getElementById('tableView');
+  var calendarView = document.getElementById('calendarView');
+  if (viewTable && viewCalendar && tableView && calendarView) {
+    viewTable.addEventListener('click', function() {
+      tableView.classList.remove('d-none');
+      calendarView.classList.add('d-none');
+      viewTable.classList.add('active');
+      viewCalendar.classList.remove('active');
+    });
+    viewCalendar.addEventListener('click', function() {
+      tableView.classList.add('d-none');
+      calendarView.classList.remove('d-none');
+      viewCalendar.classList.add('active');
+      viewTable.classList.remove('active');
+      renderCalendar();
+    });
+
+    // Calendar data from training rows
+    var calMonth = new Date().getMonth();
+    var calYear = new Date().getFullYear();
+    var monthNames = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+
+    function getTrainingData() {
+      var data = {};
+      document.querySelectorAll('.training-row').forEach(function(row) {
+        var d = row.getAttribute('data-date');
+        var coach = row.getAttribute('data-coach');
+        var loc = row.getAttribute('data-location');
+        var time = row.querySelectorAll('td')[1]?.textContent?.trim() || '';
+        var isCanceled = row.classList.contains('row-canceled');
+        if (!data[d]) data[d] = [];
+        data[d].push({coach: coach, location: loc, time: time, canceled: isCanceled});
+      });
+      return data;
+    }
+
+    function renderCalendar() {
+      var grid = document.getElementById('calendarGrid');
+      var label = document.getElementById('calMonthLabel');
+      if (!grid || !label) return;
+      label.textContent = monthNames[calMonth] + ' ' + calYear;
+
+      var firstDay = new Date(calYear, calMonth, 1).getDay();
+      var offset = (firstDay + 6) % 7; // Mon=0
+      var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      var today = new Date();
+      var tData = getTrainingData();
+
+      var html = '<div class="cal-header">Pn</div><div class="cal-header">Wt</div><div class="cal-header">Śr</div><div class="cal-header">Cz</div><div class="cal-header">Pt</div><div class="cal-header">Sb</div><div class="cal-header">Nd</div>';
+
+      for (var i = 0; i < offset; i++) {
+        html += '<div class="cal-day cal-empty"></div>';
+      }
+
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+        var isToday = (today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === d);
+        var events = tData[dateStr] || [];
+        var cls = 'cal-day' + (isToday ? ' cal-today' : '') + (events.length > 0 ? ' cal-has-events' : '');
+        html += '<div class="' + cls + '">';
+        html += '<div class="cal-day-num">' + d + '</div>';
+        for (var e = 0; e < events.length; e++) {
+          var ev = events[e];
+          var evCls = ev.canceled ? 'cal-event cal-event-canceled' : 'cal-event';
+          html += '<div class="' + evCls + '" title="' + ev.time + ' ' + ev.location + ' (' + ev.coach + ')">';
+          html += '<span class="cal-event-time">' + ev.time + '</span> ';
+          html += '<span class="cal-event-loc">' + ev.location + '</span>';
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+
+      grid.innerHTML = html;
+    }
+
+    document.getElementById('calPrev')?.addEventListener('click', function() {
+      calMonth--;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderCalendar();
+    });
+    document.getElementById('calNext')?.addEventListener('click', function() {
+      calMonth++;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      renderCalendar();
+    });
+  }
+});
+</script>
 {% endblock %}

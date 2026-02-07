@@ -1,0 +1,107 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="admin-page-header">
+  <h2>
+    <a href="{{ url_for('admin.manage_volunteers') }}" class="text-decoration-none" style="color:inherit;">
+      <i class="bi bi-person-lines-fill"></i>Wolontariusze
+    </a>
+    <i class="bi bi-chevron-right" style="font-size:1rem; color:#aaa; margin: 0 0.25rem;"></i>
+    <span>{{ volunteer.first_name }} {{ volunteer.last_name }}</span>
+  </h2>
+</div>
+
+<!-- Volunteer Info Card -->
+<div class="admin-card">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="d-flex align-items-center gap-3">
+        <div style="width:56px; height:56px; border-radius:50%; background: linear-gradient(135deg, #663399, #1e3c72); color:white; display:flex; align-items:center; justify-content:center; font-size:1.4rem; font-weight:700; flex-shrink:0;">
+          {{ volunteer.first_name[0] }}{{ volunteer.last_name[0] }}
+        </div>
+        <div>
+          <h4 class="mb-0" style="font-weight:700;">{{ volunteer.first_name }} {{ volunteer.last_name }}</h4>
+          {% if volunteer.is_adult == false %}
+            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Nieletni</span>
+          {% elif volunteer.is_adult == true %}
+            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Pełnoletni</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="d-flex flex-column gap-1">
+        <div>
+          <i class="bi bi-envelope me-2 text-muted"></i>
+          <a href="mailto:{{ volunteer.email }}">{{ volunteer.email }}</a>
+        </div>
+        {% if volunteer.phone_number %}
+        <div>
+          <i class="bi bi-whatsapp me-2" style="color:#25D366;"></i>
+          <a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ volunteer.phone_number }}" style="color:#25D366;">
+            {{ volunteer.phone_number|format_phone }}
+          </a>
+        </div>
+        {% else %}
+        <div>
+          <i class="bi bi-phone me-2 text-muted"></i>
+          <span class="text-muted">Brak numeru telefonu</span>
+        </div>
+        {% endif %}
+        <div>
+          <i class="bi bi-calendar-check me-2 text-muted"></i>
+          <strong>{{ bookings|length }}</strong> zajęć łącznie
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bookings History -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-clock-history"></i>Historia zajęć</h4>
+    <span class="badge bg-secondary ms-auto">{{ bookings|length }}</span>
+  </div>
+  {% if bookings %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Godzina</th>
+          <th>Miejsce</th>
+          <th>Trener</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for booking in bookings %}
+        <tr class="{% if booking.training.is_canceled %}row-canceled{% endif %}">
+          <td><strong>{{ booking.training.date.strftime('%d.%m.%Y') }}</strong></td>
+          <td>{{ booking.training.date.strftime('%H:%M') }}</td>
+          <td><i class="bi bi-geo-alt me-1 text-muted"></i>{{ booking.training.location.name }}</td>
+          <td>{{ booking.training.coach.first_name }} {{ booking.training.coach.last_name }}</td>
+          <td>
+            {% if booking.training.is_canceled %}
+              <span class="badge-canceled">Odwołany</span>
+            {% elif booking.is_confirmed == true %}
+              <span class="badge-confirmed">✅ Potwierdzony</span>
+            {% elif booking.is_confirmed == false %}
+              <span class="badge-declined">❌ Odmówiony</span>
+            {% else %}
+              <span class="badge-pending">⏳ Oczekuje</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4">
+    <i class="bi bi-calendar-x" style="font-size:2rem;"></i>
+    <p class="mt-2 mb-0">Ten wolontariusz nie ma jeszcze żadnych zapisów.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

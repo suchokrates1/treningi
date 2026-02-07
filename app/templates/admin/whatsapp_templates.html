@@ -1,0 +1,95 @@
+{% extends "admin/admin_base.html" %}
+{% block admin_content %}
+<div class="admin-page-header">
+  <h2><i class="bi bi-chat-dots-fill"></i>Szablony wiadomości WhatsApp</h2>
+</div>
+
+<div class="alert alert-info mb-4">
+  <i class="bi bi-info-circle me-1"></i>
+  Edytuj treść szablonów wiadomości WhatsApp. Zmienne w nawiasach <code>{}</code> są zastępowane prawdziwymi danymi.
+  Po zapisaniu zmian, system będzie używał zaktualizowanej treści.
+</div>
+
+<div class="row g-4">
+  {% for tpl in templates %}
+  <div class="col-lg-6 col-xl-4">
+    <div class="admin-card h-100 d-flex flex-column">
+      <div class="admin-card-header">
+        <h4>
+          <span class="me-1">{{ tpl.icon }}</span>{{ tpl.name }}
+        </h4>
+      </div>
+      <p class="small text-muted mb-2">
+        <i class="bi bi-arrow-right me-1"></i>{{ tpl.description }}
+      </p>
+      <span class="badge bg-light text-dark border mb-2" style="width:fit-content;">
+        <i class="bi bi-person me-1"></i>{{ tpl.recipient }}
+      </span>
+
+      <div class="wa-tpl-tabs mb-2">
+        <button type="button" class="btn btn-sm btn-outline-primary active wa-tab-btn" data-tpl="{{ tpl.id }}" data-panel="preview">
+          <i class="bi bi-eye me-1"></i>Podgląd
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary wa-tab-btn" data-tpl="{{ tpl.id }}" data-panel="edit">
+          <i class="bi bi-pencil me-1"></i>Edytuj
+        </button>
+      </div>
+
+      <div class="flex-grow-1" id="preview-{{ tpl.id }}">
+        <div class="wa-phone-preview mt-2">
+          <div class="wa-phone-header">
+            <i class="bi bi-whatsapp"></i>
+            <span>{{ tpl.recipient }}</span>
+          </div>
+          <div class="wa-phone-body">
+            <div class="wa-phone-bubble">{{ tpl.body }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-none flex-grow-1" id="edit-{{ tpl.id }}">
+        <form method="POST" action="{{ url_for('admin.whatsapp_templates_save') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="template_id" value="{{ tpl.id }}">
+          <textarea name="body" class="form-control" rows="10" style="font-size:0.85rem; white-space:pre-wrap;">{{ tpl.body }}</textarea>
+          <button type="submit" class="btn btn-admin-success btn-sm mt-2 w-100">
+            <i class="bi bi-check-lg me-1"></i>Zapisz szablon
+          </button>
+        </form>
+      </div>
+
+      {% if tpl.variables %}
+      <div class="mt-auto pt-2">
+        <small class="text-muted"><i class="bi bi-braces me-1"></i>Zmienne:</small>
+        {% for v in tpl.variables %}
+        <span class="badge bg-light text-dark border ms-1">{{ v }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.wa-tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = btn.getAttribute('data-tpl');
+      var panel = btn.getAttribute('data-panel');
+      var previewEl = document.getElementById('preview-' + id);
+      var editEl = document.getElementById('edit-' + id);
+      if (panel === 'edit') {
+        previewEl.classList.add('d-none');
+        editEl.classList.remove('d-none');
+      } else {
+        previewEl.classList.remove('d-none');
+        editEl.classList.add('d-none');
+      }
+      btn.parentElement.querySelectorAll('.wa-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+});
+</script>
+{% endblock %}

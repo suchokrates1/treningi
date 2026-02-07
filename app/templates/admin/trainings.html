@@ -1,32 +1,70 @@
 {% extends "admin/admin_base.html" %}
 {% block admin_content %}
-<div class="container mt-4">
-  <h2>Treningi</h2>
-<div class="d-flex justify-content-end mb-3">
-  <a href="{{ url_for('admin.export_excel') }}" class="btn btn-outline-primary me-2">
-    📥 Eksportuj do Excela
-  </a>
-  <a href="{{ url_for('admin.import_excel') }}" class="btn btn-outline-success">
-    📤 Importuj z Excela
-  </a>
+<div class="admin-page-header">
+  <h2><i class="bi bi-calendar-event"></i>Treningi</h2>
+  <div class="header-actions">
+    <a href="{{ url_for('admin.export_excel') }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-download me-1"></i>Eksport Excel
+    </a>
+    <a href="{{ url_for('admin.import_excel') }}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-upload me-1"></i>Import Excel
+    </a>
+  </div>
 </div>
 
-  <form method="POST" class="mb-4">
+<!-- Dashboard Stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="bi bi-calendar-event"></i></div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.total_month }}</div>
+      <div class="stat-label">Treningów w tym miesiącu</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="bi bi-calendar-check"></i></div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.today }}</div>
+      <div class="stat-label">Treningów dzisiaj</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="bi bi-people"></i></div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.volunteers }}</div>
+      <div class="stat-label">Zapisanych wolontariuszy</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="bi bi-check-circle"></i></div>
+    <div class="stat-info">
+      <div class="stat-value">{{ stats.confirmed_pct }}%</div>
+      <div class="stat-label">Potwierdzonych</div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Training Form -->
+<div class="admin-card admin-form">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-plus-circle"></i>Dodaj trening</h4>
+  </div>
+  <form method="POST">
     {{ form.hidden_tag() }}
-    <div class="row g-2 align-items-end row-cols-lg-auto">
-      <div class="col-auto col-lg-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
         {{ form.date.label(class="form-label") }}
         {{ form.date(class="form-control") }}
       </div>
-      <div class="col-auto col-lg-3">
+      <div class="col-md-3">
         {{ form.location_id.label(class="form-label") }}
         {{ form.location_id(class="form-select") }}
       </div>
-      <div class="col-auto col-lg-3">
+      <div class="col-md-3">
         {{ form.coach_id.label(class="form-label") }}
         {{ form.coach_id(class="form-select") }}
       </div>
-      <div class="col-auto col-lg-2">
+      <div class="col-md-2">
         {{ form.max_volunteers.label(class="form-label") }}
         {{ form.max_volunteers(class="form-control") }}
       </div>
@@ -55,9 +93,7 @@
           </div>
         </div>
         <div class="col-auto">
-          {% set weekday_names = [
-            'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'
-          ] %}
+          {% set weekday_names = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'] %}
           {% set weekday_value = '–' %}
           {% if form.date.data %}
             {% set weekday_index = form.date.data.weekday() %}
@@ -71,15 +107,10 @@
         </div>
       </div>
       <div class="mt-3 d-flex flex-wrap gap-2">
-        <button type="submit" class="btn btn-success">Dodaj pojedynczy trening</button>
-        <button
-          type="submit"
-          name="create_schedule"
-          value="1"
-          class="btn btn-outline-primary{% if not form.repeat.data %} d-none{% endif %}"
-          id="schedule-button"
-        >
-          Dodaj harmonogram treningów
+        <button type="submit" class="btn btn-admin-success"><i class="bi bi-plus-lg me-1"></i>Dodaj pojedynczy trening</button>
+        <button type="submit" name="create_schedule" value="1"
+                class="btn btn-admin-primary{% if not form.repeat.data %} d-none{% endif %}" id="schedule-button">
+          <i class="bi bi-calendar-plus me-1"></i>Dodaj harmonogram treningów
         </button>
       </div>
       {% if repeat_feedback %}
@@ -96,126 +127,210 @@
       {% endif %}
     </div>
     <div class="mt-3{% if form.repeat.data %} d-none{% endif %}" id="single-submit-fallback">
-      <button type="submit" class="btn btn-success">Dodaj pojedynczy trening</button>
+      <button type="submit" class="btn btn-admin-success"><i class="bi bi-plus-lg me-1"></i>Dodaj pojedynczy trening</button>
     </div>
   </form>
+</div>
 
-  <h4 class="mt-4">Harmonogram</h4>
-  <div class="table-responsive">
-    <table class="table table-striped table-sm align-middle">
+<!-- Schedule Summary -->
+{% if series_summary %}
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-arrow-repeat"></i>Harmonogram</h4>
+  </div>
+  <div class="table-scroll">
+    <table class="admin-table">
       <thead>
         <tr>
-          <th>Dzień tygodnia</th>
+          <th>Dzień</th>
           <th>Godzina</th>
           <th>Trener</th>
           <th>Miejsce</th>
-          <th>Liczba treningów</th>
+          <th>Treningów</th>
           <th>Zakres dat</th>
           <th class="text-end">Akcje</th>
         </tr>
       </thead>
       <tbody>
-        {% if series_summary %}
-          {% for series in series_summary %}
-            <tr>
-              <td>{{ series.weekday_label }}</td>
-              <td>{{ series.time_label }}</td>
-              <td>{{ series.coach_name }}</td>
-              <td>{{ series.location_name }}</td>
-              <td>{{ series.count }}</td>
-              <td>
-                {{ series.first_date.strftime('%Y-%m-%d') }} –
-                {{ series.last_date.strftime('%Y-%m-%d') }}
-              </td>
-              <td class="text-end">
-                <a href="{{ url_for('admin.edit_series', series_key=series.series_key) }}" class="btn btn-sm btn-outline-primary me-1">
-                  Edytuj
-                </a>
-                <form method="post" action="{{ url_for('admin.delete_series', series_key=series.series_key) }}" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button class="btn btn-sm btn-outline-danger">Usuń</button>
-                </form>
-              </td>
-            </tr>
-          {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="7" class="text-center text-muted">Brak zaplanowanych treningów.</td>
-          </tr>
-        {% endif %}
+        {% for series in series_summary %}
+        <tr>
+          <td><strong>{{ series.weekday_label }}</strong></td>
+          <td>{{ series.time_label }}</td>
+          <td>{{ series.coach_name }}</td>
+          <td>{{ series.location_name }}</td>
+          <td><span class="badge bg-secondary">{{ series.count }}</span></td>
+          <td class="small">{{ series.first_date.strftime('%d.%m.%Y') }} – {{ series.last_date.strftime('%d.%m.%Y') }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.edit_series', series_key=series.series_key) }}" class="btn btn-icon btn-outline-primary" title="Edytuj">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{{ url_for('admin.delete_series', series_key=series.series_key) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-icon btn-outline-danger" title="Usuń serię" data-confirm="Czy na pewno chcesz usunąć tę serię treningów?" data-confirm-label="Tak, usuń serię">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
+</div>
+{% endif %}
 
-  {% for month, ts in trainings_by_month.items() %}
-  <h4 class="mt-4">{{ month|replace("-", " / ") }}</h4>
-  <table class="table table-striped table-sm">
-    <thead>
-      <tr>
-        <th>Data</th>
-        <th>Godzina</th>
-        <th>Miejsce</th>
-        <th>Trener</th>
-        <th>Telefon trenera</th>
-        <th>Wolontariusz 1</th>
-        <th>Wolontariusz 2</th>
-        <th>Akcje</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in ts %}
-      <tr class="{% if t.is_canceled %}table-danger{% endif %}">
-        <td>{{ t.date.strftime('%Y-%m-%d') }}</td>
-        <td>{{ t.date.strftime('%H:%M') }}</td>
-        <td>{{ t.location.name }}</td>
-        <td>{{ t.coach.first_name }} {{ t.coach.last_name }}</td>
-        <td><a href="tel:{{ t.coach.phone_number }}">{{ t.coach.phone_number }}</a></td>
-        {% set b1 = t.bookings[0].volunteer if t.bookings|length > 0 else None %}
-        {% set b2 = t.bookings[1].volunteer if t.bookings|length > 1 else None %}
-        <td>
-          {% if b1 %}
-            {{ b1.first_name }} {{ b1.last_name }}
-            <br><small class="text-muted">{{ b1.email }}</small>
-            {% if b1.phone_number %}
-              <br><a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ b1.phone_number }}" title="Otwórz czat WhatsApp"><i class="bi bi-whatsapp" style="color:#25D366;"></i> {{ b1.phone_number|format_phone }}</a>
+<!-- Training List by Month -->
+<!-- Filter & View Toggle Bar -->
+<div class="admin-card" style="padding: 1rem 1.5rem;">
+  <div class="d-flex flex-wrap align-items-center gap-3">
+    <div class="d-flex align-items-center gap-2 flex-wrap flex-grow-1">
+      <i class="bi bi-funnel text-muted"></i>
+      <select id="filterCoach" class="form-select form-select-sm" style="max-width:180px;">
+        <option value="">Wszyscy trenerzy</option>
+        {% for c in coaches %}
+        <option value="{{ c.first_name }} {{ c.last_name }}">{{ c.first_name }} {{ c.last_name }}</option>
+        {% endfor %}
+      </select>
+      <select id="filterLocation" class="form-select form-select-sm" style="max-width:180px;">
+        <option value="">Wszystkie miejsca</option>
+        {% for loc in locations %}
+        <option value="{{ loc.name }}">{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Widok">
+      <button type="button" class="btn btn-outline-primary active" id="viewTable" title="Widok tabeli">
+        <i class="bi bi-table"></i>
+      </button>
+      <button type="button" class="btn btn-outline-primary" id="viewCalendar" title="Widok kalendarza">
+        <i class="bi bi-calendar3"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TABLE VIEW -->
+<div id="tableView">
+{% for month, ts in trainings_by_month.items() %}
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h4><i class="bi bi-calendar3"></i>{{ month|replace("-", " / ") }}</h4>
+    <span class="badge bg-secondary ms-auto">{{ ts|length }} treningów</span>
+  </div>
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Godzina</th>
+          <th>Miejsce</th>
+          <th>Trener</th>
+          <th>Wolontariusz 1</th>
+          <th>Wolontariusz 2</th>
+          <th class="text-end">Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in ts %}
+        <tr class="training-row {% if t.is_canceled %}row-canceled{% endif %}" data-coach="{{ t.coach.first_name }} {{ t.coach.last_name }}" data-location="{{ t.location.name }}" data-date="{{ t.date.strftime('%Y-%m-%d') }}">
+          <td><strong>{{ t.date.strftime('%d.%m') }}</strong></td>
+          <td>{{ t.date.strftime('%H:%M') }}</td>
+          <td>{{ t.location.name }}</td>
+          <td>
+            {{ t.coach.first_name }} {{ t.coach.last_name }}
+            <br><small><a href="tel:{{ t.coach.phone_number }}">{{ t.coach.phone_number|format_phone }}</a></small>
+          </td>
+          {% set b1 = t.bookings[0] if t.bookings|length > 0 else None %}
+          {% set b2 = t.bookings[1] if t.bookings|length > 1 else None %}
+          <td>
+            {% if b1 %}
+              <div class="vol-slot">
+                <div>
+                  <div class="vol-name">{{ b1.volunteer.first_name }} {{ b1.volunteer.last_name }}</div>
+                  <div class="vol-contact">{{ b1.volunteer.email }}</div>
+                  {% if b1.volunteer.phone_number %}
+                    <a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ b1.volunteer.phone_number }}" class="small" style="color: #25D366;" title="Czat WhatsApp">
+                      <i class="bi bi-whatsapp"></i> {{ b1.volunteer.phone_number|format_phone }}
+                    </a>
+                  {% endif %}
+                </div>
+                {% if b1.is_confirmed == true %}
+                  <span class="badge-confirmed ms-1" title="Potwierdzono">✅</span>
+                {% elif b1.is_confirmed == false %}
+                  <span class="badge-declined ms-1" title="Odmówiono">❌</span>
+                {% else %}
+                  <span class="badge-pending ms-1" title="Oczekuje">⏳</span>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="vol-slot-empty">— wolne —</span>
             {% endif %}
-          {% endif %}
-        </td>
-        <td>
-          {% if b2 %}
-            {{ b2.first_name }} {{ b2.last_name }}
-            <br><small class="text-muted">{{ b2.email }}</small>
-            {% if b2.phone_number %}
-              <br><a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ b2.phone_number }}" title="Otwórz czat WhatsApp"><i class="bi bi-whatsapp" style="color:#25D366;"></i> {{ b2.phone_number|format_phone }}</a>
+          </td>
+          <td>
+            {% if b2 %}
+              <div class="vol-slot">
+                <div>
+                  <div class="vol-name">{{ b2.volunteer.first_name }} {{ b2.volunteer.last_name }}</div>
+                  <div class="vol-contact">{{ b2.volunteer.email }}</div>
+                  {% if b2.volunteer.phone_number %}
+                    <a href="{{ url_for('admin.whatsapp_chat') }}?phone={{ b2.volunteer.phone_number }}" class="small" style="color: #25D366;" title="Czat WhatsApp">
+                      <i class="bi bi-whatsapp"></i> {{ b2.volunteer.phone_number|format_phone }}
+                    </a>
+                  {% endif %}
+                </div>
+                {% if b2.is_confirmed == true %}
+                  <span class="badge-confirmed ms-1" title="Potwierdzono">✅</span>
+                {% elif b2.is_confirmed == false %}
+                  <span class="badge-declined ms-1" title="Odmówiono">❌</span>
+                {% else %}
+                  <span class="badge-pending ms-1" title="Oczekuje">⏳</span>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="vol-slot-empty">— wolne —</span>
             {% endif %}
-          {% endif %}
-        </td>
-        <td>
-          <a href="{{ url_for('admin.edit_training', training_id=t.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edytuj">
-            <i class="bi bi-pencil"></i>
-          </a>
-          {% if t.is_canceled %}
-            <span class="text-danger me-1">Odwołany</span>
-          {% else %}
-            <form method="post" action="{{ url_for('admin.cancel_training', training_id=t.id) }}" class="d-inline me-1">
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('admin.edit_training', training_id=t.id) }}" class="btn btn-icon btn-outline-primary" title="Edytuj">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% if t.is_canceled %}
+              <span class="badge-canceled">Odwołany</span>
+            {% else %}
+              <form method="post" action="{{ url_for('admin.cancel_training', training_id=t.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-icon btn-outline-warning" title="Odwołaj" data-confirm="Czy na pewno chcesz odwołać ten trening? Wolontariusze zostaną powiadomieni." data-confirm-label="Tak, odwołaj">
+                  <i class="bi bi-calendar-x"></i>
+                </button>
+              </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin.delete_training', training_id=t.id) }}" class="d-inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger" title="Odwołaj">
-                <i class="bi bi-calendar-x"></i>
+              <button class="btn btn-icon btn-outline-secondary" title="Usuń" data-confirm="Czy na pewno chcesz usunąć ten trening?" data-confirm-label="Tak, usuń">
+                <i class="bi bi-trash"></i>
               </button>
             </form>
-          {% endif %}
-          <form method="post" action="{{ url_for('admin.delete_training', training_id=t.id) }}" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-outline-secondary" title="Usuń">
-              <i class="bi bi-trash"></i>
-            </button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
+{% endfor %}
+</div><!-- /tableView -->
+
+<!-- CALENDAR VIEW -->
+<div id="calendarView" class="d-none">
+  <div class="admin-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <button class="btn btn-outline-primary btn-sm" id="calPrev"><i class="bi bi-chevron-left"></i></button>
+      <h4 class="mb-0" id="calMonthLabel" style="font-weight:700; color:#663399;"></h4>
+      <button class="btn btn-outline-primary btn-sm" id="calNext"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/trainings_form.js') }}"></script>
 {% endblock %}

@@ -1,10 +1,18 @@
 {% extends "admin/admin_base.html" %}
 {% block admin_content %}
-<div class="container mt-4">
-  <h2>Ustawienia e-mail</h2>
-  <form method="POST" enctype="multipart/form-data">
-    {{ form.csrf_token }}
-    <div class="row g-2">
+<div class="admin-page-header">
+  <h2><i class="bi bi-gear-fill"></i>Ustawienia e-mail</h2>
+</div>
+
+<form method="POST" enctype="multipart/form-data">
+  {{ form.csrf_token }}
+
+  <!-- SMTP Configuration -->
+  <div class="admin-card admin-form">
+    <div class="admin-card-header">
+      <h4><i class="bi bi-server"></i>Konfiguracja SMTP</h4>
+    </div>
+    <div class="row g-3">
       <div class="col-md-4">
         {{ form.server.label(class="form-label") }}
         {{ form.server(class="form-control") }}
@@ -17,138 +25,156 @@
         {{ form.encryption.label(class="form-label") }}
         {{ form.encryption(class="form-select") }}
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         {{ form.login.label(class="form-label") }}
         {{ form.login(class="form-control") }}
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         {{ form.password.label(class="form-label") }}
         {{ form.password(class="form-control") }}
       </div>
-    </div>
-    <div class="row g-2 mt-2">
-      <div class="col-md-6">
+      <div class="col-md-4">
         {{ form.sender.label(class="form-label") }}
         {{ form.sender(class="form-control") }}
         <div class="form-text">{{ form.sender.description }}</div>
       </div>
-    </div>
-    <div class="row g-2 mt-2">
-      <div class="col-md-6">
+      <div class="col-md-4">
         {{ form.test_recipient.label(class="form-label") }}
         {{ form.test_recipient(class="form-control") }}
       </div>
     </div>
-    <div class="mb-3 mt-2">
-      {{ form.registration_template.label(class="form-label") }}
-      {{ form.registration_template(id="registration_template") }}
-      <div id="registration_editor" class="quill-wrapper" style="height:200px;"></div>
-      <textarea id="registration_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
-      <div class="mt-2">
-        {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}', '{logo}'] %}
-        <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
-        {% endfor %}
-        <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="registration" data-editor="registration_editor">Podgląd</button>
-        <div class="form-check form-switch d-inline-block ms-2">
-          <input class="form-check-input html-toggle" type="checkbox" role="switch" id="registration_html_toggle" data-editor="registration_editor">
-          <label class="form-check-label" for="registration_html_toggle">Edytuj HTML</label>
-        </div>
+  </div>
+
+  <!-- Registration template -->
+  <div class="admin-card admin-form">
+    <div class="admin-card-header">
+      <h4><i class="bi bi-envelope-check"></i>Szablon potwierdzenia rejestracji</h4>
+    </div>
+    {{ form.registration_template(id="registration_template") }}
+    <div id="registration_editor" class="quill-wrapper" style="height:200px;"></div>
+    <textarea id="registration_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
+    <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
+      {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}', '{logo}'] %}
+      <button type="button" class="btn btn-sm btn-outline-secondary insert-var" data-editor="registration_editor" data-value="{{ var }}">{{ var }}</button>
+      {% endfor %}
+      <button type="button" class="btn btn-sm btn-admin-primary ms-2 preview-btn" data-template="registration" data-editor="registration_editor"><i class="bi bi-eye me-1"></i>Podgląd</button>
+      <div class="form-check form-switch d-inline-block ms-2">
+        <input class="form-check-input html-toggle" type="checkbox" role="switch" id="registration_html_toggle" data-editor="registration_editor">
+        <label class="form-check-label" for="registration_html_toggle">HTML</label>
       </div>
     </div>
-    <div class="mb-3">
-      {{ form.registration_files_adult.label(class="form-label") }}
-      {{ form.registration_files_adult(class="form-control", multiple=True) }}
-      <div class="form-text">Dodaj dokumenty wysyłane do osób pełnoletnich.</div>
-      {% if form.remove_adult_files.choices %}
-      <div class="mt-2">
-        <p class="mb-1">Istniejące załączniki:</p>
-        {% for subfield in form.remove_adult_files %}
-        <div class="d-flex align-items-center mb-1">
-          <div class="form-check mb-0">
-            {{ subfield(class="form-check-input", id=subfield.id) }}
-            <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
-          </div>
-          <button type="button"
-                  class="btn btn-sm btn-outline-danger ms-2 remove-attachment-btn"
-                  data-target="{{ subfield.id }}"
-                  data-confirm="Czy na pewno chcesz usunąć ten załącznik?">
-            Usuń
-          </button>
-        </div>
-        {% endfor %}
-        <div class="form-text">Zaznacz pliki, które mają zostać usunięte.</div>
-      </div>
-      {% else %}
-      <div class="form-text">Brak zapisanych załączników dla osób pełnoletnich.</div>
-      {% endif %}
+  </div>
+
+  <!-- Attachments (adult) -->
+  <div class="admin-card admin-form">
+    <div class="admin-card-header">
+      <h4><i class="bi bi-paperclip"></i>Załączniki — osoby pełnoletnie</h4>
     </div>
-    <div class="mb-3">
-      {{ form.registration_files_minor.label(class="form-label") }}
-      {{ form.registration_files_minor(class="form-control", multiple=True) }}
-      <div class="form-text">Dodaj dokumenty wysyłane do osób niepełnoletnich.</div>
-      {% if form.remove_minor_files.choices %}
-      <div class="mt-2">
-        <p class="mb-1">Istniejące załączniki:</p>
-        {% for subfield in form.remove_minor_files %}
-        <div class="d-flex align-items-center mb-1">
-          <div class="form-check mb-0">
-            {{ subfield(class="form-check-input", id=subfield.id) }}
-            <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
-          </div>
-          <button type="button"
-                  class="btn btn-sm btn-outline-danger ms-2 remove-attachment-btn"
-                  data-target="{{ subfield.id }}"
-                  data-confirm="Czy na pewno chcesz usunąć ten załącznik?">
-            Usuń
-          </button>
+    {{ form.registration_files_adult(class="form-control", multiple=True) }}
+    <div class="form-text mt-1">Dodaj dokumenty wysyłane do osób pełnoletnich.</div>
+    {% if form.remove_adult_files.choices %}
+    <div class="mt-2">
+      <p class="mb-1 fw-semibold small">Istniejące załączniki:</p>
+      {% for subfield in form.remove_adult_files %}
+      <div class="d-flex align-items-center mb-1">
+        <div class="form-check mb-0">
+          {{ subfield(class="form-check-input", id=subfield.id) }}
+          <label class="form-check-label small" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
         </div>
-        {% endfor %}
-        <div class="form-text">Zaznacz pliki, które mają zostać usunięte.</div>
+        <button type="button"
+                class="btn btn-sm btn-outline-danger ms-2 remove-attachment-btn"
+                data-target="{{ subfield.id }}"
+                data-confirm="Czy na pewno chcesz usunąć ten załącznik?">
+          <i class="bi bi-trash"></i>
+        </button>
       </div>
-      {% else %}
-      <div class="form-text">Brak zapisanych załączników dla osób niepełnoletnich.</div>
-      {% endif %}
+      {% endfor %}
     </div>
-    <div class="mb-3">
-      {{ form.cancellation_template.label(class="form-label") }}
-      {{ form.cancellation_template(id="cancellation_template") }}
-      <div id="cancellation_editor" class="quill-wrapper" style="height:200px;"></div>
-      <textarea id="cancellation_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
-      <div class="mt-2">
-        {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}', '{logo}'] %}
-        <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
-        {% endfor %}
-        <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="cancellation" data-editor="cancellation_editor">Podgląd</button>
-        <div class="form-check form-switch d-inline-block ms-2">
-          <input class="form-check-input html-toggle" type="checkbox" role="switch" id="cancellation_html_toggle" data-editor="cancellation_editor">
-          <label class="form-check-label" for="cancellation_html_toggle">Edytuj HTML</label>
-        </div>
-      </div>
+    {% else %}
+    <div class="form-text text-muted"><i class="bi bi-info-circle me-1"></i>Brak zapisanych załączników.</div>
+    {% endif %}
+  </div>
+
+  <!-- Attachments (minor) -->
+  <div class="admin-card admin-form">
+    <div class="admin-card-header">
+      <h4><i class="bi bi-paperclip"></i>Załączniki — osoby niepełnoletnie</h4>
     </div>
-    <div class="mb-3">
-      {{ form.phone_request_template.label(class="form-label") }}
-      {{ form.phone_request_template(id="phone_request_template") }}
-      <div id="phone_request_editor" class="quill-wrapper" style="height:200px;"></div>
-      <textarea id="phone_request_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
-      <div class="mt-2">
-        {% for var in ['{first_name}', '{last_name}', '{email}', '{update_link}', '{logo}'] %}
-        <button type="button" class="btn btn-sm btn-secondary insert-var" data-editor="phone_request_editor" data-value="{{ var }}">{{ var }}</button>
-        {% endfor %}
-        <button type="button" class="btn btn-sm btn-outline-primary ms-2 preview-btn" data-template="phone_request" data-editor="phone_request_editor">Podgląd</button>
-        <div class="form-check form-switch d-inline-block ms-2">
-          <input class="form-check-input html-toggle" type="checkbox" role="switch" id="phone_request_html_toggle" data-editor="phone_request_editor">
-          <label class="form-check-label" for="phone_request_html_toggle">Edytuj HTML</label>
+    {{ form.registration_files_minor(class="form-control", multiple=True) }}
+    <div class="form-text mt-1">Dodaj dokumenty wysyłane do osób niepełnoletnich.</div>
+    {% if form.remove_minor_files.choices %}
+    <div class="mt-2">
+      <p class="mb-1 fw-semibold small">Istniejące załączniki:</p>
+      {% for subfield in form.remove_minor_files %}
+      <div class="d-flex align-items-center mb-1">
+        <div class="form-check mb-0">
+          {{ subfield(class="form-check-input", id=subfield.id) }}
+          <label class="form-check-label small" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
         </div>
+        <button type="button"
+                class="btn btn-sm btn-outline-danger ms-2 remove-attachment-btn"
+                data-target="{{ subfield.id }}"
+                data-confirm="Czy na pewno chcesz usunąć ten załącznik?">
+          <i class="bi bi-trash"></i>
+        </button>
       </div>
-      <div class="form-text mt-2">
-        <strong>Uwaga:</strong> Ten szablon jest używany do wysyłania jednorazowych maili do wolontariuszy bez numeru telefonu.
-        Uruchom komendę <code>flask send-phone-requests</code> aby wysłać kampanię.
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="form-text text-muted"><i class="bi bi-info-circle me-1"></i>Brak zapisanych załączników.</div>
+    {% endif %}
+  </div>
+
+  <!-- Cancellation template -->
+  <div class="admin-card admin-form">
+    <div class="admin-card-header">
+      <h4><i class="bi bi-envelope-x"></i>Szablon odwołania treningu</h4>
+    </div>
+    {{ form.cancellation_template(id="cancellation_template") }}
+    <div id="cancellation_editor" class="quill-wrapper" style="height:200px;"></div>
+    <textarea id="cancellation_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
+    <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
+      {% for var in ['{first_name}', '{last_name}', '{training}', '{cancel_link}', '{date}', '{location}', '{logo}'] %}
+      <button type="button" class="btn btn-sm btn-outline-secondary insert-var" data-editor="cancellation_editor" data-value="{{ var }}">{{ var }}</button>
+      {% endfor %}
+      <button type="button" class="btn btn-sm btn-admin-primary ms-2 preview-btn" data-template="cancellation" data-editor="cancellation_editor"><i class="bi bi-eye me-1"></i>Podgląd</button>
+      <div class="form-check form-switch d-inline-block ms-2">
+        <input class="form-check-input html-toggle" type="checkbox" role="switch" id="cancellation_html_toggle" data-editor="cancellation_editor">
+        <label class="form-check-label" for="cancellation_html_toggle">HTML</label>
       </div>
     </div>
-  {{ form.submit(class="btn btn-primary") }}
-  {{ form.send_test(class="btn btn-secondary ms-2", formaction=url_for('admin.test_email'), formmethod='post') }}
-  </form>
-</div>
+  </div>
+
+  <!-- Phone request template -->
+  <div class="admin-card admin-form">
+    <div class="admin-card-header">
+      <h4><i class="bi bi-phone"></i>Szablon prośby o telefon</h4>
+    </div>
+    {{ form.phone_request_template(id="phone_request_template") }}
+    <div id="phone_request_editor" class="quill-wrapper" style="height:200px;"></div>
+    <textarea id="phone_request_editor_textarea" class="form-control d-none" style="height:200px;"></textarea>
+    <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
+      {% for var in ['{first_name}', '{last_name}', '{email}', '{update_link}', '{logo}'] %}
+      <button type="button" class="btn btn-sm btn-outline-secondary insert-var" data-editor="phone_request_editor" data-value="{{ var }}">{{ var }}</button>
+      {% endfor %}
+      <button type="button" class="btn btn-sm btn-admin-primary ms-2 preview-btn" data-template="phone_request" data-editor="phone_request_editor"><i class="bi bi-eye me-1"></i>Podgląd</button>
+      <div class="form-check form-switch d-inline-block ms-2">
+        <input class="form-check-input html-toggle" type="checkbox" role="switch" id="phone_request_html_toggle" data-editor="phone_request_editor">
+        <label class="form-check-label" for="phone_request_html_toggle">HTML</label>
+      </div>
+    </div>
+    <div class="alert alert-info mt-3 mb-0 small">
+      <i class="bi bi-info-circle me-1"></i><strong>Uwaga:</strong> Ten szablon jest używany do wysyłania jednorazowych maili do wolontariuszy bez numeru telefonu.
+      Uruchom komendę <code>flask send-phone-requests</code> aby wysłać kampanię.
+    </div>
+  </div>
+
+  <!-- Save buttons -->
+  <div class="d-flex gap-2 mb-3">
+    {{ form.submit(class="btn btn-admin-primary") }}
+    {{ form.send_test(class="btn btn-outline-secondary", formaction=url_for('admin.test_email'), formmethod='post') }}
+  </div>
+</form>
 
 <!-- Preview Modal -->
 <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
