@@ -6,7 +6,7 @@
 /* Layout */
 .admin-layout {
   display: flex;
-  min-height: calc(100vh - 100px);
+  min-height: calc(100vh - 64px);
   margin: -1rem 0 -2rem 0;
 }
 
@@ -19,8 +19,8 @@
   display: flex;
   flex-direction: column;
   position: sticky;
-  top: 100px;
-  height: calc(100vh - 100px);
+  top: 64px;
+  height: calc(100vh - 64px);
   overflow-y: auto;
   z-index: 100;
 }
@@ -106,20 +106,71 @@
   justify-content: center;
 }
 
+/* ── Fullscreen Mobile Menu (Offcanvas) ─────────────── */
+.mobile-menu-canvas {
+  background: linear-gradient(180deg, #1e1e2f 0%, #2d1b4e 100%) !important;
+  border: none !important;
+  width: 100% !important;
+}
+.mobile-menu-header {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 1.25rem 1.5rem;
+  color: white;
+}
+.mobile-menu-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+}
+.mobile-menu-nav {
+  flex: 1;
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+}
+.mobile-menu-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  font-size: 1.05rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+.mobile-menu-link:hover {
+  background: rgba(255,255,255,0.06);
+  color: white;
+}
+.mobile-menu-link.active {
+  background: rgba(168,85,247,0.15);
+  color: #a855f7;
+  border-left-color: #a855f7;
+  font-weight: 600;
+}
+.mobile-menu-link i {
+  font-size: 1.3rem;
+  width: 24px;
+  text-align: center;
+}
+.mobile-menu-link.whatsapp { color: #25D366; }
+.mobile-menu-link.whatsapp:hover { color: #2ee67a; }
+.mobile-menu-link.whatsapp.active { color: #25D366; border-left-color: #25D366; }
+.mobile-menu-link.logout { color: #f87171; }
+.mobile-menu-link.logout:hover { color: #ff8a8a; }
+.mobile-menu-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.1);
+  margin: 0.75rem 1.5rem;
+}
+.mobile-menu-footer {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 0.5rem 0;
+}
+
 @media (max-width: 991.98px) {
-  .admin-sidebar {
-    position: fixed;
-    left: -260px;
-    top: 0;
-    height: 100vh;
-    transition: left 0.3s ease;
-    z-index: 1040;
-    padding-top: 100px;
-  }
-  .admin-sidebar.open {
-    left: 0;
-    box-shadow: 5px 0 30px rgba(0,0,0,0.3);
-  }
   .admin-main {
     width: 100%;
   }
@@ -820,4 +871,141 @@ body.dark-mode .admin-login-card { background: #2a2a40; }
     border-right: none;
     border-bottom: 1px solid #dee2e6;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN MONTH TABS (Trainings page)
+   ═══════════════════════════════════════════════════════════════ */
+.admin-month-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.25rem;
+}
+.admin-month-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  border: 2px solid #e0e0e0;
+  background: white;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  min-width: 80px;
+  position: relative;
+}
+.admin-month-tab:hover {
+  border-color: #663399;
+  color: #663399;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102,51,153,0.15);
+}
+.admin-month-tab.active {
+  background: linear-gradient(135deg, #663399, #1e3c72);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 4px 15px rgba(102,51,153,0.3);
+  transform: translateY(-1px);
+}
+.admin-month-tab .tab-month {
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.admin-month-tab .tab-year {
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+.admin-month-tab .tab-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #663399;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-month-tab.active .tab-count {
+  background: rgba(255,255,255,0.25);
+}
+body.dark-mode .admin-month-tab {
+  background: #2a2a40;
+  border-color: #3a3a50;
+  color: #aaa;
+}
+body.dark-mode .admin-month-tab:hover {
+  border-color: #a855f7;
+  color: #a855f7;
+}
+body.dark-mode .admin-month-tab.active {
+  background: linear-gradient(135deg, #663399, #1e3c72);
+  color: white;
+}
+body.dark-mode .admin-month-tab .tab-count {
+  background: #a855f7;
+}
+
+.admin-month-content {
+  display: none;
+}
+.admin-month-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .admin-month-tab {
+    padding: 0.5rem 0.7rem;
+    min-width: 60px;
+  }
+  .admin-month-tab .tab-month { font-size: 0.7rem; }
+  .admin-month-tabs { gap: 0.3rem; }
+}
+
+/* ── Empty State ──────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: #999;
+}
+.empty-state-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0ecf8, #e8e4f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  font-size: 2rem;
+  color: #663399;
+}
+body.dark-mode .empty-state-icon {
+  background: linear-gradient(135deg, #2d1b4e, #3a2a5e);
+  color: #a855f7;
+}
+.empty-state h5 {
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 0.5rem;
+}
+body.dark-mode .empty-state h5 { color: #ccc; }
+.empty-state p {
+  max-width: 400px;
+  margin: 0 auto;
+  font-size: 0.9rem;
 }

@@ -8,8 +8,8 @@
 {% if session.get('admin_logged_in') %}
 <!-- Admin Layout: Sidebar + Content -->
 <div class="admin-layout">
-  <!-- Sidebar -->
-  <aside class="admin-sidebar" id="adminSidebar">
+  <!-- Sidebar (desktop) -->
+  <aside class="admin-sidebar d-none d-lg-flex" id="adminSidebar">
     <div class="sidebar-header">
       <i class="bi bi-shield-lock-fill"></i>
       <span>Panel admina</span>
@@ -23,13 +23,13 @@
         <i class="bi bi-people-fill"></i>
         <span>Trenerzy</span>
       </a>
-      <a href="/admin/locations" class="sidebar-link {% if '/admin/locations' in request.path %}active{% endif %}">
-        <i class="bi bi-geo-alt-fill"></i>
-        <span>Miejsca</span>
-      </a>
       <a href="/admin/volunteers" class="sidebar-link {% if '/admin/volunteers' in request.path %}active{% endif %}">
         <i class="bi bi-person-lines-fill"></i>
         <span>Wolontariusze</span>
+      </a>
+      <a href="/admin/locations" class="sidebar-link {% if '/admin/locations' in request.path %}active{% endif %}">
+        <i class="bi bi-geo-alt-fill"></i>
+        <span>Miejsca</span>
       </a>
       <a href="/admin/history" class="sidebar-link {% if '/admin/history' in request.path %}active{% endif %}">
         <i class="bi bi-clock-history"></i>
@@ -61,10 +61,68 @@
     </div>
   </aside>
 
+  <!-- Mobile Offcanvas Menu -->
+  <div class="offcanvas offcanvas-start mobile-menu-canvas d-lg-none" tabindex="-1" id="mobileMenu">
+    <div class="offcanvas-header mobile-menu-header">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-shield-lock-fill" style="color:#a855f7; font-size:1.4rem;"></i>
+        <span class="offcanvas-title" style="font-weight:700; font-size:1.1rem;">Panel admina</span>
+      </div>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Zamknij"></button>
+    </div>
+    <div class="offcanvas-body mobile-menu-body">
+      <nav class="mobile-menu-nav">
+        <a href="{{ url_for('admin.manage_trainings') }}" class="mobile-menu-link {% if request.path.startswith('/admin/trainings') or request.path == '/admin/' %}active{% endif %}">
+          <i class="bi bi-calendar-event"></i>
+          <span>Treningi</span>
+        </a>
+        <a href="{{ url_for('admin.manage_trainers') }}" class="mobile-menu-link {% if '/admin/trainers' in request.path %}active{% endif %}">
+          <i class="bi bi-people-fill"></i>
+          <span>Trenerzy</span>
+        </a>
+        <a href="/admin/volunteers" class="mobile-menu-link {% if '/admin/volunteers' in request.path %}active{% endif %}">
+          <i class="bi bi-person-lines-fill"></i>
+          <span>Wolontariusze</span>
+        </a>
+        <a href="/admin/locations" class="mobile-menu-link {% if '/admin/locations' in request.path %}active{% endif %}">
+          <i class="bi bi-geo-alt-fill"></i>
+          <span>Miejsca</span>
+        </a>
+        <a href="/admin/history" class="mobile-menu-link {% if '/admin/history' in request.path %}active{% endif %}">
+          <i class="bi bi-clock-history"></i>
+          <span>Historia</span>
+        </a>
+        <div class="mobile-menu-divider"></div>
+        <a href="/admin/settings" class="mobile-menu-link {% if '/admin/settings' in request.path %}active{% endif %}">
+          <i class="bi bi-gear-fill"></i>
+          <span>Ustawienia e-mail</span>
+        </a>
+        <a href="/admin/whatsapp-templates" class="mobile-menu-link {% if '/admin/whatsapp-templates' in request.path %}active{% endif %}">
+          <i class="bi bi-chat-dots-fill"></i>
+          <span>Szablony WhatsApp</span>
+        </a>
+        <a href="/admin/whatsapp" class="mobile-menu-link whatsapp {% if request.path == '/admin/whatsapp' %}active{% endif %}">
+          <i class="bi bi-whatsapp"></i>
+          <span>Czat WhatsApp</span>
+        </a>
+      </nav>
+      <div class="mobile-menu-footer">
+        <a href="{{ url_for('routes.index') }}" class="mobile-menu-link">
+          <i class="bi bi-arrow-left-circle"></i>
+          <span>Strona główna</span>
+        </a>
+        <a href="{{ url_for('admin.logout') }}" class="mobile-menu-link logout">
+          <i class="bi bi-box-arrow-left"></i>
+          <span>Wyloguj</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
   <!-- Main content area -->
   <div class="admin-main">
     <!-- Mobile sidebar toggle -->
-    <button class="sidebar-toggle d-lg-none" id="sidebarToggle" aria-label="Menu">
+    <button class="sidebar-toggle d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu" aria-label="Menu">
       <i class="bi bi-list"></i>
     </button>
 
@@ -98,20 +156,6 @@
 <script src="{{ url_for('static', filename='js/email_editor.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // ── Sidebar toggle ──
-  var toggle = document.getElementById('sidebarToggle');
-  var sidebar = document.getElementById('adminSidebar');
-  if (toggle && sidebar) {
-    toggle.addEventListener('click', function() {
-      sidebar.classList.toggle('open');
-    });
-    document.addEventListener('click', function(e) {
-      if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && e.target !== toggle && !toggle.contains(e.target)) {
-        sidebar.classList.remove('open');
-      }
-    });
-  }
-
   // ── Confirmation Modal ──
   var confirmModal = document.getElementById('confirmModal');
   if (confirmModal) {
@@ -134,11 +178,28 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // ── Admin Month Tabs ──
+  var adminMonthTabs = document.querySelectorAll('.admin-month-tab');
+  var adminMonthContents = document.querySelectorAll('.admin-month-content');
+  if (adminMonthTabs.length > 0) {
+    adminMonthTabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var month = this.getAttribute('data-month');
+        adminMonthTabs.forEach(function(t) { t.classList.remove('active'); });
+        this.classList.add('active');
+        adminMonthContents.forEach(function(c) {
+          c.classList.toggle('active', c.getAttribute('data-month') === month);
+        });
+        if (typeof applyAdminFilters === 'function') applyAdminFilters();
+      });
+    });
+  }
+
   // ── Training Filtering ──
   var filterCoach = document.getElementById('filterCoach');
   var filterLocation = document.getElementById('filterLocation');
   if (filterCoach && filterLocation) {
-    function applyFilters() {
+    window.applyAdminFilters = function() {
       var coach = filterCoach.value;
       var loc = filterLocation.value;
       document.querySelectorAll('.training-row').forEach(function(row) {
@@ -146,16 +207,19 @@ document.addEventListener('DOMContentLoaded', function() {
         var matchLoc = !loc || row.getAttribute('data-location') === loc;
         row.style.display = (matchCoach && matchLoc) ? '' : 'none';
       });
-      // Hide empty month cards
-      document.querySelectorAll('#tableView > .admin-card').forEach(function(card) {
-        var rows = card.querySelectorAll('.training-row');
-        if (rows.length === 0) return;
-        var anyVisible = Array.from(rows).some(function(r) { return r.style.display !== 'none'; });
-        card.style.display = anyVisible ? '' : 'none';
+      // Update tab counts for visible rows
+      adminMonthTabs.forEach(function(tab) {
+        var month = tab.getAttribute('data-month');
+        var content = document.querySelector('.admin-month-content[data-month="' + month + '"]');
+        if (content) {
+          var visible = content.querySelectorAll('.training-row:not([style*="display: none"])').length;
+          var countEl = tab.querySelector('.tab-count');
+          if (countEl) countEl.textContent = visible;
+        }
       });
-    }
-    filterCoach.addEventListener('change', applyFilters);
-    filterLocation.addEventListener('change', applyFilters);
+    };
+    filterCoach.addEventListener('change', applyAdminFilters);
+    filterLocation.addEventListener('change', applyAdminFilters);
   }
 
   // ── View Toggle (Table / Calendar) ──
@@ -163,16 +227,19 @@ document.addEventListener('DOMContentLoaded', function() {
   var viewCalendar = document.getElementById('viewCalendar');
   var tableView = document.getElementById('tableView');
   var calendarView = document.getElementById('calendarView');
+  var monthTabsEl = document.getElementById('adminMonthTabs');
   if (viewTable && viewCalendar && tableView && calendarView) {
     viewTable.addEventListener('click', function() {
       tableView.classList.remove('d-none');
       calendarView.classList.add('d-none');
+      if (monthTabsEl) monthTabsEl.classList.remove('d-none');
       viewTable.classList.add('active');
       viewCalendar.classList.remove('active');
     });
     viewCalendar.addEventListener('click', function() {
       tableView.classList.add('d-none');
       calendarView.classList.remove('d-none');
+      if (monthTabsEl) monthTabsEl.classList.add('d-none');
       viewCalendar.classList.add('active');
       viewTable.classList.remove('active');
       renderCalendar();

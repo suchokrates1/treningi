@@ -98,6 +98,10 @@ def create_app():
         # Register custom Jinja filter for phone formatting
         app.jinja_env.filters['format_phone'] = format_phone_display
 
+        # Register Jinja globals
+        from datetime import datetime as _dt
+        app.jinja_env.globals['now'] = _dt.now
+
         # Register CLI commands
         cli.init_app(app)
 
