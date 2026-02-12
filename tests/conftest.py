@@ -30,6 +30,18 @@ def no_email(monkeypatch):
     monkeypatch.setattr("app.email_utils.send_email", lambda *a, **k: (True, None))
 
 
+@pytest.fixture(autouse=True)
+def clear_pending_signups():
+    """Cancel any pending signup timers and clear the dict between tests."""
+    from app.whatsapp_utils import _pending_signups, _pending_lock
+    yield
+    with _pending_lock:
+        for entry in _pending_signups.values():
+            if entry.get("timer"):
+                entry["timer"].cancel()
+        _pending_signups.clear()
+
+
 @pytest.fixture
 def sample_data(app_instance):
     """Create one coach, location, volunteer and training for tests."""
