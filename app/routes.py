@@ -8,7 +8,7 @@ from flask import (
     request,
     abort,
 )
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 from pathlib import Path
 from .models import Training, Booking, Volunteer, EmailSettings, StoredFile
 from .forms import VolunteerForm, CancelForm, PhoneUpdateForm
@@ -17,7 +17,7 @@ from .email_utils import send_email
 from .template_utils import render_template_string
 from .whatsapp_utils import (
     notify_coach_volunteer_canceled,
-    notify_volunteer_signup_confirmation,
+    schedule_signup_notification,
     format_phone_display,
 )
 
@@ -190,18 +190,18 @@ def index():
                     msg += f": {error}"
                 flash(msg, "danger")
 
-        # Notify volunteer via WhatsApp about successful signup
+        # Schedule deferred WhatsApp signup confirmation (consolidates
+        # back-to-back signups within the grace period).
         if existing_volunteer.phone_number:
-            volunteer_full_name = f"{existing_volunteer.first_name} {existing_volunteer.last_name}"
             training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
-            wa_success, wa_error = notify_volunteer_signup_confirmation(
+            schedule_signup_notification(
+                volunteer_id=existing_volunteer.id,
                 volunteer_phone=existing_volunteer.phone_number,
                 volunteer_name=existing_volunteer.first_name,
                 training_date=training_date_str,
                 training_location=training.location.name,
+                app=current_app._get_current_object(),
             )
-            if not wa_success and wa_error:
-                current_app.logger.warning("WhatsApp notification to volunteer failed: %s", wa_error)
 
         flash("Zapisano na trening!", "success")
         return redirect(url_for('routes.index'))
@@ -252,12 +252,17 @@ def cancel_booking():
                 training = booking.training
                 volunteer_full_name = f"{volunteer.first_name} {volunteer.last_name}"
                 training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
-                
+
+                # Smart cancel: only notify coach if training is today
+                # or volunteer had already confirmed/declined (reminder was sent).
+                training_is_today = training.date.date() == date.today()
+                was_confirmed = booking.is_confirmed is not None
+
                 db.session.delete(booking)
                 db.session.commit()
 
-                # Notify coach via WhatsApp about volunteer cancellation
-                if training.coach.phone_number:
+                # Notify coach via WhatsApp only when relevant
+                if training.coach.phone_number and (training_is_today or was_confirmed):
                     wa_success, wa_error = notify_coach_volunteer_canceled(
                         coach_phone=training.coach.phone_number,
                         coach_name=f"{training.coach.first_name} {training.coach.last_name}",

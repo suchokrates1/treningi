@@ -322,12 +322,25 @@ def send_coach_summary_command(hours_before, window_minutes):
             not_yet_count += 1
             continue
 
-        # Build summary message
+        # Build summary message — but skip if coach has NO volunteers at all
+        has_any_volunteers = False
+        for training in coach_trainings_list:
+            if training.bookings:
+                has_any_volunteers = True
+                break
+
+        if not has_any_volunteers:
+            current_app.logger.info(
+                "Coach %s has no volunteers today — skipping summary",
+                coach.first_name,
+            )
+            skipped_count += 1
+            continue
+
         message_lines = [
-            f"Dzien dobry {coach.first_name}!",
-            "",
-            "Podsumowanie dzisiejszych treningow:",
-            "",
+            f"📋 *Dzisiejsze treningi*\n",
+            f"Cześć {coach.first_name}! 👋\n",
+            "Podsumowanie Twoich dzisiejszych treningów:\n",
         ]
 
         for training in coach_trainings_list:
@@ -338,7 +351,7 @@ def send_coach_summary_command(hours_before, window_minutes):
             confirmed_bookings = [b for b in training.bookings if b.is_confirmed is True]
             pending_bookings = [b for b in training.bookings if b.is_confirmed is None]
 
-            message_lines.append(f"--- {time_str} - {location} ---")
+            message_lines.append(f"🕐 *{time_str} — {location}*")
 
             if confirmed_bookings:
                 for booking in confirmed_bookings:
@@ -347,7 +360,7 @@ def send_coach_summary_command(hours_before, window_minutes):
                         phone_str = normalize_phone_number(vol.phone_number)
                     else:
                         phone_str = "brak tel."
-                    message_lines.append(f"[OK] {vol.first_name} {vol.last_name} ({phone_str})")
+                    message_lines.append(f"  ✅ {vol.first_name} {vol.last_name} ({phone_str})")
 
             if pending_bookings:
                 for booking in pending_bookings:
@@ -356,17 +369,16 @@ def send_coach_summary_command(hours_before, window_minutes):
                         phone_str = normalize_phone_number(vol.phone_number)
                     else:
                         phone_str = "brak tel."
-                    message_lines.append(f"[?] {vol.first_name} {vol.last_name} ({phone_str})")
+                    message_lines.append(f"  ❓ {vol.first_name} {vol.last_name} ({phone_str})")
 
             if not confirmed_bookings and not pending_bookings:
-                message_lines.append("  Brak zapisanych wolontariuszy")
+                message_lines.append("  ⚪ Brak zapisanych wolontariuszy")
 
             message_lines.append("")
 
-        # Legenda
-        message_lines.append("Legenda: [OK] potwierdzony, [?] oczekuje")
+        message_lines.append("✅ — potwierdzony  ❓ — oczekuje")
         message_lines.append("")
-        message_lines.append("System zapisow Blind Tenis")
+        message_lines.append("🎾 *Fundacja Widzimy Inaczej*\n_System zapisów Blind Tenis_")
         message = "\n".join(message_lines)
 
         success, error = send_whatsapp_message(coach.phone_number, message)

@@ -10,6 +10,7 @@ Configuration environment variables:
 """
 
 import re
+import threading
 from flask import current_app
 import requests
 from typing import Optional
@@ -18,6 +19,19 @@ from typing import Optional
 # Max length for user-provided text in WhatsApp messages
 MAX_NAME_LENGTH = 100
 MAX_LOCATION_LENGTH = 200
+
+# Grace period (seconds) before sending signup confirmation to allow consolidation
+SIGNUP_GRACE_PERIOD_SECONDS = 90
+
+# Milestone booking counts that trigger celebration messages
+MILESTONE_COUNTS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100]
+
+# In-memory pending signups: volunteer_id -> {timer, trainings: [...], app_context_data}
+_pending_signups: dict[int, dict] = {}
+_pending_lock = threading.Lock()
+
+# ── Message footer ───────────────────────────────────────────────
+_FOOTER = "🎾 *Fundacja Widzimy Inaczej*\n_System zapisów Blind Tenis_"
 
 
 def _get_template_body(key: str, default: str) -> str:
@@ -178,6 +192,31 @@ def send_whatsapp_message(
         return False, error_msg
 
 
+def _milestone_line(booking_count: int) -> str:
+    """Return a celebration line if *booking_count* is a milestone, else ''."""
+    if booking_count in MILESTONE_COUNTS:
+        return f"\n🏆 To już Twój *{booking_count}. wolontariat* z nami! Dziękujemy! 💛\n"
+    return ""
+
+
+def get_volunteer_booking_count(volunteer_id: int) -> int:
+    """Return the total number of (non-canceled) bookings for *volunteer_id*."""
+    from .models import Booking, Training
+    return (
+        Booking.query
+        .join(Training)
+        .filter(
+            Booking.volunteer_id == volunteer_id,
+            Training.is_canceled.is_(False),
+        )
+        .count()
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Coach notifications
+# ═══════════════════════════════════════════════════════════════
+
 def notify_coach_new_signup(
     coach_phone: str,
     coach_name: str,
@@ -186,18 +225,16 @@ def notify_coach_new_signup(
     training_location: str,
 ) -> tuple[bool, Optional[str]]:
     """Notify a coach about a new volunteer signup."""
-    # Sanitize user-provided data
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
     training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
 
     default = (
-        "📋 Nowy wolontariusz zapisał się na trening!\n\n"
-        "Cześć {trener}!\n\n"
-        "👤 Wolontariusz: {wolontariusz}\n"
+        "📋 *Nowy zapis na trening!*\n\n"
+        "Cześć {trener}! 👋\n\n"
+        "👤 Wolontariusz: *{wolontariusz}*\n"
         "📅 Data: {data}\n"
         "📍 Miejsce: {miejsce}\n\n"
-        "Pozdrawiamy,\n"
-        "Fundacja Widzimy Inaczej"
+        + _FOOTER
     )
     body = _get_template_body("coach_new_signup", default)
     message = (
@@ -210,6 +247,40 @@ def notify_coach_new_signup(
     return send_whatsapp_message(coach_phone, message)
 
 
+def notify_coach_volunteer_canceled(
+    coach_phone: str,
+    coach_name: str,
+    volunteer_name: str,
+    training_date: str,
+    training_location: str,
+) -> tuple[bool, Optional[str]]:
+    """Notify a coach that a volunteer has canceled their booking."""
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+
+    default = (
+        "⚠️ *Wypisanie z treningu*\n\n"
+        "Cześć {trener}! 👋\n\n"
+        "👤 Wolontariusz *{wolontariusz}* wypisał się:\n"
+        "📅 Data: {data}\n"
+        "📍 Miejsce: {miejsce}\n\n"
+        + _FOOTER
+    )
+    body = _get_template_body("coach_volunteer_canceled", default)
+    message = (
+        body
+        .replace("{trener}", coach_name)
+        .replace("{wolontariusz}", volunteer_name)
+        .replace("{data}", training_date)
+        .replace("{miejsce}", training_location)
+    )
+    return send_whatsapp_message(coach_phone, message)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Volunteer reminders (day before)
+# ═══════════════════════════════════════════════════════════════
+
 def notify_volunteer_reminder(
     volunteer_phone: str,
     volunteer_name: str,
@@ -220,22 +291,22 @@ def notify_volunteer_reminder(
     coach_phone: str,
 ) -> tuple[bool, Optional[str]]:
     """Send a reminder to a volunteer about their upcoming training (day before)."""
-    # Sanitize user-provided data
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
     training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
     coach_name = sanitize_for_whatsapp(coach_name, MAX_NAME_LENGTH)
 
     formatted_coach_phone = format_phone_display(coach_phone)
     default = (
-        "🎾 Przypomnienie o jutrzejszym wolontariacie!\n\n"
-        "Cześć {imię}!\n\n"
-        "Przypominamy, że jutro o {godzina} masz wolontariat:\n\n"
+        "🎾 *Przypomnienie o jutrzejszym wolontariacie!*\n\n"
+        "Cześć {imię}! 👋\n\n"
+        "Przypominamy, że jutro o *{godzina}* masz wolontariat:\n\n"
         "📍 Miejsce: {miejsce}\n"
         "👨‍🏫 Trener: {trener}\n"
-        "📞 Telefon do trenera: {telefon}\n\n"
-        "✅ Odpisz POTWIERDZAM jeśli będziesz\n"
-        "❌ Odpisz REZYGNUJĘ jeśli nie możesz\n\n"
-        "Fundacja Widzimy Inaczej"
+        "📞 Telefon: {telefon}\n\n"
+        "📩 *Odpisz:*\n"
+        "✅ POTWIERDZAM — będę\n"
+        "❌ REZYGNUJĘ — nie mogę\n\n"
+        + _FOOTER
     )
     body = _get_template_body("volunteer_reminder", default)
     message = (
@@ -248,6 +319,7 @@ def notify_volunteer_reminder(
     )
     return send_whatsapp_message(volunteer_phone, message)
 
+
 def notify_volunteer_reminder_multi(
     volunteer_phone: str,
     volunteer_name: str,
@@ -257,38 +329,40 @@ def notify_volunteer_reminder_multi(
 
     Each entry in *trainings_info* should have keys:
     ``time``, ``location``, ``coach_name``, ``coach_phone``.
-
-    Note: This template is dynamic (per-training list) and does not use a
-    DB template body directly. The header/footer wording mirrors the
-    ``volunteer_reminder_multi`` DB template for consistency.
     """
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
 
     lines = [
-        f"🎾 Przypomnienie o jutrzejszych wolontariatach!\n",
-        f"Cześć {volunteer_name}!\n",
-        f"Jutro masz {len(trainings_info)} wolontariaty:\n",
+        f"🎾 *Przypomnienie o jutrzejszych wolontariatach!*\n",
+        f"Cześć {volunteer_name}! 👋\n",
+        f"Jutro masz *{len(trainings_info)} wolontariaty*:\n",
     ]
     for i, t in enumerate(trainings_info, 1):
         loc = sanitize_for_whatsapp(t['location'], MAX_LOCATION_LENGTH)
         coach = sanitize_for_whatsapp(t['coach_name'], MAX_NAME_LENGTH)
         phone_fmt = format_phone_display(t['coach_phone'])
         lines.append(
-            f"{i}. 🕐 {t['time']} — 📍 {loc}\n"
+            f"*{i}.* 🕐 {t['time']} — 📍 {loc}\n"
             f"   👨\u200d🏫 {coach}, 📞 {phone_fmt}"
         )
 
     lines.append("")
+    lines.append("📩 *Odpisz:*")
     if len(trainings_info) > 1:
         lines.append("✅ POTWIERDZAM — potwierdź wszystkie")
         lines.append("✅ POTWIERDZAM 1 — potwierdź tylko pierwszy")
         lines.append("❌ REZYGNUJĘ — zrezygnuj ze wszystkich")
     else:
-        lines.append("✅ Odpisz POTWIERDZAM jeśli będziesz")
-        lines.append("❌ Odpisz REZYGNUJĘ jeśli nie możesz")
-    lines.append("\nFundacja Widzimy Inaczej")
+        lines.append("✅ POTWIERDZAM — będę")
+        lines.append("❌ REZYGNUJĘ — nie mogę")
+    lines.append(f"\n{_FOOTER}")
 
     return send_whatsapp_message(volunteer_phone, "\n".join(lines))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Volunteer — training canceled / time changed
+# ═══════════════════════════════════════════════════════════════
 
 def notify_volunteer_training_canceled(
     volunteer_phone: str,
@@ -297,19 +371,17 @@ def notify_volunteer_training_canceled(
     training_location: str,
 ) -> tuple[bool, Optional[str]]:
     """Notify a volunteer that their training has been canceled."""
-    # Sanitize user-provided data
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
     training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
 
     default = (
-        "⚠️ Trening został odwołany\n\n"
-        "Cześć {imię}!\n\n"
-        "Niestety informujemy, że trening zaplanowany na:\n\n"
+        "⚠️ *Trening został odwołany*\n\n"
+        "Cześć {imię}! 👋\n\n"
+        "Niestety trening zaplanowany na:\n\n"
         "📅 Data: {data}\n"
         "📍 Miejsce: {miejsce}\n\n"
-        "został odwołany.\n\n"
-        "Przepraszamy za utrudnienia.\n"
-        "Fundacja Widzimy Inaczej"
+        "został *odwołany*. Przepraszamy za utrudnienia.\n\n"
+        + _FOOTER
     )
     body = _get_template_body("training_canceled", default)
     message = (
@@ -334,16 +406,17 @@ def notify_volunteer_training_time_changed(
     training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
 
     default = (
-        "\u23f0 Zmiana godziny treningu!\n\n"
-        "Cze\u015b\u0107 {imię}!\n\n"
-        "Informujemy, \u017ce godzina Twojego treningu zosta\u0142a zmieniona:\n\n"
-        "\ud83d\udcc5 Data: {data}\n"
-        "\u274c Stara godzina: {stara_godzina}\n"
-        "\u2705 Nowa godzina: {nowa_godzina}\n"
-        "\ud83d\udccd Miejsce: {miejsce}\n\n"
-        "\u2705 Odpisz POTWIERDZAM je\u015bli b\u0119dziesz o nowej godzinie\n"
-        "\u274c Odpisz REZYGNUJ\u0118 je\u015bli nie mo\u017cesz\n\n"
-        "Fundacja Widzimy Inaczej"
+        "⏰ *Zmiana godziny treningu!*\n\n"
+        "Cześć {imię}! 👋\n\n"
+        "Godzina Twojego treningu została zmieniona:\n\n"
+        "📅 Data: {data}\n"
+        "❌ Stara godzina: {stara_godzina}\n"
+        "✅ Nowa godzina: *{nowa_godzina}*\n"
+        "📍 Miejsce: {miejsce}\n\n"
+        "📩 *Odpisz:*\n"
+        "✅ POTWIERDZAM — będę o nowej godzinie\n"
+        "❌ REZYGNUJĘ — nie mogę\n\n"
+        + _FOOTER
     )
     body = _get_template_body("time_changed", default)
     message = (
@@ -357,58 +430,37 @@ def notify_volunteer_training_time_changed(
     return send_whatsapp_message(volunteer_phone, message)
 
 
-def notify_coach_volunteer_canceled(
-    coach_phone: str,
-    coach_name: str,
-    volunteer_name: str,
-    training_date: str,
-    training_location: str,
-) -> tuple[bool, Optional[str]]:
-    """Notify a coach that a volunteer has canceled their booking."""
-    # Sanitize user-provided data
-    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
-    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
-
-    default = (
-        "⚠️ Wolontariusz wypisał się z treningu\n\n"
-        "Cześć {trener}!\n\n"
-        "👤 Wolontariusz: {wolontariusz}\n"
-        "📅 Data: {data}\n"
-        "📍 Miejsce: {miejsce}\n\n"
-        "Pozdrawiamy,\n"
-        "Fundacja Widzimy Inaczej"
-    )
-    body = _get_template_body("coach_volunteer_canceled", default)
-    message = (
-        body
-        .replace("{trener}", coach_name)
-        .replace("{wolontariusz}", volunteer_name)
-        .replace("{data}", training_date)
-        .replace("{miejsce}", training_location)
-    )
-    return send_whatsapp_message(coach_phone, message)
-
+# ═══════════════════════════════════════════════════════════════
+#  Volunteer signup confirmation (with deferred consolidation)
+# ═══════════════════════════════════════════════════════════════
 
 def notify_volunteer_signup_confirmation(
     volunteer_phone: str,
     volunteer_name: str,
     training_date: str,
     training_location: str,
+    booking_count: int = 0,
 ) -> tuple[bool, Optional[str]]:
-    """Send signup confirmation to volunteer with a note to check email."""
-    # Sanitize user-provided data
+    """Send signup confirmation to volunteer (single training)."""
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
     training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    milestone = _milestone_line(booking_count)
+
+    returning_line = ""
+    if booking_count > 1 and not milestone:
+        returning_line = "\n🔄 Miło Cię znów widzieć!\n"
 
     default = (
-        "✅ Dziękujemy za zapisanie się!\n\n"
-        "Cześć {imię}!\n\n"
-        "Twój zapis na wolontariat został przyjęty:\n\n"
+        "✅ *Zapisano na wolontariat!*\n\n"
+        "Cześć {imię}! 👋\n"
+        "{powracajacy}"
+        "{kamien_milowy}"
+        "\nTwój zapis został przyjęty:\n\n"
         "📅 Data: {data}\n"
         "📍 Miejsce: {miejsce}\n\n"
-        "📧 Sprawdź swoją skrzynkę e-mail — wysłaliśmy Ci szczegółowe informacje oraz potrzebne dokumenty.\n\n"
-        "Do zobaczenia! 🎾\n"
-        "Fundacja Widzimy Inaczej"
+        "📧 Sprawdź e-mail — wysłaliśmy szczegóły i dokumenty.\n\n"
+        "Do zobaczenia! 👋\n\n"
+        + _FOOTER
     )
     body = _get_template_body("signup_confirmation", default)
     message = (
@@ -416,5 +468,115 @@ def notify_volunteer_signup_confirmation(
         .replace("{imię}", volunteer_name)
         .replace("{data}", training_date)
         .replace("{miejsce}", training_location)
+        .replace("{powracajacy}", returning_line)
+        .replace("{kamien_milowy}", milestone)
     )
     return send_whatsapp_message(volunteer_phone, message)
+
+
+def notify_volunteer_signup_confirmation_multi(
+    volunteer_phone: str,
+    volunteer_name: str,
+    trainings_info: list[dict],
+    booking_count: int = 0,
+) -> tuple[bool, Optional[str]]:
+    """Send consolidated signup confirmation for multiple trainings.
+
+    Each entry in *trainings_info*: ``date``, ``location``.
+    """
+    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
+    milestone = _milestone_line(booking_count)
+
+    returning_line = ""
+    if booking_count > 1 and not milestone:
+        returning_line = "\n🔄 Miło Cię znów widzieć!\n"
+
+    lines = [
+        "✅ *Zapisano na wolontariat!*\n",
+        f"Cześć {volunteer_name}! 👋",
+    ]
+    if returning_line:
+        lines.append(returning_line.strip())
+    if milestone:
+        lines.append(milestone.strip())
+
+    lines.append(f"\nTwoje zapisy ({len(trainings_info)}) zostały przyjęte:\n")
+    for i, t in enumerate(trainings_info, 1):
+        loc = sanitize_for_whatsapp(t['location'], MAX_LOCATION_LENGTH)
+        lines.append(f"*{i}.* 📅 {t['date']} — 📍 {loc}")
+
+    lines.append("\n📧 Sprawdź e-mail — wysłaliśmy szczegóły i dokumenty.")
+    lines.append(f"\nDo zobaczenia! 👋\n\n{_FOOTER}")
+
+    return send_whatsapp_message(volunteer_phone, "\n".join(lines))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Deferred signup notification (grace period for consolidation)
+# ═══════════════════════════════════════════════════════════════
+
+def schedule_signup_notification(
+    volunteer_id: int,
+    volunteer_phone: str,
+    volunteer_name: str,
+    training_date: str,
+    training_location: str,
+    app,
+) -> None:
+    """Schedule a signup confirmation with a grace period.
+
+    If the same volunteer signs up for another training within
+    ``SIGNUP_GRACE_PERIOD_SECONDS``, the messages are consolidated.
+    """
+    training_info = {"date": training_date, "location": training_location}
+
+    with _pending_lock:
+        entry = _pending_signups.get(volunteer_id)
+        if entry:
+            # Cancel existing timer and append training
+            entry["timer"].cancel()
+            entry["trainings"].append(training_info)
+        else:
+            entry = {
+                "phone": volunteer_phone,
+                "name": volunteer_name,
+                "trainings": [training_info],
+                "timer": None,
+            }
+            _pending_signups[volunteer_id] = entry
+
+        # (Re)start timer
+        timer = threading.Timer(
+            SIGNUP_GRACE_PERIOD_SECONDS,
+            _flush_pending_signup,
+            args=[volunteer_id, app],
+        )
+        timer.daemon = True
+        entry["timer"] = timer
+        timer.start()
+
+
+def _flush_pending_signup(volunteer_id: int, app) -> None:
+    """Send the consolidated signup notification after the grace period."""
+    with _pending_lock:
+        entry = _pending_signups.pop(volunteer_id, None)
+    if not entry:
+        return
+
+    with app.app_context():
+        booking_count = get_volunteer_booking_count(volunteer_id)
+        trainings = entry["trainings"]
+        phone = entry["phone"]
+        name = entry["name"]
+
+        if len(trainings) == 1:
+            t = trainings[0]
+            notify_volunteer_signup_confirmation(
+                phone, name, t["date"], t["location"],
+                booking_count=booking_count,
+            )
+        else:
+            notify_volunteer_signup_confirmation_multi(
+                phone, name, trainings,
+                booking_count=booking_count,
+            )
