@@ -47,6 +47,12 @@ services:
       - WHATSAPP_HOOK_EVENTS=message
     volumes:
       - waha_sessions:/app/.sessions
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "5", "-H", "X-Api-Key: blindtenis2026", "http://localhost:3000/api/sessions/default"]
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tenis-waha.rule=Host(`waha.widzimyinaczej.org.pl`)"
