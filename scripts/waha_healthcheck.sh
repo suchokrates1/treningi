@@ -4,9 +4,19 @@
 # Run via cron every 5 minutes: */5 * * * * /home/suchokrates1/treningi/scripts/waha_healthcheck.sh >> /tmp/waha-healthcheck.log 2>&1
 
 WAHA_URL="http://localhost:3001"
-API_KEY="blindtenis2026"
 SESSION="default"
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
+
+# Read API key from .env file (never hardcode secrets)
+ENV_FILE="/home/suchokrates1/treningi/.env"
+if [ -f "$ENV_FILE" ]; then
+    API_KEY=$(grep -E '^WAHA_API_KEY=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+if [ -z "$API_KEY" ]; then
+    echo "$LOG_PREFIX ERROR: WAHA_API_KEY not found in $ENV_FILE"
+    exit 1
+fi
 
 # Check if WAHA container is running
 if ! docker ps --format '{{.Names}}' | grep -q tenis_waha; then
