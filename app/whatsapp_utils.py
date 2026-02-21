@@ -11,6 +11,8 @@ Configuration environment variables:
 
 import re
 import threading
+from collections import OrderedDict
+from datetime import datetime as _dt
 from flask import current_app
 import requests
 from typing import Optional
@@ -104,6 +106,36 @@ def format_phone_display(phone: str) -> str:
         return f"{digits[:3]} {digits[3:6]} {digits[6:]}"
     
     return phone
+
+
+def _polish_date(date_str: str) -> str:
+    """Convert ``'2025-02-22 09:00'`` → ``'22.02.2025, 09:00'``.
+
+    Also handles date-only ``'2025-02-22'`` → ``'22.02.2025'``.
+    """
+    date_str = date_str.strip()
+    if ' ' in date_str:
+        dt = _dt.strptime(date_str, '%Y-%m-%d %H:%M')
+        return f"{dt.strftime('%d.%m.%Y')}, {dt.strftime('%H:%M')}"
+    dt = _dt.strptime(date_str, '%Y-%m-%d')
+    return dt.strftime('%d.%m.%Y')
+
+
+def _group_dates(trainings_info: list[dict]) -> list[str]:
+    """Group trainings by calendar day and join times.
+
+    Returns lines like ``'📅 22.02.2025: 09:00, 10:00'``.
+    """
+    grouped: OrderedDict[str, list[str]] = OrderedDict()
+    for t in trainings_info:
+        raw = t['date'].strip()
+        dt = _dt.strptime(raw, '%Y-%m-%d %H:%M')
+        day = dt.strftime('%d.%m.%Y')
+        time = dt.strftime('%H:%M')
+        grouped.setdefault(day, []).append(time)
+    return [
+        f"📅 {day}: {', '.join(times)}" for day, times in grouped.items()
+    ]
 
 
 def get_waha_config() -> dict:
@@ -217,36 +249,6 @@ def get_volunteer_booking_count(volunteer_id: int) -> int:
 #  Coach notifications
 # ═══════════════════════════════════════════════════════════════
 
-def notify_coach_new_signup(
-    coach_phone: str,
-    coach_name: str,
-    volunteer_name: str,
-    training_date: str,
-    training_location: str,
-) -> tuple[bool, Optional[str]]:
-    """Notify a coach about a new volunteer signup."""
-    volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
-    training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
-
-    default = (
-        "📋 *Nowy zapis na trening!*\n\n"
-        "Cześć {trener}! 👋\n\n"
-        "👤 Wolontariusz: *{wolontariusz}*\n"
-        "📅 Data: {data}\n"
-        "📍 Miejsce: {miejsce}\n\n"
-        + _FOOTER
-    )
-    body = _get_template_body("coach_new_signup", default)
-    message = (
-        body
-        .replace("{trener}", coach_name)
-        .replace("{wolontariusz}", volunteer_name)
-        .replace("{data}", training_date)
-        .replace("{miejsce}", training_location)
-    )
-    return send_whatsapp_message(coach_phone, message)
-
-
 def notify_coach_volunteer_canceled(
     coach_phone: str,
     coach_name: str,
@@ -271,7 +273,7 @@ def notify_coach_volunteer_canceled(
         body
         .replace("{trener}", coach_name)
         .replace("{wolontariusz}", volunteer_name)
-        .replace("{data}", training_date)
+        .replace("{data}", _polish_date(training_date))
         .replace("{miejsce}", training_location)
     )
     return send_whatsapp_message(coach_phone, message)
@@ -387,7 +389,7 @@ def notify_volunteer_training_canceled(
     message = (
         body
         .replace("{imię}", volunteer_name)
-        .replace("{data}", training_date)
+        .replace("{data}", _polish_date(training_date))
         .replace("{miejsce}", training_location)
     )
     return send_whatsapp_message(volunteer_phone, message)
@@ -422,7 +424,7 @@ def notify_volunteer_training_time_changed(
     message = (
         body
         .replace("{imię}", volunteer_name)
-        .replace("{data}", training_date)
+        .replace("{data}", _polish_date(training_date))
         .replace("{stara_godzina}", training_old_time)
         .replace("{nowa_godzina}", training_new_time)
         .replace("{miejsce}", training_location)
@@ -473,7 +475,7 @@ def notify_volunteer_signup_confirmation(
     message = (
         body
         .replace("{imię}", volunteer_name)
-        .replace("{data}", training_date)
+        .replace("{data}", _polish_date(training_date))
         .replace("{miejsce}", training_location)
         .replace("{trener}", coach_name)
         .replace("{telefon}", formatted_coach_phone)
@@ -521,9 +523,9 @@ def notify_volunteer_signup_confirmation_multi(
     same_venue = len(locations) == 1 and len(coaches) == 1
 
     if same_venue:
-        # Same location + coach → list only dates, show venue once
-        for i, t in enumerate(trainings_info, 1):
-            lines.append(f"*{i}.* 📅 {t['date']}")
+        # Same location + coach → group by date, show venue once
+        for date_line in _group_dates(trainings_info):
+            lines.append(date_line)
         loc = sanitize_for_whatsapp(trainings_info[0]['location'], MAX_LOCATION_LENGTH)
         coach = sanitize_for_whatsapp(trainings_info[0].get('coach_name', ''), MAX_NAME_LENGTH)
         coach_ph = format_phone_display(trainings_info[0].get('coach_phone', ''))
@@ -538,7 +540,7 @@ def notify_volunteer_signup_confirmation_multi(
             loc = sanitize_for_whatsapp(t['location'], MAX_LOCATION_LENGTH)
             coach = sanitize_for_whatsapp(t.get('coach_name', ''), MAX_NAME_LENGTH)
             coach_ph = format_phone_display(t.get('coach_phone', ''))
-            line = f"*{i}.* 📅 {t['date']} — 📍 {loc}"
+            line = f"*{i}.* {_polish_date(t['date'])} — 📍 {loc}"
             if coach:
                 line += f"\n   👨‍🏫 {coach}"
                 if coach_ph:
@@ -661,12 +663,12 @@ def _send_signup_email(
     # Build training info for template
     if len(trainings) == 1:
         t = trainings[0]
-        training_str = f"{t['date']} w {t['location']}"
+        training_str = f"{_polish_date(t['date'])} w {t['location']}"
         cancel_link = t.get('cancel_link', '')
     else:
         parts = []
         for t in trainings:
-            parts.append(f"{t['date']} w {t['location']}")
+            parts.append(f"{_polish_date(t['date'])} w {t['location']}")
         training_str = "<br>".join(parts)
         cancel_link = trainings[0].get('cancel_link', '')
 
@@ -675,7 +677,7 @@ def _send_signup_email(
         "last_name": volunteer_last_name,
         "training": training_str,
         "cancel_link": cancel_link,
-        "date": trainings[0]["date"],
+        "date": _polish_date(trainings[0]["date"]),
         "location": trainings[0]["location"],
         "logo": logo_url,
     }

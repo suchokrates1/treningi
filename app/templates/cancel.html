@@ -4,7 +4,7 @@
   <h2 class="mb-3">Wypisz się z treningu</h2>
   {% if training %}
     <p>
-      {{ training.date.strftime('%Y-%m-%d %H:%M') }},
+      {{ training.date.strftime('%d.%m.%Y') }}, {{ training.date.strftime('%H:%M') }},
       {{ training.location.name }},
       {{ training.coach.first_name }} {{ training.coach.last_name }}
     </p>

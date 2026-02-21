@@ -282,7 +282,7 @@ def send_confirmation_response(chat_id: str, booking: Booking | list[Booking]) -
             f"Do zobaczenia {day_word} o {training.date.strftime('%H:%M')}\n"
             f"📍 {training.location.name}\n"
             f"👨‍🏫 Trener: {training.coach.first_name} {training.coach.last_name}\n"
-            f"📞 Tel: {training.coach.phone_number}"
+            f"📞 Tel: {format_phone_display(training.coach.phone_number)}"
         )
     else:
         training_date = bookings[0].training.date.date()
@@ -292,7 +292,7 @@ def send_confirmation_response(chat_id: str, booking: Booking | list[Booking]) -
             t = b.training
             lines.append(
                 f"🕐 {t.date.strftime('%H:%M')} - 📍 {t.location.name} "
-                f"(🏫 {t.coach.first_name} {t.coach.last_name}, 📞 {t.coach.phone_number})"
+                f"(🏫 {t.coach.first_name} {t.coach.last_name}, 📞 {format_phone_display(t.coach.phone_number)})"
             )
         message = "\n".join(lines)
 
@@ -304,7 +304,7 @@ def send_cancellation_response(chat_id: str, booking: Booking) -> None:
     training = booking.training
     message = (
         f"❌ Twoja rezygnacja została przyjęta.\n\n"
-        f"Trening: {training.date.strftime('%Y-%m-%d %H:%M')}\n"
+        f"Trening: {training.date.strftime('%d.%m.%Y')}, {training.date.strftime('%H:%M')}\n"
         f"📍 {training.location.name}\n\n"
         f"Mamy nadzieję, że zobaczysz się z nami innym razem!\n"
         f"Fundacja Widzimy Inaczej"
@@ -322,7 +322,7 @@ def send_selection_prompt(chat_id: str, bookings: list[Booking], *, cancel_mode:
     for i, booking in enumerate(bookings, 1):
         training = booking.training
         lines.append(
-            f"{i}. {training.date.strftime('%Y-%m-%d %H:%M')} - {training.location.name}"
+            f"{i}. {training.date.strftime('%d.%m.%Y')}, {training.date.strftime('%H:%M')} - {training.location.name}"
         )
     
     if cancel_mode:

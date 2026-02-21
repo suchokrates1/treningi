@@ -195,14 +195,15 @@ def cancel_booking():
                     else "Twoje zgłoszenie na trening {training} zostało anulowane."
                 )
                 training_info = (
-                    f"{training.date.strftime('%Y-%m-%d %H:%M')} "
+                    f"{training.date.strftime('%d.%m.%Y')}, "
+                    f"{training.date.strftime('%H:%M')} "
                     f"w {training.location.name}"
                 )
                 data = {
                     "first_name": volunteer.first_name,
                     "last_name": volunteer.last_name,
                     "training": training_info,
-                    "date": training.date.strftime("%Y-%m-%d %H:%M"),
+                    "date": f"{training.date.strftime('%d.%m.%Y')}, {training.date.strftime('%H:%M')}",
                     "location": training.location.name,
                     "logo": url_for("static", filename="logo.png", _external=True),
                 }
