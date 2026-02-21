@@ -23,7 +23,7 @@ from werkzeug.utils import secure_filename
 from . import db, csrf
 from sqlalchemy.orm import joinedload
 from . import email_utils
-from .whatsapp_utils import notify_volunteer_training_canceled, notify_volunteer_training_time_changed
+from .whatsapp_utils import notify_volunteer_training_canceled, notify_volunteer_training_time_changed, normalize_phone_number
 
 # Alias retained for compatibility with tests that monkeypatch the function.
 send_email = email_utils.send_email
@@ -205,7 +205,7 @@ def manage_trainers():
         new_coach = Coach(
             first_name=form.first_name.data.strip(),
             last_name=form.last_name.data.strip(),
-            phone_number=form.phone_number.data.strip(),
+            phone_number=normalize_phone_number(form.phone_number.data.strip()),
         )
         db.session.add(new_coach)
         db.session.commit()
@@ -226,7 +226,7 @@ def edit_trainer(coach_id):
     if form.validate_on_submit():
         coach.first_name = form.first_name.data.strip()
         coach.last_name = form.last_name.data.strip()
-        coach.phone_number = form.phone_number.data.strip()
+        coach.phone_number = normalize_phone_number(form.phone_number.data.strip())
         db.session.commit()
         flash("Zaktualizowano dane trenera.", "success")
         return redirect(url_for("admin.manage_trainers"))

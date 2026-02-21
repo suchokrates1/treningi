@@ -347,9 +347,10 @@ def send_coach_summary_command(hours_before, window_minutes):
             time_str = training.date.strftime("%H:%M")
             location = training.location.name
 
-            # Get confirmed and pending volunteers
+            # Get confirmed, pending, and declined volunteers
             confirmed_bookings = [b for b in training.bookings if b.is_confirmed is True]
             pending_bookings = [b for b in training.bookings if b.is_confirmed is None]
+            declined_bookings = [b for b in training.bookings if b.is_confirmed is False]
 
             message_lines.append(f"🕐 *{time_str} — {location}*")
 
@@ -371,12 +372,21 @@ def send_coach_summary_command(hours_before, window_minutes):
                         phone_str = "brak tel."
                     message_lines.append(f"  ❓ {vol.first_name} {vol.last_name} ({phone_str})")
 
-            if not confirmed_bookings and not pending_bookings:
+            if declined_bookings:
+                for booking in declined_bookings:
+                    vol = booking.volunteer
+                    if vol.phone_number:
+                        phone_str = normalize_phone_number(vol.phone_number)
+                    else:
+                        phone_str = "brak tel."
+                    message_lines.append(f"  ❌ {vol.first_name} {vol.last_name} ({phone_str})")
+
+            if not confirmed_bookings and not pending_bookings and not declined_bookings:
                 message_lines.append("  ⚪ Brak zapisanych wolontariuszy")
 
             message_lines.append("")
 
-        message_lines.append("✅ — potwierdzony  ❓ — oczekuje")
+        message_lines.append("✅ — potwierdzony  ❓ — oczekuje  ❌ — zrezygnował")
         message_lines.append("")
         message_lines.append("🎾 *Fundacja Widzimy Inaczej*\n_System zapisów Blind Tenis_")
         message = "\n".join(message_lines)
