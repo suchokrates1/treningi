@@ -4,12 +4,13 @@ import re
 import html
 import json
 import urllib.request
+import urllib.parse
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timezone, timedelta
 
 from . import db
 from .models import Volunteer, Booking, Training, Coach
-from .whatsapp_utils import send_whatsapp_message, normalize_phone_number
+from .whatsapp_utils import send_whatsapp_message, normalize_phone_number, notify_coach_volunteer_canceled
 from .ai_assistant import ask_gemini
 
 webhook_bp = Blueprint('webhook', __name__)
@@ -33,30 +34,49 @@ def _find_volunteer_by_name(name: str) -> Volunteer | None:
 
 
 def _extract_phone_from_lid(lid_id: str) -> str | None:
-    """Resolve @lid chat ID to phone number via WAHA chat name.
+    """Resolve @lid chat ID to phone number via WAHA chat endpoint.
 
     WAHA stores the phone number (e.g. '+48 519 179 904') in the chat
     ``name`` field even when the chat ID uses the @lid format.
+    Uses single-chat endpoint instead of listing all chats.
     """
     waha_url = current_app.config.get('WHATSAPP_API_URL') or 'http://waha:3000'
     waha_key = current_app.config.get('WHATSAPP_API_KEY') or ''
     session = current_app.config.get('WHATSAPP_SESSION') or 'default'
+
+    # Try single-chat endpoint first (much faster than listing all chats)
+    try:
+        encoded_lid = urllib.parse.quote(lid_id, safe='')
+        req = urllib.request.Request(
+            f'{waha_url}/api/{session}/chats/{encoded_lid}',
+            headers={'X-Api-Key': waha_key},
+        )
+        chat = json.loads(urllib.request.urlopen(req, timeout=5).read())
+        name = chat.get('name', '')
+        digits = re.sub(r'\D', '', name)
+        if len(digits) >= 9:
+            current_app.logger.info(
+                f'Resolved @lid {lid_id} to phone {digits} via chat name "{name}"'
+            )
+            return digits
+    except Exception:
+        pass  # Fall through to full list
+
+    # Fallback: scan all chats (in case single-chat endpoint not available)
     try:
         req = urllib.request.Request(
             f'{waha_url}/api/{session}/chats',
             headers={'X-Api-Key': waha_key},
         )
-        chats = json.loads(urllib.request.urlopen(req, timeout=5).read())
+        chats = json.loads(urllib.request.urlopen(req, timeout=10).read())
         for chat in chats:
             cid = chat.get('id', '')
-            # id can be a dict (WEBJS) or a string
             if isinstance(cid, dict):
                 serialized = cid.get('_serialized', '')
             else:
                 serialized = str(cid)
             if serialized == lid_id:
                 name = chat.get('name', '')
-                # Name is often the phone in format "+48 519 179 904"
                 digits = re.sub(r'\D', '', name)
                 if len(digits) >= 9:
                     current_app.logger.info(
@@ -126,7 +146,7 @@ CANCEL_PATTERNS = [
     r'\bnie\s+(bede|będę)\b',
     r'\bodwo[łl]uj[eę]\b',
     r'\banuluj[eę]?\b',
-
+    r'\brezygnuj[eę]\s+ze\s+wszystk',
 ]
 
 
@@ -219,20 +239,29 @@ def find_volunteer_by_phone(phone: str) -> Volunteer | None:
     return volunteer
 
 
-def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
-    """Get bookings for today and tomorrow that haven't been confirmed yet."""
+def get_pending_bookings(volunteer: Volunteer, *, future_only: bool = False) -> list[Booking]:
+    """Get bookings that haven't been confirmed yet.
+
+    By default returns bookings for today and tomorrow (for confirm flow).
+    With ``future_only=True`` returns ALL future unconfirmed bookings
+    (used for cancel flow so REZYGNUJĘ covers trainings further out).
+    """
     now = datetime.now(timezone.utc)
-    tomorrow = now.date() + timedelta(days=1)
-    tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
     
-    return Booking.query.join(Training).filter(
+    query = Booking.query.join(Training).filter(
         Booking.volunteer_id == volunteer.id,
         Training.date >= now,
-        Training.date <= tomorrow_end,
         Training.is_canceled.is_(False),
         Training.is_deleted.is_(False),
-        Booking.is_confirmed.is_(None),
-    ).order_by(Training.date).all()
+    )
+    
+    if not future_only:
+        # Confirm flow: only today + tomorrow
+        tomorrow = now.date() + timedelta(days=1)
+        tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
+        query = query.filter(Training.date <= tomorrow_end, Booking.is_confirmed.is_(None))
+    
+    return query.order_by(Training.date).all()
 
 
 def send_confirmation_response(chat_id: str, booking: Booking | list[Booking]) -> None:
@@ -283,18 +312,25 @@ def send_cancellation_response(chat_id: str, booking: Booking) -> None:
     send_whatsapp_message('', message, chat_id=chat_id)
 
 
-def send_selection_prompt(chat_id: str, bookings: list[Booking]) -> None:
-    """Send message asking user to select which training to confirm."""
-    lines = ["📋 Masz kilka treningów jutro. Który potwierdzasz?\n"]
+def send_selection_prompt(chat_id: str, bookings: list[Booking], *, cancel_mode: bool = False) -> None:
+    """Send message asking user to select which training."""
+    if cancel_mode:
+        lines = ["📋 Z którego treningu rezygnujesz?\n"]
+    else:
+        lines = ["📋 Masz kilka treningów. Który potwierdzasz?\n"]
     
     for i, booking in enumerate(bookings, 1):
         training = booking.training
         lines.append(
-            f"{i}. {training.date.strftime('%H:%M')} - {training.location.name}"
+            f"{i}. {training.date.strftime('%Y-%m-%d %H:%M')} - {training.location.name}"
         )
     
-    lines.append("\n✅ Odpisz numer (np. 1) aby potwierdzić")
-    lines.append("❌ Odpisz 'rezygnuję z X' aby zrezygnować")
+    if cancel_mode:
+        lines.append("\n❌ Odpisz numer (np. 1) aby zrezygnować")
+        lines.append("❌ Odpisz 'rezygnuję ze wszystkich' aby odwołać wszystkie")
+    else:
+        lines.append("\n✅ Odpisz numer (np. 1) aby potwierdzić")
+        lines.append("❌ Odpisz 'rezygnuję z X' aby zrezygnować")
     
     send_whatsapp_message('', "\n".join(lines), chat_id=chat_id)
 
@@ -325,12 +361,18 @@ def send_unknown_response(chat_id: str, message: str = "", volunteer: Volunteer 
     send_whatsapp_message('', fallback, chat_id=chat_id)
 
 
-def send_no_booking_response(chat_id: str) -> None:
+def send_no_booking_response(chat_id: str, *, intent: str | None = None) -> None:
     """Send response when no pending booking found."""
-    message = (
-        "ℹ️ Nie znaleziono żadnego treningu do potwierdzenia na jutro.\n\n"
-        "Jeśli uważasz, że to błąd, skontaktuj się z nami."
-    )
+    if intent == 'cancel':
+        message = (
+            "ℹ️ Nie masz żadnych przyszłych treningów do odwołania.\n\n"
+            "Jeśli uważasz, że to błąd, skontaktuj się z nami."
+        )
+    else:
+        message = (
+            "ℹ️ Nie znaleziono żadnego treningu do potwierdzenia na jutro.\n\n"
+            "Jeśli uważasz, że to błąd, skontaktuj się z nami."
+        )
     send_whatsapp_message('', message, chat_id=chat_id)
 
 
@@ -474,13 +516,61 @@ def whatsapp_webhook():
                     selection = int(cancel_match.group(1))
                     if 1 <= selection <= len(bookings):
                         booking = bookings[selection - 1]
-                        booking.is_confirmed = False
-                        db.session.commit()
+                        training = booking.training
+                        was_confirmed = booking.is_confirmed is True
+                        vol_name = f"{volunteer.first_name} {volunteer.last_name}"
+                        # Capture coach info before delete
+                        coach_info = None
+                        if was_confirmed and training.coach and training.coach.phone_number:
+                            coach_info = {
+                                'phone': training.coach.phone_number,
+                                'name': f"{training.coach.first_name} {training.coach.last_name}",
+                                'date': training.date.strftime('%Y-%m-%d %H:%M'),
+                                'location': training.location.name,
+                            }
                         send_cancellation_response(chat_id, booking)
+                        db.session.delete(booking)
+                        db.session.commit()
+                        if coach_info:
+                            notify_coach_volunteer_canceled(
+                                coach_phone=coach_info['phone'],
+                                coach_name=coach_info['name'],
+                                volunteer_name=vol_name,
+                                training_date=coach_info['date'],
+                                training_location=coach_info['location'],
+                            )
                         del _pending_selections[chat_id]
                         return jsonify({'status': 'ok', 'action': 'cancelled_selection'}), 200
                 except ValueError:
                     pass
+            
+            # Check for "rezygnuję ze wszystkich" — cancel ALL pending bookings
+            if re.search(r'rezygnuj\w*\s+ze\s+wszystk|cancel|rezygnuj[eę]', message_body.lower()):
+                vol_name = f"{volunteer.first_name} {volunteer.last_name}"
+                for bk in bookings:
+                    training = bk.training
+                    was_confirmed = bk.is_confirmed is True
+                    coach_info = None
+                    if was_confirmed and training.coach and training.coach.phone_number:
+                        coach_info = {
+                            'phone': training.coach.phone_number,
+                            'name': f"{training.coach.first_name} {training.coach.last_name}",
+                            'date': training.date.strftime('%Y-%m-%d %H:%M'),
+                            'location': training.location.name,
+                        }
+                    send_cancellation_response(chat_id, bk)
+                    db.session.delete(bk)
+                    db.session.commit()
+                    if coach_info:
+                        notify_coach_volunteer_canceled(
+                            coach_phone=coach_info['phone'],
+                            coach_name=coach_info['name'],
+                            volunteer_name=vol_name,
+                            training_date=coach_info['date'],
+                            training_location=coach_info['location'],
+                        )
+                del _pending_selections[chat_id]
+                return jsonify({'status': 'ok', 'action': 'cancelled_all_selection'}), 200
             
             # Didn't understand, repeat the selection prompt
             send_selection_prompt(chat_id, bookings)
@@ -496,34 +586,86 @@ def whatsapp_webhook():
             print(f"[WEBHOOK] AI response sent", flush=True)
             return jsonify({'status': 'ok', 'action': 'unknown'}), 200
         
-        # Get pending bookings for tomorrow
+        # --- Helper: delete booking + optionally notify coach ---
+        def _cancel_booking(bk: Booking):
+            """Delete a booking. Notify coach only if volunteer had confirmed."""
+            training = bk.training
+            was_confirmed = bk.is_confirmed is True
+            vol_name = f"{volunteer.first_name} {volunteer.last_name}"
+            
+            # Capture info for coach notification BEFORE deleting
+            coach_info = None
+            if was_confirmed and training.coach and training.coach.phone_number:
+                coach_info = {
+                    'phone': training.coach.phone_number,
+                    'name': f"{training.coach.first_name} {training.coach.last_name}",
+                    'date': training.date.strftime('%Y-%m-%d %H:%M'),
+                    'location': training.location.name,
+                }
+            
+            # Send cancellation WA message BEFORE delete (needs relationships)
+            send_cancellation_response(chat_id, bk)
+            
+            db.session.delete(bk)
+            db.session.commit()
+            
+            # Notify coach only if volunteer had already confirmed
+            if coach_info:
+                notify_coach_volunteer_canceled(
+                    coach_phone=coach_info['phone'],
+                    coach_name=coach_info['name'],
+                    volunteer_name=vol_name,
+                    training_date=coach_info['date'],
+                    training_location=coach_info['location'],
+                )
+        
+        # --- Cancel flow: use ALL future bookings ---------------------
+        is_cancel = intent and ('cancel' in intent)
+        
+        if is_cancel:
+            cancel_bookings = get_pending_bookings(volunteer, future_only=True)
+            if not cancel_bookings:
+                send_no_booking_response(chat_id, intent='cancel')
+                return jsonify({'status': 'ok', 'action': 'no_booking'}), 200
+            
+            # cancel_N — specific booking
+            num_match = re.match(r'cancel_(\d+)', intent)
+            if num_match:
+                idx = int(num_match.group(1))
+                if 1 <= idx <= len(cancel_bookings):
+                    _cancel_booking(cancel_bookings[idx - 1])
+                    return jsonify({'status': 'ok', 'action': f'cancel_{idx}'}), 200
+                _pending_selections[chat_id] = cancel_bookings
+                send_selection_prompt(chat_id, cancel_bookings, cancel_mode=True)
+                return jsonify({'status': 'ok', 'action': 'bad_number'}), 200
+            
+            # Single booking — cancel immediately
+            if len(cancel_bookings) == 1:
+                _cancel_booking(cancel_bookings[0])
+                return jsonify({'status': 'ok', 'action': 'cancelled'}), 200
+            
+            # Multiple bookings — ask which one
+            _pending_selections[chat_id] = cancel_bookings
+            send_selection_prompt(chat_id, cancel_bookings, cancel_mode=True)
+            return jsonify({'status': 'ok', 'action': 'selection_requested'}), 200
+        
+        # --- Confirm flow: today + tomorrow only ----------------------
         pending_bookings = get_pending_bookings(volunteer)
         
         if not pending_bookings:
             send_no_booking_response(chat_id)
             return jsonify({'status': 'ok', 'action': 'no_booking'}), 200
         
-        # --- Helper: confirm/cancel Nth booking -----------------------
-        def _handle_nth(n: int, confirm: bool):
-            """Confirm or cancel booking number *n* (1-based)."""
-            if 1 <= n <= len(pending_bookings):
-                bk = pending_bookings[n - 1]
-                bk.is_confirmed = confirm
-                db.session.commit()
-                if confirm:
-                    send_confirmation_response(chat_id, bk)
-                else:
-                    send_cancellation_response(chat_id, bk)
-                return True
-            return False
-
-        # --- Handle confirm_N / cancel_N intents ----------------------
-        num_match = re.match(r'(confirm|cancel)_(\d+)', intent or '')
+        # confirm_N — specific booking
+        num_match = re.match(r'confirm_(\d+)', intent or '')
         if num_match:
-            action, idx = num_match.group(1), int(num_match.group(2))
-            if _handle_nth(idx, confirm=(action == 'confirm')):
-                return jsonify({'status': 'ok', 'action': f'{action}_{idx}'}), 200
-            # Invalid number — fall through to selection prompt
+            idx = int(num_match.group(1))
+            if 1 <= idx <= len(pending_bookings):
+                bk = pending_bookings[idx - 1]
+                bk.is_confirmed = True
+                db.session.commit()
+                send_confirmation_response(chat_id, bk)
+                return jsonify({'status': 'ok', 'action': f'confirm_{idx}'}), 200
             _pending_selections[chat_id] = pending_bookings
             send_selection_prompt(chat_id, pending_bookings)
             return jsonify({'status': 'ok', 'action': 'bad_number'}), 200
@@ -531,34 +673,17 @@ def whatsapp_webhook():
         # Handle single booking
         if len(pending_bookings) == 1:
             booking = pending_bookings[0]
-            
-            if intent == 'confirm':
-                booking.is_confirmed = True
-                db.session.commit()
-                send_confirmation_response(chat_id, booking)
-                return jsonify({'status': 'ok', 'action': 'confirmed'}), 200
-            
-            elif intent == 'cancel':
-                booking.is_confirmed = False
-                db.session.commit()
-                send_cancellation_response(chat_id, booking)
-                return jsonify({'status': 'ok', 'action': 'cancelled'}), 200
+            booking.is_confirmed = True
+            db.session.commit()
+            send_confirmation_response(chat_id, booking)
+            return jsonify({'status': 'ok', 'action': 'confirmed'}), 200
         
-        # Multiple bookings
-        else:
-            if intent == 'confirm':
-                # Confirm ALL pending bookings at once
-                for booking in pending_bookings:
-                    booking.is_confirmed = True
-                db.session.commit()
-                send_confirmation_response(chat_id, pending_bookings)
-                return jsonify({'status': 'ok', 'action': 'confirmed_all'}), 200
-
-            elif intent == 'cancel':
-                # For cancellation, ask which one
-                _pending_selections[chat_id] = pending_bookings
-                send_selection_prompt(chat_id, pending_bookings)
-                return jsonify({'status': 'ok', 'action': 'selection_requested'}), 200
+        # Multiple bookings — confirm all
+        for booking in pending_bookings:
+            booking.is_confirmed = True
+        db.session.commit()
+        send_confirmation_response(chat_id, pending_bookings)
+        return jsonify({'status': 'ok', 'action': 'confirmed_all'}), 200
         
     except Exception as e:
         import traceback

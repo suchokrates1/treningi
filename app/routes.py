@@ -19,6 +19,7 @@ from .whatsapp_utils import (
     notify_coach_volunteer_canceled,
     schedule_signup_notification,
     format_phone_display,
+    normalize_phone_number,
 )
 
 bp = Blueprint('routes', __name__)
@@ -60,6 +61,8 @@ def index():
         first_name = form.first_name.data.strip()
         last_name = form.last_name.data.strip()
         phone_number = form.phone_number.data.strip() if form.phone_number.data else None
+        if phone_number:
+            phone_number = normalize_phone_number(phone_number)
 
         if not existing_volunteer:
             existing_volunteer = Volunteer(
@@ -353,7 +356,8 @@ def update_phone(token):
     
     if form.validate_on_submit():
         # Zapisz numer telefonu
-        volunteer.phone_number = form.phone_number.data
+        phone_raw = form.phone_number.data.strip() if form.phone_number.data else None
+        volunteer.phone_number = normalize_phone_number(phone_raw) if phone_raw else None
         # Wyczyść token - link jednorazowy
         volunteer.phone_update_token = None
         db.session.commit()
