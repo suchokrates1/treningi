@@ -130,7 +130,7 @@ def test_registration_attachments_match_age(
         captured.append(kwargs.get("attachments"))
         return True, None
 
-    monkeypatch.setattr("app.routes.send_email", fake_send_email)
+    monkeypatch.setattr("app.email_utils.send_email", fake_send_email)
 
     with app_instance.app_context():
         adult_file = StoredFile(

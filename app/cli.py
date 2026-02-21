@@ -233,7 +233,7 @@ def send_coach_summary_command(hours_before, window_minutes):
     
     Example cron (every 30 min): */30 * * * * cd /app && flask send-coach-summary
     """
-    from .whatsapp_utils import send_whatsapp_message, format_phone_display, normalize_phone_number
+    from .whatsapp_utils import send_whatsapp_message, format_phone_display
     from .models import Coach
 
     # Use Warsaw timezone consistently
@@ -358,7 +358,7 @@ def send_coach_summary_command(hours_before, window_minutes):
                 for booking in confirmed_bookings:
                     vol = booking.volunteer
                     if vol.phone_number:
-                        phone_str = normalize_phone_number(vol.phone_number)
+                        phone_str = format_phone_display(vol.phone_number)
                     else:
                         phone_str = "brak tel."
                     message_lines.append(f"  ✅ {vol.first_name} {vol.last_name} ({phone_str})")
@@ -367,7 +367,7 @@ def send_coach_summary_command(hours_before, window_minutes):
                 for booking in pending_bookings:
                     vol = booking.volunteer
                     if vol.phone_number:
-                        phone_str = normalize_phone_number(vol.phone_number)
+                        phone_str = format_phone_display(vol.phone_number)
                     else:
                         phone_str = "brak tel."
                     message_lines.append(f"  ❓ {vol.first_name} {vol.last_name} ({phone_str})")
@@ -376,7 +376,7 @@ def send_coach_summary_command(hours_before, window_minutes):
                 for booking in declined_bookings:
                     vol = booking.volunteer
                     if vol.phone_number:
-                        phone_str = normalize_phone_number(vol.phone_number)
+                        phone_str = format_phone_display(vol.phone_number)
                     else:
                         phone_str = "brak tel."
                     message_lines.append(f"  ❌ {vol.first_name} {vol.last_name} ({phone_str})")
