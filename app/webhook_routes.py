@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 from . import db
 from .models import Volunteer, Booking, Training, Coach
-from .whatsapp_utils import send_whatsapp_message, normalize_phone_number, notify_coach_volunteer_canceled
+from .whatsapp_utils import send_whatsapp_message, normalize_phone_number, notify_coach_volunteer_canceled, format_phone_display
 from .ai_assistant import ask_gemini
 
 webhook_bp = Blueprint('webhook', __name__)
@@ -239,28 +239,28 @@ def find_volunteer_by_phone(phone: str) -> Volunteer | None:
     return volunteer
 
 
-def get_pending_bookings(volunteer: Volunteer, *, future_only: bool = False) -> list[Booking]:
-    """Get bookings that haven't been confirmed yet.
+def get_pending_bookings(volunteer: Volunteer, *, for_cancel: bool = False) -> list[Booking]:
+    """Get bookings for today and tomorrow.
 
-    By default returns bookings for today and tomorrow (for confirm flow).
-    With ``future_only=True`` returns ALL future unconfirmed bookings
-    (used for cancel flow so REZYGNUJĘ covers trainings further out).
+    Default (confirm flow): only unconfirmed (``is_confirmed is None``).
+    With ``for_cancel=True``: any confirmation status — so REZYGNUJĘ
+    covers exactly the trainings the reminder asked about.
     """
     now = datetime.now(timezone.utc)
-    
+    tomorrow = now.date() + timedelta(days=1)
+    tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
+
     query = Booking.query.join(Training).filter(
         Booking.volunteer_id == volunteer.id,
         Training.date >= now,
+        Training.date <= tomorrow_end,
         Training.is_canceled.is_(False),
         Training.is_deleted.is_(False),
     )
-    
-    if not future_only:
-        # Confirm flow: only today + tomorrow
-        tomorrow = now.date() + timedelta(days=1)
-        tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
-        query = query.filter(Training.date <= tomorrow_end, Booking.is_confirmed.is_(None))
-    
+
+    if not for_cancel:
+        query = query.filter(Booking.is_confirmed.is_(None))
+
     return query.order_by(Training.date).all()
 
 
@@ -365,7 +365,7 @@ def send_no_booking_response(chat_id: str, *, intent: str | None = None) -> None
     """Send response when no pending booking found."""
     if intent == 'cancel':
         message = (
-            "ℹ️ Nie masz żadnych przyszłych treningów do odwołania.\n\n"
+            "ℹ️ Nie masz żadnych treningów na dziś lub jutro do odwołania.\n\n"
             "Jeśli uważasz, że to błąd, skontaktuj się z nami."
         )
     else:
@@ -623,7 +623,7 @@ def whatsapp_webhook():
         is_cancel = intent and ('cancel' in intent)
         
         if is_cancel:
-            cancel_bookings = get_pending_bookings(volunteer, future_only=True)
+            cancel_bookings = get_pending_bookings(volunteer, for_cancel=True)
             if not cancel_bookings:
                 send_no_booking_response(chat_id, intent='cancel')
                 return jsonify({'status': 'ok', 'action': 'no_booking'}), 200

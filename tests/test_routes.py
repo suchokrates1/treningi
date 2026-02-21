@@ -125,7 +125,6 @@ def test_signup_handles_attachment_metadata(
         return True, None
 
     monkeypatch.setattr("app.email_utils.send_email", fake_send_email)
-    monkeypatch.setattr("app.routes.send_email", fake_send_email)
 
     response = client.post(
         "/",

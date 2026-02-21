@@ -440,10 +440,15 @@ def notify_volunteer_signup_confirmation(
     training_date: str,
     training_location: str,
     booking_count: int = 0,
+    *,
+    coach_name: str = '',
+    coach_phone: str = '',
 ) -> tuple[bool, Optional[str]]:
     """Send signup confirmation to volunteer (single training)."""
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
     training_location = sanitize_for_whatsapp(training_location, MAX_LOCATION_LENGTH)
+    coach_name = sanitize_for_whatsapp(coach_name, MAX_NAME_LENGTH)
+    formatted_coach_phone = format_phone_display(coach_phone) if coach_phone else ''
     milestone = _milestone_line(booking_count)
 
     returning_line = ""
@@ -457,7 +462,9 @@ def notify_volunteer_signup_confirmation(
         "{kamien_milowy}"
         "\nTwój zapis został przyjęty:\n\n"
         "📅 Data: {data}\n"
-        "📍 Miejsce: {miejsce}\n\n"
+        "📍 Miejsce: {miejsce}\n"
+        "👨‍🏫 Trener: {trener}\n"
+        "📞 Telefon: {telefon}\n\n"
         "📧 Sprawdź e-mail — wysłaliśmy szczegóły i dokumenty.\n\n"
         "Do zobaczenia! 👋\n\n"
         + _FOOTER
@@ -468,6 +475,8 @@ def notify_volunteer_signup_confirmation(
         .replace("{imię}", volunteer_name)
         .replace("{data}", training_date)
         .replace("{miejsce}", training_location)
+        .replace("{trener}", coach_name)
+        .replace("{telefon}", formatted_coach_phone)
         .replace("{powracajacy}", returning_line)
         .replace("{kamien_milowy}", milestone)
     )
@@ -482,7 +491,11 @@ def notify_volunteer_signup_confirmation_multi(
 ) -> tuple[bool, Optional[str]]:
     """Send consolidated signup confirmation for multiple trainings.
 
-    Each entry in *trainings_info*: ``date``, ``location``.
+    Each entry in *trainings_info*: ``date``, ``location``,
+    ``coach_name``, ``coach_phone``.
+
+    When all trainings share the same location/coach, the shared info
+    is shown once instead of being repeated for every entry.
     """
     volunteer_name = sanitize_for_whatsapp(volunteer_name, MAX_NAME_LENGTH)
     milestone = _milestone_line(booking_count)
@@ -501,9 +514,36 @@ def notify_volunteer_signup_confirmation_multi(
         lines.append(milestone.strip())
 
     lines.append(f"\nTwoje zapisy ({len(trainings_info)}) zostały przyjęte:\n")
-    for i, t in enumerate(trainings_info, 1):
-        loc = sanitize_for_whatsapp(t['location'], MAX_LOCATION_LENGTH)
-        lines.append(f"*{i}.* 📅 {t['date']} — 📍 {loc}")
+
+    # Check if all trainings share the same location + coach
+    locations = {t.get('location', '') for t in trainings_info}
+    coaches = {t.get('coach_name', '') for t in trainings_info}
+    same_venue = len(locations) == 1 and len(coaches) == 1
+
+    if same_venue:
+        # Same location + coach → list only dates, show venue once
+        for i, t in enumerate(trainings_info, 1):
+            lines.append(f"*{i}.* 📅 {t['date']}")
+        loc = sanitize_for_whatsapp(trainings_info[0]['location'], MAX_LOCATION_LENGTH)
+        coach = sanitize_for_whatsapp(trainings_info[0].get('coach_name', ''), MAX_NAME_LENGTH)
+        coach_ph = format_phone_display(trainings_info[0].get('coach_phone', ''))
+        lines.append(f"\n📍 Miejsce: {loc}")
+        if coach:
+            lines.append(f"👨‍🏫 Trener: {coach}")
+        if coach_ph:
+            lines.append(f"📞 Telefon: {coach_ph}")
+    else:
+        # Different venues → show all details per training
+        for i, t in enumerate(trainings_info, 1):
+            loc = sanitize_for_whatsapp(t['location'], MAX_LOCATION_LENGTH)
+            coach = sanitize_for_whatsapp(t.get('coach_name', ''), MAX_NAME_LENGTH)
+            coach_ph = format_phone_display(t.get('coach_phone', ''))
+            line = f"*{i}.* 📅 {t['date']} — 📍 {loc}"
+            if coach:
+                line += f"\n   👨‍🏫 {coach}"
+                if coach_ph:
+                    line += f", 📞 {coach_ph}"
+            lines.append(line)
 
     lines.append("\n📧 Sprawdź e-mail — wysłaliśmy szczegóły i dokumenty.")
     lines.append(f"\nDo zobaczenia! 👋\n\n{_FOOTER}")
@@ -522,13 +562,30 @@ def schedule_signup_notification(
     training_date: str,
     training_location: str,
     app,
+    *,
+    coach_name: str = '',
+    coach_phone: str = '',
+    training_id: int | None = None,
+    cancel_link: str = '',
+    volunteer_email: str = '',
+    volunteer_last_name: str = '',
+    is_adult: bool = True,
+    logo_url: str = '',
 ) -> None:
     """Schedule a signup confirmation with a grace period.
 
     If the same volunteer signs up for another training within
-    ``SIGNUP_GRACE_PERIOD_SECONDS``, the messages are consolidated.
+    ``SIGNUP_GRACE_PERIOD_SECONDS``, both WhatsApp and email
+    confirmations are consolidated into single messages.
     """
-    training_info = {"date": training_date, "location": training_location}
+    training_info = {
+        "date": training_date,
+        "location": training_location,
+        "coach_name": coach_name,
+        "coach_phone": coach_phone,
+        "training_id": training_id,
+        "cancel_link": cancel_link,
+    }
 
     with _pending_lock:
         entry = _pending_signups.get(volunteer_id)
@@ -536,28 +593,143 @@ def schedule_signup_notification(
             # Cancel existing timer and append training
             entry["timer"].cancel()
             entry["trainings"].append(training_info)
+            # Keep latest volunteer data
+            if volunteer_email:
+                entry["email"] = volunteer_email
+            if volunteer_last_name:
+                entry["last_name"] = volunteer_last_name
+            entry["is_adult"] = is_adult
+            if logo_url:
+                entry["logo_url"] = logo_url
         else:
             entry = {
                 "phone": volunteer_phone,
                 "name": volunteer_name,
+                "email": volunteer_email,
+                "last_name": volunteer_last_name,
+                "is_adult": is_adult,
+                "logo_url": logo_url,
                 "trainings": [training_info],
                 "timer": None,
             }
             _pending_signups[volunteer_id] = entry
 
-        # (Re)start timer
-        timer = threading.Timer(
-            SIGNUP_GRACE_PERIOD_SECONDS,
-            _flush_pending_signup,
-            args=[volunteer_id, app],
-        )
-        timer.daemon = True
-        entry["timer"] = timer
-        timer.start()
+        # In test mode, flush immediately (no timer) so assertions work
+        if getattr(app, 'testing', False):
+            # Release lock before calling flush (it re-acquires it)
+            pass  # will call flush outside lock block
+
+    if getattr(app, 'testing', False):
+        _flush_pending_signup(volunteer_id, app)
+        return
+
+    with _pending_lock:
+        entry = _pending_signups.get(volunteer_id)
+        if entry:
+            # (Re)start timer
+            timer = threading.Timer(
+                SIGNUP_GRACE_PERIOD_SECONDS,
+                _flush_pending_signup,
+                args=[volunteer_id, app],
+            )
+            timer.daemon = True
+            entry["timer"] = timer
+            timer.start()
+
+
+def _send_signup_email(
+    volunteer_email: str,
+    volunteer_first_name: str,
+    volunteer_last_name: str,
+    is_adult: bool,
+    trainings: list[dict],
+    logo_url: str,
+) -> None:
+    """Send consolidated signup confirmation email.
+
+    Must be called within an app context.
+    """
+    from .models import EmailSettings, StoredFile
+    from . import email_utils
+    from .template_utils import render_template_string
+    from pathlib import Path
+
+    settings = EmailSettings.query.first()
+    if not settings or not settings.registration_template:
+        return
+
+    # Build training info for template
+    if len(trainings) == 1:
+        t = trainings[0]
+        training_str = f"{t['date']} w {t['location']}"
+        cancel_link = t.get('cancel_link', '')
+    else:
+        parts = []
+        for t in trainings:
+            parts.append(f"{t['date']} w {t['location']}")
+        training_str = "<br>".join(parts)
+        cancel_link = trainings[0].get('cancel_link', '')
+
+    data = {
+        "first_name": volunteer_first_name,
+        "last_name": volunteer_last_name,
+        "training": training_str,
+        "cancel_link": cancel_link,
+        "date": trainings[0]["date"],
+        "location": trainings[0]["location"],
+        "logo": logo_url,
+    }
+
+    html_body = render_template_string(settings.registration_template, data)
+
+    # Load attachments (once, regardless of how many trainings)
+    attachments: list[tuple[str, str, bytes]] = []
+    attachments_meta = (
+        settings.registration_files_adult if is_adult
+        else settings.registration_files_minor
+    ) or []
+
+    legacy_ids = [entry for entry in attachments_meta if isinstance(entry, int)]
+    if legacy_ids:
+        stored_files = StoredFile.query.filter(StoredFile.id.in_(legacy_ids)).all()
+        stored_by_id = {f.id: f for f in stored_files}
+        for file_id in legacy_ids:
+            sf = stored_by_id.get(file_id)
+            if sf:
+                attachments.append((sf.filename, sf.content_type, sf.data))
+
+    attachments_dir = Path(current_app.instance_path) / "attachments"
+    for entry in attachments_meta:
+        if not isinstance(entry, dict):
+            continue
+        stored_name = entry.get("stored_name")
+        if not stored_name:
+            continue
+        file_path = attachments_dir / stored_name
+        try:
+            file_data = file_path.read_bytes()
+        except OSError:
+            current_app.logger.warning(
+                "Attachment file %s referenced in settings is missing", file_path,
+            )
+            continue
+        filename = entry.get("original_name") or entry.get("filename") or stored_name
+        content_type = entry.get("content_type") or "application/octet-stream"
+        attachments.append((filename, content_type, file_data))
+
+    success, error = email_utils.send_email(
+        "Potwierdzenie zgłoszenia",
+        None,
+        [volunteer_email],
+        html_body=html_body,
+        attachments=attachments,
+    )
+    if not success:
+        current_app.logger.warning("Failed to send signup email to %s: %s", volunteer_email, error)
 
 
 def _flush_pending_signup(volunteer_id: int, app) -> None:
-    """Send the consolidated signup notification after the grace period."""
+    """Send the consolidated signup notification (WA + email) after the grace period."""
     with _pending_lock:
         entry = _pending_signups.pop(volunteer_id, None)
     if not entry:
@@ -566,17 +738,36 @@ def _flush_pending_signup(volunteer_id: int, app) -> None:
     with app.app_context():
         booking_count = get_volunteer_booking_count(volunteer_id)
         trainings = entry["trainings"]
-        phone = entry["phone"]
-        name = entry["name"]
+        phone = entry.get("phone", "")
+        name = entry.get("name", "")
+        email = entry.get("email", "")
+        last_name = entry.get("last_name", "")
+        is_adult = entry.get("is_adult", True)
+        logo_url = entry.get("logo_url", "")
 
-        if len(trainings) == 1:
-            t = trainings[0]
-            notify_volunteer_signup_confirmation(
-                phone, name, t["date"], t["location"],
-                booking_count=booking_count,
-            )
-        else:
-            notify_volunteer_signup_confirmation_multi(
-                phone, name, trainings,
-                booking_count=booking_count,
+        # --- Consolidated WhatsApp ---
+        if phone:
+            if len(trainings) == 1:
+                t = trainings[0]
+                notify_volunteer_signup_confirmation(
+                    phone, name, t["date"], t["location"],
+                    booking_count=booking_count,
+                    coach_name=t.get("coach_name", ""),
+                    coach_phone=t.get("coach_phone", ""),
+                )
+            else:
+                notify_volunteer_signup_confirmation_multi(
+                    phone, name, trainings,
+                    booking_count=booking_count,
+                )
+
+        # --- Consolidated email ---
+        if email:
+            _send_signup_email(
+                volunteer_email=email,
+                volunteer_first_name=name,
+                volunteer_last_name=last_name,
+                is_adult=is_adult,
+                trainings=trainings,
+                logo_url=logo_url,
             )

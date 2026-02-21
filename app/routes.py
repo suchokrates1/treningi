@@ -9,8 +9,7 @@ from flask import (
     abort,
 )
 from datetime import datetime, date, timezone
-from pathlib import Path
-from .models import Training, Booking, Volunteer, EmailSettings, StoredFile
+from .models import Training, Booking, Volunteer, EmailSettings
 from .forms import VolunteerForm, CancelForm, PhoneUpdateForm
 from . import db
 from .email_utils import send_email
@@ -98,113 +97,26 @@ def index():
         db.session.add(booking)
         db.session.commit()
 
-        # Coach receives daily summary before training (send-coach-summary),
-        # no individual signup notifications via WhatsApp.
-
-        settings = db.session.get(EmailSettings, 1)
-        if settings and settings.registration_template:
-            cancel_link = url_for(
-                "routes.cancel_booking",
-                training_id=training.id,
-                _external=True,
-            )
-            training_info = (
-                f"{training.date.strftime('%Y-%m-%d %H:%M')} "
-                f"w {training.location.name}"
-            )
-            data = {
-                "first_name": existing_volunteer.first_name,
-                "last_name": existing_volunteer.last_name,
-                "training": training_info,
-                "cancel_link": cancel_link,
-                "date": training.date.strftime("%Y-%m-%d %H:%M"),
-                "location": training.location.name,
-                "logo": url_for("static", filename="logo.png", _external=True),
-            }
-            html_body = render_template_string(
-                settings.registration_template, data
-            )
-            attachments: list[tuple[str, str, bytes]] = []
-            if settings:
-                attachments_meta = (
-                    settings.registration_files_adult
-                    if existing_volunteer.is_adult
-                    else settings.registration_files_minor
-                ) or []
-
-                legacy_ids = [
-                    entry for entry in attachments_meta if isinstance(entry, int)
-                ]
-                if legacy_ids:
-                    stored = (
-                        StoredFile.query.filter(StoredFile.id.in_(legacy_ids)).all()
-                    )
-                    stored_by_id = {file.id: file for file in stored}
-                    for file_id in legacy_ids:
-                        stored_file = stored_by_id.get(file_id)
-                        if not stored_file:
-                            current_app.logger.warning(
-                                "Stored file with id %s referenced in settings but missing",
-                                file_id,
-                            )
-                            continue
-                        attachments.append(
-                            (
-                                stored_file.filename,
-                                stored_file.content_type,
-                                stored_file.data,
-                            )
-                        )
-
-                attachments_dir = Path(current_app.instance_path) / "attachments"
-                for entry in attachments_meta:
-                    if not isinstance(entry, dict):
-                        continue
-                    stored_name = entry.get("stored_name")
-                    if not stored_name:
-                        continue
-                    file_path = attachments_dir / stored_name
-                    try:
-                        data = file_path.read_bytes()
-                    except OSError:
-                        current_app.logger.warning(
-                            "Attachment file %s referenced in settings is missing",
-                            file_path,
-                        )
-                        continue
-                    filename = (
-                        entry.get("original_name")
-                        or entry.get("filename")
-                        or stored_name
-                    )
-                    content_type = entry.get("content_type") or "application/octet-stream"
-                    attachments.append((filename, content_type, data))
-
-            success, error = send_email(
-                "Potwierdzenie zgłoszenia",
-                None,
-                [existing_volunteer.email],
-                html_body=html_body,
-                attachments=attachments,
-            )
-            if not success:
-                msg = "Nie udało się wysłać potwierdzenia"
-                if error:
-                    msg += f": {error}"
-                flash(msg, "danger")
-
-        # Schedule deferred WhatsApp signup confirmation (consolidates
-        # back-to-back signups within the grace period).
-        if existing_volunteer.phone_number:
-            training_date_str = training.date.strftime('%Y-%m-%d %H:%M')
-            schedule_signup_notification(
-                volunteer_id=existing_volunteer.id,
-                volunteer_phone=existing_volunteer.phone_number,
-                volunteer_name=existing_volunteer.first_name,
-                training_date=training_date_str,
-                training_location=training.location.name,
-                app=current_app._get_current_object(),
-            )
+        # Schedule deferred signup notification (WA + email consolidated).
+        # Both WhatsApp and email are sent together after a grace period
+        # to consolidate back-to-back signups into one message.
+        coach_full = f"{training.coach.first_name} {training.coach.last_name}"
+        schedule_signup_notification(
+            volunteer_id=existing_volunteer.id,
+            volunteer_phone=existing_volunteer.phone_number or '',
+            volunteer_name=existing_volunteer.first_name,
+            training_date=training.date.strftime('%Y-%m-%d %H:%M'),
+            training_location=training.location.name,
+            app=current_app._get_current_object(),
+            coach_name=coach_full,
+            coach_phone=training.coach.phone_number or '',
+            training_id=training.id,
+            cancel_link=url_for("routes.cancel_booking", training_id=training.id, _external=True),
+            volunteer_email=existing_volunteer.email,
+            volunteer_last_name=existing_volunteer.last_name,
+            is_adult=existing_volunteer.is_adult,
+            logo_url=url_for("static", filename="logo.png", _external=True),
+        )
 
         flash("Zapisano na trening!", "success")
         return redirect(url_for('routes.index'))
