@@ -191,24 +191,32 @@ def detect_intent(message: str) -> str | None:
 
 
 def find_volunteer_by_phone(phone: str) -> Volunteer | None:
-    """Find volunteer by phone number."""
+    """Find volunteer by phone number.
+    
+    Handles phones stored with spaces/dashes (e.g. '607 575 408')
+    by stripping non-digit characters before comparison.
+    """
     normalized = normalize_phone_number(phone)
     
-    # Try different formats
-    phone_variants = [
-        normalized,
-        normalized.lstrip('+'),
-        normalized.replace('+48', ''),
-    ]
+    # Extract last 9 digits (Polish phone without country code)
+    digits_only = re.sub(r'\D', '', normalized)
+    last9 = digits_only[-9:] if len(digits_only) >= 9 else digits_only
     
-    for variant in phone_variants:
-        volunteer = Volunteer.query.filter(
-            Volunteer.phone_number.ilike(f'%{variant[-9:]}%')
-        ).first()
-        if volunteer:
-            return volunteer
+    if not last9:
+        return None
     
-    return None
+    # Compare against phone_number with all non-digit chars stripped
+    # This handles phones stored as '607 575 408', '607-575-408', etc.
+    volunteer = Volunteer.query.filter(
+        db.func.replace(
+            db.func.replace(
+                db.func.replace(Volunteer.phone_number, ' ', ''),
+                '-', ''),
+            '+', ''
+        ).like(f'%{last9}%')
+    ).first()
+    
+    return volunteer
 
 
 def get_pending_bookings(volunteer: Volunteer) -> list[Booking]:
