@@ -31,7 +31,7 @@ def upgrade():
         sa.column("email", sa.String),
     )
     coach_emails = {
-        ("Mariusz", "Jodłowski"): "mariusz.jodkowski@gmail.com",
+        ("Mariusz", "Jodkowski"): "mariusz.jodkowski@gmail.com",
         ("Antoni", "Polaszek"): "katalonia13x@gmail.com",
         ("Mariusz", "Appel"): "mappel@op.pl",
         ("Radosław", "Banasz"): "banasz.radek1@gmail.com",
