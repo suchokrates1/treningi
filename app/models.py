@@ -10,6 +10,7 @@ class Coach(db.Model):
     first_name = db.Column(db.String(64), nullable=False)
     last_name = db.Column(db.String(64), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(128), nullable=True)
 
     def __repr__(self):
         return f"<Coach {self.first_name} {self.last_name}>"

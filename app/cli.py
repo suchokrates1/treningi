@@ -404,8 +404,219 @@ def send_coach_summary_command(hours_before, window_minutes):
     click.echo(f"\nPodsumowanie: {sent_count} wyslanych, {failed_count} bledow, {skipped_count} pominietych, {not_yet_count} za wczesnie")
 
 
+@click.command("send-monthly-summary")
+@click.option("--month", default=None, type=int, help="Month number (1-12). Default: previous month.")
+@click.option("--year", default=None, type=int, help="Year. Default: current year (or previous if Jan).")
+@click.option("--test-email", default=None, help="Send all summaries to this email instead (for testing).")
+@with_appcontext
+def send_monthly_summary_command(month, year, test_email):
+    """Send monthly training summary email to each coach.
+
+    By default summarises the previous month.  Run on the last day of
+    each month (or first day of next month) via cron.
+
+    Example cron (last day of month at 21:00):
+      0 21 28-31 * * [ "$(date -d tomorrow +\\%d)" = "01" ] && cd ... && flask send-monthly-summary
+    """
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from .models import Coach
+
+    warsaw_tz = ZoneInfo("Europe/Warsaw")
+    now = datetime.now(warsaw_tz)
+
+    if month is None or year is None:
+        # Default: previous month
+        first_of_current = now.replace(day=1)
+        last_month = first_of_current - timedelta(days=1)
+        month = month or last_month.month
+        year = year or last_month.year
+
+    # Month date range (naive, matching DB storage)
+    month_start = datetime(year, month, 1)
+    if month == 12:
+        month_end = datetime(year + 1, 1, 1)
+    else:
+        month_end = datetime(year, month + 1, 1)
+
+    MONTH_NAMES_PL = [
+        '', 'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
+        'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień',
+    ]
+    month_name = MONTH_NAMES_PL[month]
+    period_label = f"{month_name} {year}"
+
+    coaches = Coach.query.order_by(Coach.last_name).all()
+    sent_count = 0
+    skipped_count = 0
+    failed_count = 0
+
+    for coach in coaches:
+        recipient = test_email or coach.email
+        if not recipient:
+            click.echo(f"POMINIĘTO {coach.first_name} {coach.last_name} — brak emaila")
+            skipped_count += 1
+            continue
+
+        # Get this coach's trainings for the month
+        trainings = (
+            Training.query
+            .filter(
+                Training.coach_id == coach.id,
+                Training.date >= month_start,
+                Training.date < month_end,
+                Training.is_canceled.is_(False),
+                Training.is_deleted.is_(False),
+            )
+            .order_by(Training.date)
+            .all()
+        )
+
+        if not trainings:
+            click.echo(f"POMINIĘTO {coach.first_name} {coach.last_name} — brak treningów w {period_label}")
+            skipped_count += 1
+            continue
+
+        # ── Build Excel workbook ────────────────────────────────
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Treningi {period_label}"
+
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin'),
+        )
+
+        # Title row
+        ws.merge_cells('A1:D1')
+        title_cell = ws['A1']
+        title_cell.value = f"Podsumowanie treningów — {period_label}"
+        title_cell.font = Font(bold=True, size=14, color="2E7D32")
+        title_cell.alignment = Alignment(horizontal='center')
+
+        ws.merge_cells('A2:D2')
+        ws['A2'].value = f"Trener: {coach.first_name} {coach.last_name}"
+        ws['A2'].font = Font(bold=True, size=12)
+        ws['A2'].alignment = Alignment(horizontal='center')
+
+        # Headers
+        headers = ['Data', 'Godzina', 'Miejsce', 'Wolontariusze']
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = thin_border
+
+        row = 5
+        total_trainings = 0
+        total_volunteers = 0
+
+        for training in trainings:
+            total_trainings += 1
+            volunteers = [b.volunteer for b in training.bookings]
+            vol_names = ', '.join(
+                f"{v.first_name} {v.last_name}" for v in volunteers
+            ) if volunteers else '—'
+            total_volunteers += len(volunteers)
+
+            date_str = training.date.strftime('%d.%m.%Y')
+            time_str = training.date.strftime('%H:%M')
+            loc_name = training.location.name
+
+            ws.cell(row=row, column=1, value=date_str).border = thin_border
+            ws.cell(row=row, column=2, value=time_str).border = thin_border
+            ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+            ws.cell(row=row, column=3, value=loc_name).border = thin_border
+            ws.cell(row=row, column=4, value=vol_names).border = thin_border
+            row += 1
+
+        # Summary row
+        row += 1
+        ws.cell(row=row, column=1, value='Łącznie treningów:').font = Font(bold=True)
+        ws.cell(row=row, column=2, value=total_trainings).font = Font(bold=True)
+        ws.cell(row=row, column=1 + 2, value='Łącznie wolontariuszy:').font = Font(bold=True)
+        ws.cell(row=row, column=4, value=total_volunteers).font = Font(bold=True)
+
+        # Auto-width
+        ws.column_dimensions['A'].width = 14
+        ws.column_dimensions['B'].width = 10
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 45
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        excel_bytes = buf.getvalue()
+        filename = f"treningi_{month_name}_{year}.xlsx"
+
+        # ── Build HTML email body ───────────────────────────────
+        html_rows = []
+        for training in trainings:
+            volunteers = [b.volunteer for b in training.bookings]
+            vol_str = ', '.join(
+                f"{v.first_name} {v.last_name}" for v in volunteers
+            ) if volunteers else '<em>brak</em>'
+            html_rows.append(
+                f"<tr>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;'>{training.date.strftime('%d.%m.%Y')}</td>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;text-align:center;'>{training.date.strftime('%H:%M')}</td>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;'>{training.location.name}</td>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;'>{vol_str}</td>"
+                f"</tr>"
+            )
+
+        html_body = f"""\
+<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
+  <h2 style="color:#2E7D32;">🎾 Podsumowanie treningów — {period_label}</h2>
+  <p>Cześć {coach.first_name}!</p>
+  <p>Poniżej znajdziesz podsumowanie Twoich treningów za <strong>{period_label}</strong>:</p>
+  <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+    <thead>
+      <tr style="background:#2E7D32;color:#fff;">
+        <th style="padding:8px 10px;border:1px solid #2E7D32;">Data</th>
+        <th style="padding:8px 10px;border:1px solid #2E7D32;">Godzina</th>
+        <th style="padding:8px 10px;border:1px solid #2E7D32;">Miejsce</th>
+        <th style="padding:8px 10px;border:1px solid #2E7D32;">Wolontariusze</th>
+      </tr>
+    </thead>
+    <tbody>
+      {''.join(html_rows)}
+    </tbody>
+  </table>
+  <p><strong>Łącznie:</strong> {total_trainings} treningów, {total_volunteers} wolontariuszy</p>
+  <p style="margin-top:24px;color:#666;font-size:13px;">
+    Ten email został wygenerowany automatycznie.<br>
+    🎾 Fundacja Widzimy Inaczej — Blind Tenis
+  </p>
+</div>"""
+
+        # ── Send email ──────────────────────────────────────────
+        success, error = send_email(
+            subject=f"Podsumowanie treningów — {period_label}",
+            body=None,
+            recipients=[recipient],
+            html_body=html_body,
+            attachments=[(filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excel_bytes)],
+        )
+
+        coach_name = f"{coach.first_name} {coach.last_name}"
+        if success:
+            sent_count += 1
+            dest = f" → {recipient}" if test_email else ""
+            click.echo(f"OK {coach_name}: {total_trainings} treningów, {total_volunteers} wolontariuszy{dest}")
+        else:
+            failed_count += 1
+            click.echo(f"BŁĄD {coach_name}: {error}")
+
+    click.echo(f"\nWysłano: {sent_count}, pominięto: {skipped_count}, błędów: {failed_count}")
+
+
 def init_app(app):
     """Register CLI commands with the app."""
     app.cli.add_command(send_reminders_command)
     app.cli.add_command(send_phone_requests_command)
     app.cli.add_command(send_coach_summary_command)
+    app.cli.add_command(send_monthly_summary_command)

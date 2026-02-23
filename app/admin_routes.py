@@ -206,6 +206,7 @@ def manage_trainers():
             first_name=form.first_name.data.strip(),
             last_name=form.last_name.data.strip(),
             phone_number=normalize_phone_number(form.phone_number.data.strip()),
+            email=form.email.data.strip() if form.email.data else None,
         )
         db.session.add(new_coach)
         db.session.commit()
@@ -227,6 +228,7 @@ def edit_trainer(coach_id):
         coach.first_name = form.first_name.data.strip()
         coach.last_name = form.last_name.data.strip()
         coach.phone_number = normalize_phone_number(form.phone_number.data.strip())
+        coach.email = form.email.data.strip() if form.email.data else None
         db.session.commit()
         flash("Zaktualizowano dane trenera.", "success")
         return redirect(url_for("admin.manage_trainers"))
