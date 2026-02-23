@@ -24,6 +24,10 @@
         {{ form.phone_number(class="form-control") }}
       </div>
       <div class="col-md-3">
+        {{ form.email.label(class="form-label") }}
+        {{ form.email(class="form-control", type="email", placeholder="opcjonalny") }}
+      </div>
+      <div class="col-md-3">
         <button class="btn btn-admin-success w-100"><i class="bi bi-plus-lg me-1"></i>Dodaj trenera</button>
       </div>
     </div>
@@ -37,12 +41,13 @@
   </div>
   <div class="table-scroll">
     <table class="admin-table">
-      <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th class="text-end">Akcje</th></tr></thead>
+      <thead><tr><th>Imię i nazwisko</th><th>Telefon</th><th>Email</th><th class="text-end">Akcje</th></tr></thead>
       <tbody>
         {% for coach in coaches %}
         <tr>
           <td><strong>{{ coach.first_name }} {{ coach.last_name }}</strong></td>
           <td><a href="tel:{{ coach.phone_number }}"><i class="bi bi-telephone me-1"></i>{{ coach.phone_number|format_phone }}</a></td>
+          <td>{% if coach.email %}<a href="mailto:{{ coach.email }}"><i class="bi bi-envelope me-1"></i>{{ coach.email }}</a>{% else %}<span class="text-muted">---</span>{% endif %}</td>
           <td class="text-end">
             <a href="{{ url_for('admin.edit_trainer', coach_id=coach.id) }}" class="btn btn-icon btn-outline-primary" title="Edytuj">
               <i class="bi bi-pencil"></i>

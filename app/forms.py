@@ -99,6 +99,9 @@ class CoachForm(FlaskForm):
     phone_number = TelField(
         'Telefon', validators=[DataRequired(), Length(max=20), validate_polish_phone]
     )
+    email = StringField(
+        'Email', validators=[Optional(), Email(), Length(max=128)]
+    )
     submit = SubmitField('Zapisz')
 
     def validate(self, extra_validators=None):
