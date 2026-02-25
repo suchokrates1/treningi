@@ -322,6 +322,21 @@ def send_coach_summary_command(hours_before, window_minutes):
             not_yet_count += 1
             continue
 
+        # Skip if coach has NO volunteers at all
+        has_any_volunteers = False
+        for training in coach_trainings_list:
+            if training.bookings:
+                has_any_volunteers = True
+                break
+
+        if not has_any_volunteers:
+            current_app.logger.info(
+                "Coach %s has no volunteers today — skipping summary",
+                coach.first_name,
+            )
+            skipped_count += 1
+            continue
+
         message_lines = [
             f"📋 *Dzisiejsze treningi*\n",
             f"Cześć {coach.first_name}! 👋\n",
