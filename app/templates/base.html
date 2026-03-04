@@ -11,6 +11,8 @@
     .header-logo { max-height: 36px; }
     .footer-logo { max-height: 30px; }
     .footer a { text-decoration: none; }
+    .header-coordinator-link { text-decoration: none; color: inherit; opacity: 0.8; }
+    .header-coordinator-link:hover { opacity: 1; text-decoration: underline; }
     /* Mobile header */
     @media (max-width: 768px) {
       body { padding-top: 56px; }
@@ -28,6 +30,13 @@
       <a href="{{ url_for('routes.index') }}" class="header-brand">
         <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Fundacji Widzimy Inaczej" class="header-logo">
       </a>
+      <div class="d-none d-md-flex align-items-center gap-3 small text-muted me-auto ms-4">
+        <span><i class="bi bi-person-badge-fill me-1"></i>Koordynator:
+          <a href="mailto:mappel@op.pl" class="header-coordinator-link">Mariusz Appel</a>
+          &nbsp;&middot;&nbsp;
+          <a href="tel:+48600987641" class="header-coordinator-link">600&nbsp;987&nbsp;641</a>
+        </span>
+      </div>
       <div class="d-flex align-items-center gap-2">
         {% if session.get('admin_logged_in') %}
           {% if not request.path.startswith('/admin') %}
