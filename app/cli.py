@@ -409,11 +409,13 @@ def send_coach_summary_command(hours_before, window_minutes):
 @click.option("--year", default=None, type=int, help="Year. Default: current year (or previous if Jan).")
 @click.option("--test-email", default=None, help="Send all summaries to this email instead (for testing).")
 @click.option("--coordinator-email", default=None, help="Also send a combined coordinator summary to this email.")
+@click.option("--coordinator-only", is_flag=True, default=False, help="Only send coordinator summary (skip individual coach emails).")
 @with_appcontext
-def send_monthly_summary_command(month, year, test_email, coordinator_email):
+def send_monthly_summary_command(month, year, test_email, coordinator_email, coordinator_only):
     """Send monthly training summary email to each coach.
 
     Optionally also sends a combined coordinator summary to --coordinator-email.
+    Use --coordinator-only to send only the coordinator email (skip individual coach emails).
     By default summarises the previous month.  Run on the last day of
     each month (or first day of next month) via cron.
 
@@ -453,6 +455,15 @@ def send_monthly_summary_command(month, year, test_email, coordinator_email):
     sent_count = 0
     skipped_count = 0
     failed_count = 0
+
+    if coordinator_only:
+        # Skip individual coach emails entirely
+        if coordinator_email:
+            _send_coordinator_summary(coordinator_email, coaches, month, year, month_name, period_label,
+                                      month_start, month_end, test_email)
+        else:
+            click.echo("BŁĄD: --coordinator-only wymaga podania --coordinator-email")
+        return
 
     for coach in coaches:
         recipient = test_email or coach.email
