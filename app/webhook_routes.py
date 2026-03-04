@@ -653,6 +653,40 @@ def whatsapp_webhook():
         pending_bookings = get_pending_bookings(volunteer)
         
         if not pending_bookings:
+            # Check if volunteer has already-confirmed upcoming bookings
+            now_utc = datetime.now(timezone.utc)
+            tomorrow_end = datetime.combine((now_utc.date() + timedelta(days=1)), datetime.max.time()).replace(tzinfo=timezone.utc)
+            already_confirmed = Booking.query.join(Training).filter(
+                Booking.volunteer_id == volunteer.id,
+                Booking.is_confirmed.is_(True),
+                Training.date >= now_utc,
+                Training.date <= tomorrow_end,
+                Training.is_canceled.is_(False),
+                Training.is_deleted.is_(False),
+            ).order_by(Training.date).all()
+            if already_confirmed:
+                # Build a friendly "already confirmed" message
+                if len(already_confirmed) == 1:
+                    t = already_confirmed[0].training
+                    today_date = now_utc.date()
+                    training_date = t.date.date() if hasattr(t.date, 'date') else t.date
+                    day_word = "dzisiaj" if training_date == today_date else "jutro"
+                    msg = (
+                        f"✅ Jesteś już potwierdzony/a na trening {day_word} o {t.date.strftime('%H:%M')}!\n"
+                        f"📍 {t.location.name}\n"
+                        f"👨\u200d🏫 Trener: {t.coach.first_name} {t.coach.last_name}"
+                    )
+                else:
+                    lines = ["✅ Jesteś już potwierdzony/a na:\n"]
+                    today_date = now_utc.date()
+                    for bk in already_confirmed:
+                        t = bk.training
+                        training_date = t.date.date() if hasattr(t.date, 'date') else t.date
+                        day_word = "dzisiaj" if training_date == today_date else "jutro"
+                        lines.append(f"🕐 {day_word} {t.date.strftime('%H:%M')} — {t.location.name}")
+                    msg = "\n".join(lines)
+                send_whatsapp_message('', msg, chat_id=chat_id)
+                return jsonify({'status': 'ok', 'action': 'already_confirmed'}), 200
             send_no_booking_response(chat_id)
             return jsonify({'status': 'ok', 'action': 'no_booking'}), 200
         

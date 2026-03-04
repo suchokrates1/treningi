@@ -408,10 +408,12 @@ def send_coach_summary_command(hours_before, window_minutes):
 @click.option("--month", default=None, type=int, help="Month number (1-12). Default: previous month.")
 @click.option("--year", default=None, type=int, help="Year. Default: current year (or previous if Jan).")
 @click.option("--test-email", default=None, help="Send all summaries to this email instead (for testing).")
+@click.option("--coordinator-email", default=None, help="Also send a combined coordinator summary to this email.")
 @with_appcontext
-def send_monthly_summary_command(month, year, test_email):
+def send_monthly_summary_command(month, year, test_email, coordinator_email):
     """Send monthly training summary email to each coach.
 
+    Optionally also sends a combined coordinator summary to --coordinator-email.
     By default summarises the previous month.  Run on the last day of
     each month (or first day of next month) via cron.
 
@@ -612,6 +614,157 @@ def send_monthly_summary_command(month, year, test_email):
             click.echo(f"BŁĄD {coach_name}: {error}")
 
     click.echo(f"\nWysłano: {sent_count}, pominięto: {skipped_count}, błędów: {failed_count}")
+
+    # ── Coordinator combined summary ───────────────────────────
+    if coordinator_email:
+        _send_coordinator_summary(coordinator_email, coaches, month, year, month_name, period_label,
+                                  month_start, month_end, test_email)
+
+
+def _send_coordinator_summary(coordinator_email, coaches, month, year, month_name, period_label,
+                               month_start, month_end, test_email):
+    """Build and send a combined coordinator email with all coaches' data."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from .email_utils import send_email
+
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin'),
+    )
+
+    wb = Workbook()
+    wb.remove(wb.active)  # Remove the default empty sheet
+
+    all_html_sections = []
+    grand_trainings = 0
+    grand_volunteers = 0
+
+    for coach in coaches:
+        trainings = (
+            Training.query
+            .filter(
+                Training.coach_id == coach.id,
+                Training.date >= month_start,
+                Training.date < month_end,
+                Training.is_canceled.is_(False),
+                Training.is_deleted.is_(False),
+            )
+            .order_by(Training.date)
+            .all()
+        )
+
+        coach_trainings_count = 0
+        coach_volunteers_count = 0
+        html_rows = []
+
+        for training in trainings:
+            coach_trainings_count += 1
+            volunteers = [b.volunteer for b in training.bookings]
+            vol_names = ', '.join(f"{v.first_name} {v.last_name}" for v in volunteers) if volunteers else '<em>brak</em>'
+            coach_volunteers_count += len(volunteers)
+            html_rows.append(
+                f"<tr>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;'>{training.date.strftime('%d.%m.%Y')}</td>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;text-align:center;'>{training.date.strftime('%H:%M')}</td>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;'>{training.location.name}</td>"
+                f"<td style='padding:6px 10px;border:1px solid #ddd;'>{vol_names}</td>"
+                f"</tr>"
+            )
+
+        grand_trainings += coach_trainings_count
+        grand_volunteers += coach_volunteers_count
+
+        if trainings:
+            all_html_sections.append(
+                f"<h3 style='color:#2E7D32;margin-top:28px;'>{coach.first_name} {coach.last_name}</h3>"
+                f"<p style='margin:4px 0 8px 0;color:#555;font-size:0.93em;'>"
+                f"{coach_trainings_count} treningów, {coach_volunteers_count} wolontariuszy</p>"
+                f"<table style='border-collapse:collapse;width:100%;margin-bottom:8px;'>"
+                f"<thead><tr style='background:#2E7D32;color:#fff;'>"
+                f"<th style='padding:7px 10px;border:1px solid #2E7D32;'>Data</th>"
+                f"<th style='padding:7px 10px;border:1px solid #2E7D32;'>Godzina</th>"
+                f"<th style='padding:7px 10px;border:1px solid #2E7D32;'>Miejsce</th>"
+                f"<th style='padding:7px 10px;border:1px solid #2E7D32;'>Wolontariusze</th></tr></thead>"
+                f"<tbody>{''.join(html_rows)}</tbody></table>"
+            )
+        else:
+            all_html_sections.append(
+                f"<h3 style='color:#888;margin-top:28px;'>{coach.first_name} {coach.last_name}</h3>"
+                f"<p style='color:#aaa;font-size:0.9em;'>Brak treningów w tym okresie.</p>"
+            )
+
+        # Add Excel sheet for this coach (skip if no trainings)
+        if not trainings:
+            continue
+        sheet_name = f"{coach.first_name} {coach.last_name}"[:31]
+        ws = wb.create_sheet(title=sheet_name)
+        ws.merge_cells('A1:D1')
+        ws['A1'].value = f"{coach.first_name} {coach.last_name} — {period_label}"
+        ws['A1'].font = Font(bold=True, size=13, color="2E7D32")
+        ws['A1'].alignment = Alignment(horizontal='center')
+        headers = ['Data', 'Godzina', 'Miejsce', 'Wolontariusze']
+        fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_idx, value=h)
+            cell.font = header_font
+            cell.fill = fill
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = thin_border
+        row = 4
+        for training in trainings:
+            volunteers = [b.volunteer for b in training.bookings]
+            vol_names = ', '.join(f"{v.first_name} {v.last_name}" for v in volunteers) if volunteers else '—'
+            ws.cell(row=row, column=1, value=training.date.strftime('%d.%m.%Y')).border = thin_border
+            ws.cell(row=row, column=2, value=training.date.strftime('%H:%M')).border = thin_border
+            ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+            ws.cell(row=row, column=3, value=training.location.name).border = thin_border
+            ws.cell(row=row, column=4, value=vol_names).border = thin_border
+            row += 1
+        row += 1
+        ws.cell(row=row, column=1, value='Łącznie:').font = Font(bold=True)
+        ws.cell(row=row, column=2, value=coach_trainings_count).font = Font(bold=True)
+        ws.cell(row=row, column=3, value='Wolontariuszy:').font = Font(bold=True)
+        ws.cell(row=row, column=4, value=coach_volunteers_count).font = Font(bold=True)
+        ws.column_dimensions['A'].width = 14
+        ws.column_dimensions['B'].width = 10
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 45
+
+    html_body = f"""\
+<div style="font-family:Arial,sans-serif;max-width:750px;margin:0 auto;">
+  <h2 style="color:#2E7D32;">🎾 Podsumowanie wolontariackie — {period_label}</h2>
+  <p>Cześć Mariusz!</p>
+  <p>Poniżej znajdziesz zbiorcze podsumowanie wszystkich treningów Blind Tenisa za <strong>{period_label}</strong>.</p>
+  <div style="background:#f0f8f0;border-left:4px solid #2E7D32;padding:12px 18px;border-radius:6px;margin:16px 0;">
+    <strong>📊 Łącznie: {grand_trainings} treningów, {grand_volunteers} wolontariuszy</strong>
+  </div>
+  {''.join(all_html_sections)}
+  <p style="margin-top:28px;color:#666;font-size:13px;">
+    Ten email został wygenerowany automatycznie przez system zapisów Blind Tenis.<br>
+    🎾 <a href="https://widzimyinaczej.org.pl/">Fundacja Widzimy Inaczej</a>
+  </p>
+</div>"""
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    excel_bytes = buf.getvalue()
+    filename = f"koordynator_treningi_{month_name}_{year}.xlsx"
+
+    recipient = test_email or coordinator_email
+    success, error = send_email(
+        subject=f"[Koordynator] Podsumowanie wolontariackie — {period_label}",
+        body=None,
+        recipients=[recipient],
+        html_body=html_body,
+        attachments=[(filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excel_bytes)],
+    )
+    if success:
+        click.echo(f"OK [Koordynator] Wysłano do {recipient}: {grand_trainings} treningów, {grand_volunteers} wolontariuszy łącznie")
+    else:
+        click.echo(f"BŁĄD [Koordynator]: {error}")
 
 
 def init_app(app):
