@@ -1,18 +1,33 @@
 {% extends "admin/admin_base.html" %}
 {% block admin_content %}
-<div class="admin-page-header">
+<div class="admin-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
   <h2><i class="bi bi-person-lines-fill"></i>Wolontariusze</h2>
-  <div class="header-actions">
-    <span class="badge bg-secondary" style="font-size:0.9rem;">{{ volunteers|length }} osób</span>
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge bg-secondary" style="font-size:0.9rem;">{{ total }} osób</span>
+    <form method="get" action="{{ url_for('admin.manage_volunteers') }}" class="d-flex align-items-center gap-2">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      <label for="per_page_select" class="small text-muted mb-0 text-nowrap">Wierszy:</label>
+      <select id="per_page_select" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+        {% for n in [10, 25, 50, 100] %}
+          <option value="{{ n }}" {% if n == per_page %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </form>
   </div>
 </div>
 
 <!-- Search -->
 <div class="admin-card" style="padding: 0.75rem 1.25rem;">
-  <div class="d-flex align-items-center gap-2">
-    <i class="bi bi-search text-muted"></i>
-    <input type="text" id="volunteerSearch" class="form-control form-control-sm border-0" placeholder="Szukaj wolontariusza po imieniu, nazwisku, e-mailu lub telefonie..." style="box-shadow:none;">
-  </div>
+  <form method="get" id="searchForm" action="{{ url_for('admin.manage_volunteers') }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-search text-muted"></i>
+      <input type="text" id="volunteerSearch" name="q" value="{{ q }}" class="form-control form-control-sm border-0" placeholder="Szukaj po imieniu, nazwisku, e-mailu lub telefonie..." style="box-shadow:none;" autocomplete="off">
+      {% if q %}
+        <a href="{{ url_for('admin.manage_volunteers', per_page=per_page) }}" class="btn btn-sm btn-outline-secondary" title="Wyczyść"><i class="bi bi-x-lg"></i></a>
+      {% endif %}
+    </div>
+  </form>
 </div>
 
 <div class="admin-card">
@@ -29,7 +44,7 @@
       </thead>
       <tbody>
         {% for vol, count in volunteers %}
-        <tr class="volunteer-row">
+        <tr>
           <td>
             <strong>{{ vol.first_name }} {{ vol.last_name }}</strong>
             {% if vol.is_adult == false %}
@@ -56,32 +71,58 @@
           </td>
         </tr>
         {% endfor %}
+        {% if not volunteers %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Brak wyników</td></tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
-  <div id="noResults" class="empty-state d-none">
-    <div class="empty-state-icon"><i class="bi bi-search"></i></div>
-    <h5>Brak wyników</h5>
-    <p>Nie znaleziono wolontariuszy pasujących do wyszukiwania</p>
-  </div>
 </div>
+
+{% if pagination.pages > 1 %}
+{% set cur = pagination.page %}
+{% set total_pages = pagination.pages %}
+<nav aria-label="Paginacja" class="mt-3 d-flex justify-content-center">
+  <ul class="pagination flex-wrap justify-content-center" style="max-width:100%;">
+
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('admin.manage_volunteers', page=pagination.prev_num, per_page=per_page, q=q) }}">&laquo;</a>
+    </li>
+
+    {% set pages_to_show = [] %}
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == 1 or p == total_pages or (p >= cur - 5 and p <= cur + 5) %}
+        {% set _ = pages_to_show.append(p) %}
+      {% endif %}
+    {% endfor %}
+
+    {% set prev_p = namespace(val=0) %}
+    {% for p in pages_to_show %}
+      {% if prev_p.val and p - prev_p.val > 1 %}
+        <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+      {% endif %}
+      <li class="page-item {% if p == cur %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('admin.manage_volunteers', page=p, per_page=per_page, q=q) }}">{{ p }}</a>
+      </li>
+      {% set prev_p.val = p %}
+    {% endfor %}
+
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('admin.manage_volunteers', page=pagination.next_num, per_page=per_page, q=q) }}">&raquo;</a>
+    </li>
+
+  </ul>
+</nav>
+{% endif %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  var search = document.getElementById('volunteerSearch');
-  var rows = document.querySelectorAll('.volunteer-row');
-  var noResults = document.getElementById('noResults');
-
-  search.addEventListener('input', function() {
-    var q = search.value.toLowerCase();
-    var anyVisible = false;
-    rows.forEach(function(row) {
-      var text = row.textContent.toLowerCase();
-      var match = !q || text.indexOf(q) !== -1;
-      row.style.display = match ? '' : 'none';
-      if (match) anyVisible = true;
-    });
-    noResults.classList.toggle('d-none', anyVisible);
+  var input = document.getElementById('volunteerSearch');
+  var form = document.getElementById('searchForm');
+  var timer;
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    timer = setTimeout(function() { form.submit(); }, 400);
   });
 });
 </script>

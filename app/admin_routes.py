@@ -318,20 +318,72 @@ def delete_location(location_id):
 @login_required
 def manage_volunteers():
     """List all volunteers with booking counts."""
-    volunteers = (
+    page = flask.request.args.get("page", 1, type=int)
+    q = flask.request.args.get("q", "").strip()
+
+    # per_page: query param → cookie → default 25
+    per_page_arg = flask.request.args.get("per_page", type=int)
+    if per_page_arg and per_page_arg in (10, 25, 50, 100):
+        per_page = per_page_arg
+        resp_set_cookie = True
+    else:
+        per_page = int(flask.request.cookies.get("volunteers_per_page", 25))
+        if per_page not in (10, 25, 50, 100):
+            per_page = 25
+        resp_set_cookie = False
+
+    base_q = (
         db.session.query(
             Volunteer,
             db.func.count(Booking.id).label("booking_count"),
         )
         .outerjoin(Booking, Volunteer.id == Booking.volunteer_id)
         .group_by(Volunteer.id)
-        .order_by(Volunteer.last_name, Volunteer.first_name)
-        .all()
     )
-    return render_template(
+
+    if q:
+        like = f"%{q}%"
+        base_q = base_q.filter(
+            db.or_(
+                Volunteer.first_name.ilike(like),
+                Volunteer.last_name.ilike(like),
+                Volunteer.email.ilike(like),
+                Volunteer.phone_number.ilike(like),
+            )
+        )
+
+    base_q = base_q.order_by(Volunteer.last_name, Volunteer.first_name)
+
+    total = base_q.count()
+    items = base_q.offset((page - 1) * per_page).limit(per_page).all()
+
+    # Build a simple pagination-like object
+    import math
+    pages = max(1, math.ceil(total / per_page))
+
+    class _Pagination:
+        pass
+
+    pagination = _Pagination()
+    pagination.page = page
+    pagination.pages = pages
+    pagination.total = total
+    pagination.has_prev = page > 1
+    pagination.has_next = page < pages
+    pagination.prev_num = page - 1
+    pagination.next_num = page + 1
+
+    resp = flask.make_response(render_template(
         "admin/volunteers.html",
-        volunteers=volunteers,
-    )
+        volunteers=items,
+        pagination=pagination,
+        per_page=per_page,
+        q=q,
+        total=total,
+    ))
+    if resp_set_cookie:
+        resp.set_cookie("volunteers_per_page", str(per_page), max_age=60 * 60 * 24 * 365)
+    return resp
 
 
 @admin_bp.route("/volunteers/<int:volunteer_id>")
