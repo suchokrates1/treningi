@@ -1039,6 +1039,18 @@ def import_excel():
 def history():
     """List past trainings with volunteer sign-ups."""
     page = flask.request.args.get("page", 1, type=int)
+
+    # per_page: query param → cookie → default 25
+    per_page_arg = flask.request.args.get("per_page", type=int)
+    if per_page_arg and per_page_arg in (10, 25, 50, 100):
+        per_page = per_page_arg
+        resp_set_cookie = True
+    else:
+        per_page = int(flask.request.cookies.get("history_per_page", 25))
+        if per_page not in (10, 25, 50, 100):
+            per_page = 25
+        resp_set_cookie = False
+
     stmt = (
         db.select(Training)
         .where(
@@ -1050,12 +1062,16 @@ def history():
         )
         .order_by(Training.date.desc())
     )
-    pagination = db.paginate(stmt, page=page, per_page=10)
-    return render_template(
+    pagination = db.paginate(stmt, page=page, per_page=per_page)
+    resp = flask.make_response(render_template(
         "admin/history.html",
         trainings=pagination.items,
         pagination=pagination,
-    )
+        per_page=per_page,
+    ))
+    if resp_set_cookie:
+        resp.set_cookie("history_per_page", str(per_page), max_age=60*60*24*365)
+    return resp
 
 
 @admin_bp.route("/history/<int:training_id>/remove", methods=["POST"])
