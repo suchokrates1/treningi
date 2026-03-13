@@ -82,7 +82,7 @@
     {# Build page list with ellipsis: always show first, last, cur-1, cur, cur+1 #}
     {% set pages_to_show = [] %}
     {% for p in range(1, total + 1) %}
-      {% if p == 1 or p == total or (p >= cur - 2 and p <= cur + 2) %}
+      {% if p == 1 or p == total or (p >= cur - 5 and p <= cur + 5) %}
         {% set _ = pages_to_show.append(p) %}
       {% endif %}
     {% endfor %}
