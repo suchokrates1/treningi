@@ -16,10 +16,10 @@ from .ai_assistant import ask_gemini
 webhook_bp = Blueprint('webhook', __name__)
 
 
-def _find_volunteer_by_name(name: str) -> Volunteer | None:
+def _find_person_by_name(name: str) -> tuple[Volunteer | None, Coach | None]:
     """Find a volunteer or coach by display name (for @lid contacts)."""
     if not name:
-        return None
+        return None, None
     parts = name.strip().split()
     if len(parts) >= 2:
         first = parts[0]
@@ -29,8 +29,14 @@ def _find_volunteer_by_name(name: str) -> Volunteer | None:
             Volunteer.last_name.ilike(last),
         ).first()
         if vol:
-            return vol
-    return None
+            return vol, None
+        coach = Coach.query.filter(
+            Coach.first_name.ilike(first),
+            Coach.last_name.ilike(last),
+        ).first()
+        if coach:
+            return None, coach
+    return None, None
 
 
 def _extract_phone_from_lid(lid_id: str) -> str | None:
@@ -210,33 +216,41 @@ def detect_intent(message: str) -> str | None:
     return None
 
 
-def find_volunteer_by_phone(phone: str) -> Volunteer | None:
-    """Find volunteer by phone number.
-    
-    Handles phones stored with spaces/dashes (e.g. '607 575 408')
-    by stripping non-digit characters before comparison.
-    """
+def _find_by_phone(model, phone: str):
+    """Find a model row by phone number (matches on last 9 digits)."""
     normalized = normalize_phone_number(phone)
-    
-    # Extract last 9 digits (Polish phone without country code)
     digits_only = re.sub(r'\D', '', normalized)
     last9 = digits_only[-9:] if len(digits_only) >= 9 else digits_only
-    
+
     if not last9:
         return None
-    
-    # Compare against phone_number with all non-digit chars stripped
-    # This handles phones stored as '607 575 408', '607-575-408', etc.
-    volunteer = Volunteer.query.filter(
+
+    stripped_phone = db.func.replace(
         db.func.replace(
-            db.func.replace(
-                db.func.replace(Volunteer.phone_number, ' ', ''),
-                '-', ''),
-            '+', ''
-        ).like(f'%{last9}%')
-    ).first()
-    
-    return volunteer
+            db.func.replace(model.phone_number, ' ', ''),
+            '-', ''),
+        '+', ''
+    )
+    return model.query.filter(stripped_phone.like(f'%{last9}%')).first()
+
+
+def find_volunteer_by_phone(phone: str) -> Volunteer | None:
+    """Find volunteer by phone number."""
+    return _find_by_phone(Volunteer, phone)
+
+
+def find_coach_by_phone(phone: str) -> Coach | None:
+    """Find coach by phone number."""
+    return _find_by_phone(Coach, phone)
+
+
+def find_person_by_phone(phone: str) -> tuple[Volunteer | None, Coach | None]:
+    """Find volunteer or coach by phone. Volunteers take precedence."""
+    volunteer = find_volunteer_by_phone(phone)
+    if volunteer:
+        return volunteer, None
+    coach = find_coach_by_phone(phone)
+    return None, coach
 
 
 def get_pending_bookings(volunteer: Volunteer, *, for_cancel: bool = False) -> list[Booking]:
@@ -335,29 +349,37 @@ def send_selection_prompt(chat_id: str, bookings: list[Booking], *, cancel_mode:
     send_whatsapp_message('', "\n".join(lines), chat_id=chat_id)
 
 
-def send_unknown_response(chat_id: str, message: str = "", volunteer: Volunteer | None = None) -> None:
+def send_unknown_response(
+    chat_id: str,
+    message: str = "",
+    volunteer: Volunteer | None = None,
+    coach: Coach | None = None,
+) -> None:
     """Send response when we don't understand the message.
 
-    First tries Gemini AI for a conversational reply.  Falls back to a
+    Uses Gemini AI only for known volunteers/coaches. Falls back to a
     static help message when the AI is unavailable.
-    ``chat_id`` is the raw WhatsApp chatId (``@c.us`` or ``@lid``).
     """
-    # Try AI response first
     if message:
         print(f"[WEBHOOK] Calling ask_gemini with message={message[:50]}", flush=True)
-        ai_reply = ask_gemini(message, volunteer=volunteer)
+        ai_reply = ask_gemini(message, volunteer=volunteer, coach=coach)
         print(f"[WEBHOOK] AI reply: {str(ai_reply)[:100] if ai_reply else 'None'}", flush=True)
         if ai_reply:
             send_whatsapp_message('', ai_reply, chat_id=chat_id)
             return
 
-    # Fallback: static help message
-    fallback = (
-        "Dostępne komendy:\n"
-        "✅ POTWIERDZAM - potwierdź udział w treningu\n"
-        "❌ REZYGNUJĘ - zrezygnuj z treningu\n\n"
-        "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
-    )
+    if coach and not volunteer:
+        fallback = (
+            "Cześć! Ten bot służy głównie wolontariuszom do potwierdzania treningów.\n\n"
+            "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
+        )
+    else:
+        fallback = (
+            "Dostępne komendy:\n"
+            "✅ POTWIERDZAM - potwierdź udział w treningu\n"
+            "❌ REZYGNUJĘ - zrezygnuj z treningu\n\n"
+            "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
+        )
     send_whatsapp_message('', fallback, chat_id=chat_id)
 
 
@@ -373,16 +395,6 @@ def send_no_booking_response(chat_id: str, *, intent: str | None = None) -> None
             "ℹ️ Nie znaleziono żadnego treningu do potwierdzenia na jutro.\n\n"
             "Jeśli uważasz, że to błąd, skontaktuj się z nami."
         )
-    send_whatsapp_message('', message, chat_id=chat_id)
-
-
-def send_not_found_response(chat_id: str) -> None:
-    """Send response when volunteer not found in database."""
-    message = (
-        "❓ Nie znaleziono Cię w naszej bazie.\n\n"
-        "Jeśli jesteś zapisany/a na wolontariat, skontaktuj się z nami: "
-        "biuro@widzimyinaczej.org.pl"
-    )
     send_whatsapp_message('', message, chat_id=chat_id)
 
 
@@ -460,47 +472,64 @@ def whatsapp_webhook():
         # chat_id is the raw 'from' field – we'll use it to reply
         chat_id = from_field
         volunteer = None
-        
-        # --- Identify the volunteer ---
+        coach = None
+
+        # --- Identify volunteer or coach ---
         if '@c.us' in from_field:
-            # Standard format: 48123456789@c.us → extract phone, find volunteer
             phone_match = re.match(r'^(\d{9,15})@c\.us$', from_field)
             if phone_match:
                 phone_number = phone_match.group(1)
                 print(f"[WEBHOOK] Phone from @c.us: {phone_number}", flush=True)
-                volunteer = find_volunteer_by_phone(phone_number)
+                volunteer, coach = find_person_by_phone(phone_number)
         elif '@lid' in from_field:
-            # Linked device format – find volunteer by display name
-            print(f"[WEBHOOK] @lid detected, resolving volunteer...", flush=True)
+            print(f"[WEBHOOK] @lid detected, resolving person...", flush=True)
             notify_name = _data.get('notifyName', '') or payload.get('notifyName', '')
             print(f"[WEBHOOK] notifyName={notify_name}", flush=True)
             if notify_name:
-                volunteer = _find_volunteer_by_name(notify_name)
-                print(f"[WEBHOOK] Volunteer by name: {volunteer}", flush=True)
-            if not volunteer:
-                # Try resolving @lid → phone → volunteer
+                volunteer, coach = _find_person_by_name(notify_name)
+                print(f"[WEBHOOK] Person by name: vol={volunteer}, coach={coach}", flush=True)
+            if not volunteer and not coach:
                 phone_number = _extract_phone_from_lid(from_field)
                 if phone_number:
                     print(f"[WEBHOOK] Phone from lid lookup: {phone_number}", flush=True)
-                    volunteer = find_volunteer_by_phone(phone_number)
+                    volunteer, coach = find_person_by_phone(phone_number)
         else:
             print(f"[WEBHOOK] Unknown from format: {from_field}", flush=True)
             return jsonify({'status': 'error', 'reason': 'unknown from format'}), 200
-        
-        print(f"[WEBHOOK] Volunteer resolved: {volunteer}", flush=True)
-        
-        if not volunteer:
-            print(f"[WEBHOOK] Volunteer not found, sending not_found response to {chat_id}", flush=True)
-            send_not_found_response(chat_id)
-            return jsonify({'status': 'ok', 'action': 'not_found'}), 200
-        
+
+        print(f"[WEBHOOK] Resolved: volunteer={volunteer}, coach={coach}", flush=True)
+
+        if not volunteer and not coach:
+            print(f"[WEBHOOK] Unknown sender, ignoring: {from_field}", flush=True)
+            return jsonify({'status': 'ignored', 'reason': 'unknown sender'}), 200
+
         # Rate limiting (use chat_id as key)
         if is_rate_limited(chat_id):
             print(f"[WEBHOOK] Rate limited: {chat_id}", flush=True)
             return jsonify({'status': 'rate_limited'}), 429
         
-        print(f"[WEBHOOK] Processing: vol={volunteer.first_name} {volunteer.last_name}, msg={message_body[:50]}", flush=True)
-        
+        person_label = (
+            f"vol={volunteer.first_name} {volunteer.last_name}"
+            if volunteer
+            else f"coach={coach.first_name} {coach.last_name}"
+        )
+        print(f"[WEBHOOK] Processing: {person_label}, msg={message_body[:50]}", flush=True)
+
+        # Coaches only get AI/help — no booking confirm/cancel flow
+        if coach and not volunteer:
+            intent = detect_intent(message_body)
+            if intent:
+                send_whatsapp_message(
+                    '',
+                    "Ten bot służy wolontariuszom do potwierdzania udziału w treningach "
+                    "(POTWIERDZAM / REZYGNUJĘ).\n\n"
+                    "Jeśli potrzebujesz pomocy, napisz: biuro@widzimyinaczej.org.pl",
+                    chat_id=chat_id,
+                )
+                return jsonify({'status': 'ok', 'action': 'coach_command_hint'}), 200
+            send_unknown_response(chat_id, message_body, coach=coach)
+            return jsonify({'status': 'ok', 'action': 'coach_ai'}), 200
+
         # Check if we're waiting for a selection from this user
         if chat_id in _pending_selections:
             bookings = _pending_selections[chat_id]

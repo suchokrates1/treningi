@@ -12,7 +12,7 @@ from typing import Optional
 import requests
 from flask import current_app
 
-from .models import Volunteer, Booking, Training, db
+from .models import Volunteer, Booking, Training, Coach, db
 
 
 # System prompt that defines the assistant's personality and knowledge
@@ -76,14 +76,49 @@ def _get_volunteer_context(volunteer: Volunteer) -> str:
     return "\n".join(lines)
 
 
+def _get_coach_context(coach: Coach) -> str:
+    """Build context about coach's upcoming trainings."""
+    now = datetime.now(timezone.utc)
+    upcoming = (
+        Training.query.filter(
+            Training.coach_id == coach.id,
+            Training.date >= now,
+            Training.is_canceled.is_(False),
+            Training.is_deleted.is_(False),
+        )
+        .order_by(Training.date)
+        .limit(5)
+        .all()
+    )
+
+    if not upcoming:
+        return f"Trener: {coach.first_name} {coach.last_name}. Brak nadchodzących treningów."
+
+    lines = [f"Trener: {coach.first_name} {coach.last_name}"]
+    lines.append("Nadchodzące treningi:")
+    for training in upcoming:
+        volunteer_count = Booking.query.filter_by(training_id=training.id).count()
+        lines.append(
+            f"- {training.date.strftime('%Y-%m-%d %H:%M')} w {training.location.name}, "
+            f"zapisanych wolontariuszy: {volunteer_count}/{training.max_volunteers}"
+        )
+    return "\n".join(lines)
+
+
 def ask_gemini(
     message: str,
     volunteer: Optional[Volunteer] = None,
+    coach: Optional[Coach] = None,
 ) -> Optional[str]:
     """Send a message to Gemini and get a response.
 
     Returns the response text or None if the API call fails.
+    Only call for known volunteers or coaches.
     """
+    if not volunteer and not coach:
+        current_app.logger.warning("ask_gemini called without known volunteer/coach")
+        return None
+
     api_key = os.environ.get("GEMINI_API_KEY") or current_app.config.get("GEMINI_API_KEY")
     if not api_key:
         current_app.logger.warning("GEMINI_API_KEY not configured")
@@ -91,17 +126,25 @@ def ask_gemini(
 
     model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
-    # Build the prompt with volunteer context
+    # Build the prompt with volunteer/coach context
     context = ""
+    sender_label = "użytkownika"
     if volunteer:
         try:
             context = _get_volunteer_context(volunteer)
         except Exception:
             context = f"Wolontariusz: {volunteer.first_name} {volunteer.last_name}"
+        sender_label = "wolontariusza"
+    elif coach:
+        try:
+            context = _get_coach_context(coach)
+        except Exception:
+            context = f"Trener: {coach.first_name} {coach.last_name}"
+        sender_label = "trenera"
 
     user_content = message
     if context:
-        user_content = f"[Kontekst: {context}]\n\nWiadomość od wolontariusza: {message}"
+        user_content = f"[Kontekst: {context}]\n\nWiadomość od {sender_label}: {message}"
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
