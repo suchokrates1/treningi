@@ -60,6 +60,7 @@ def create_app():
     app.config['WHATSAPP_API_URL'] = os.environ.get('WHATSAPP_API_URL')
     app.config['WHATSAPP_SESSION'] = os.environ.get('WHATSAPP_SESSION', 'default')
     app.config['WHATSAPP_API_KEY'] = os.environ.get('WHATSAPP_API_KEY')
+    app.config['IGNORED_PHONES'] = os.environ.get('IGNORED_PHONES', '')
 
     # Gemini AI configuration
     app.config['GEMINI_API_KEY'] = os.environ.get('GEMINI_API_KEY')

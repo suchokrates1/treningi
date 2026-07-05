@@ -27,6 +27,9 @@ services:
       - "traefik.http.routers.tenis-rezerwacje.entrypoints=https"
       - "traefik.http.routers.tenis-rezerwacje.tls=true"
       - "traefik.http.services.tenis-rezerwacje.loadbalancer.server.port=8000"
+    networks:
+      - default
+      - proxy
     depends_on:
       - waha
 
@@ -42,6 +45,7 @@ services:
       - WHATSAPP_DEFAULT_ENGINE=WEBJS
       - WAHA_PRINT_QR=true
       - WHATSAPP_RESTART_ALL_SESSIONS=true
+      - WHATSAPP_START_SESSION=default
       - WAHA_API_KEY=${WAHA_API_KEY}
       - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME}
       - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
@@ -61,6 +65,13 @@ services:
       - "traefik.http.routers.tenis-waha.entrypoints=https"
       - "traefik.http.routers.tenis-waha.tls=true"
       - "traefik.http.services.tenis-waha.loadbalancer.server.port=3000"
+    networks:
+      - default
+      - proxy
 
 volumes:
   waha_sessions:
+
+networks:
+  proxy:
+    external: true
