@@ -442,7 +442,16 @@ def whatsapp_webhook():
         if from_me:
             print(f"[WEBHOOK] Skipping own message", flush=True)
             return jsonify({'status': 'ignored', 'reason': 'own message'}), 200
-        
+
+        ignored_raw = current_app.config.get('IGNORED_PHONES') or ''
+        ignored_phones = set(re.sub(r'\D', '', p) for p in ignored_raw.split(',') if p.strip())
+        from_digits = re.sub(r'\D', '', from_field.split('@')[0])
+        if ignored_phones and from_digits and any(
+            from_digits.endswith(p[-9:]) for p in ignored_phones if len(p) >= 9
+        ):
+            print(f"[WEBHOOK] Ignoring message from ignored phone: {from_field}", flush=True)
+            return jsonify({'status': 'ignored', 'reason': 'ignored phone'}), 200
+
         # Skip empty messages (e.g. user just opened the chat)
         if not message_body:
             print(f"[WEBHOOK] Skipping empty message", flush=True)
