@@ -42,11 +42,15 @@ Configure the following variables:
   - `WHATSAPP_SESSION` – WAHA session name (default: `default`).
   - `WHATSAPP_API_KEY` – WAHA API key (optional, if authentication is enabled).
 
-To send daily reminders to volunteers, run:
+Scheduled jobs (reminders, coach summaries, WAHA healthcheck, monthly
+reports) run in the Compose service `scheduler` via supercronic and
+`scripts/crontab` (`TZ=Europe/Warsaw`). No host crontab is required —
+`docker compose up -d` on any server is enough.
+
+Manual run:
 ```bash
-flask send-reminders
+docker compose exec web flask send-reminders
 ```
-Add this command to your cron or scheduler to run each morning.
 
 Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.
 `LOG_LEVEL` controls the verbosity of both the Flask logger and the
