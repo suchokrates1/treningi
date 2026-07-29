@@ -50,6 +50,9 @@ reports) run in the Compose service `scheduler` via supercronic and
 Manual run:
 ```bash
 docker compose exec web flask send-reminders
+# Diagnostic only — redirects WhatsApp to WHATSAPP_TEST_PHONE (+48697495755):
+docker compose exec web flask send-reminders --test
+docker compose exec web flask send-coach-summary --test
 ```
 
 Optional variables include `FLASK_ENV`, `FLASK_APP` and `LOG_LEVEL`.

@@ -61,6 +61,15 @@ def create_app():
     app.config['WHATSAPP_SESSION'] = os.environ.get('WHATSAPP_SESSION', 'default')
     app.config['WHATSAPP_API_KEY'] = os.environ.get('WHATSAPP_API_KEY')
     app.config['IGNORED_PHONES'] = os.environ.get('IGNORED_PHONES', '')
+    # Owner phone for diagnostic / flask --test sends (never use volunteer numbers)
+    app.config['WHATSAPP_TEST_PHONE'] = os.environ.get(
+        'WHATSAPP_TEST_PHONE', '+48697495755'
+    )
+    # When "1", ALL WhatsApp traffic is redirected to WHATSAPP_TEST_PHONE
+    # (do not enable permanently in production)
+    app.config['WHATSAPP_FORCE_TEST_RECIPIENT'] = os.environ.get(
+        'WHATSAPP_FORCE_TEST_RECIPIENT', ''
+    )
 
     # Gemini AI configuration
     app.config['GEMINI_API_KEY'] = os.environ.get('GEMINI_API_KEY')

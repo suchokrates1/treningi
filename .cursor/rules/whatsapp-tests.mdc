@@ -1,0 +1,19 @@
+---
+description: WhatsApp diagnostic tests must use owner phone only
+alwaysApply: true
+---
+
+# WhatsApp test recipient
+
+All diagnostic / manual / agent-triggered WhatsApp tests in this project
+**must** go to the owner number **697495755** (`+48697495755`).
+
+Never send test or diagnostic WhatsApp to a volunteer or coach phone.
+
+## Required patterns
+
+- Prefer: `flask send-reminders --test` / `flask send-coach-summary --test`
+  (redirects via `whatsapp_test_recipient` to `WHATSAPP_TEST_PHONE`).
+- Ad-hoc Python / WAHA calls: use phone `+48697495755` or `697495755` only.
+- Env: `WHATSAPP_TEST_PHONE=+48697495755` (default in app). Do **not** set
+  `WHATSAPP_FORCE_TEST_RECIPIENT=1` permanently in production.
