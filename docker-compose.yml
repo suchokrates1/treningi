@@ -48,6 +48,7 @@ services:
     build: .
     container_name: tenis_scheduler
     restart: unless-stopped
+    init: true
     volumes:
       - .:/app
     environment:
