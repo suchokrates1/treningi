@@ -9,7 +9,13 @@ from zoneinfo import ZoneInfo
 
 from . import db
 from .models import Training, Booking, Volunteer, EmailSettings
-from .whatsapp_utils import notify_volunteer_reminder, notify_volunteer_reminder_multi, format_phone_display
+from .whatsapp_utils import (
+    notify_volunteer_reminder,
+    notify_volunteer_reminder_multi,
+    format_phone_display,
+    whatsapp_test_recipient,
+    get_test_phone,
+)
 from .email_utils import send_email
 from .template_utils import render_template_string
 
@@ -20,9 +26,23 @@ MIN_HOURS_SINCE_SIGNUP = 4
 
 
 @click.command('send-reminders')
+@click.option(
+    '--test',
+    'test_mode',
+    is_flag=True,
+    default=False,
+    help='Redirect all WhatsApp messages to WHATSAPP_TEST_PHONE (owner).',
+)
 @with_appcontext
-def send_reminders_command():
+def send_reminders_command(test_mode):
     """Send WhatsApp reminders for tomorrow's trainings (run daily in evening)."""
+    if test_mode:
+        click.echo(f"TEST MODE: all WhatsApp → {get_test_phone()}")
+    with whatsapp_test_recipient(test_mode):
+        _send_reminders_impl()
+
+
+def _send_reminders_impl():
     tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
     tomorrow_start = datetime.combine(tomorrow, datetime.min.time()).replace(tzinfo=timezone.utc)
     tomorrow_end = datetime.combine(tomorrow, datetime.max.time()).replace(tzinfo=timezone.utc)
@@ -224,8 +244,15 @@ def send_phone_requests_command(base_url):
 @click.command("send-coach-summary")
 @click.option("--hours-before", default=1, help="Send summary this many hours before first training")
 @click.option("--window-minutes", default=30, help="Time window in minutes (run cron at this interval)")
+@click.option(
+    "--test",
+    "test_mode",
+    is_flag=True,
+    default=False,
+    help="Redirect all WhatsApp messages to WHATSAPP_TEST_PHONE (owner).",
+)
 @with_appcontext
-def send_coach_summary_command(hours_before, window_minutes):
+def send_coach_summary_command(hours_before, window_minutes, test_mode):
     """Send WhatsApp summary to coaches about todays trainings.
     
     Sends to coaches whose first training is approximately --hours-before from now.
@@ -233,6 +260,13 @@ def send_coach_summary_command(hours_before, window_minutes):
     
     Example cron (every 30 min): */30 * * * * cd /app && flask send-coach-summary
     """
+    if test_mode:
+        click.echo(f"TEST MODE: all WhatsApp → {get_test_phone()}")
+    with whatsapp_test_recipient(test_mode):
+        _send_coach_summary_impl(hours_before, window_minutes)
+
+
+def _send_coach_summary_impl(hours_before, window_minutes):
     from .whatsapp_utils import send_whatsapp_message, format_phone_display
     from .models import Coach
 

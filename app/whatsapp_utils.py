@@ -12,15 +12,54 @@ Configuration environment variables:
 import re
 import threading
 from collections import OrderedDict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime as _dt
 from flask import current_app
 import requests
-from typing import Optional
+from typing import Iterator, Optional
 
 
 # Max length for user-provided text in WhatsApp messages
 MAX_NAME_LENGTH = 100
 MAX_LOCATION_LENGTH = 200
+
+# Default owner phone for diagnostic / --test WhatsApp sends
+DEFAULT_TEST_PHONE = "+48697495755"
+
+# When True, send_whatsapp_message redirects every message to WHATSAPP_TEST_PHONE
+_force_test_recipient: ContextVar[bool] = ContextVar(
+    "whatsapp_force_test_recipient", default=False
+)
+
+
+@contextmanager
+def whatsapp_test_recipient(enabled: bool = True) -> Iterator[None]:
+    """Redirect all WhatsApp sends in this context to WHATSAPP_TEST_PHONE."""
+    token = _force_test_recipient.set(bool(enabled))
+    try:
+        yield
+    finally:
+        _force_test_recipient.reset(token)
+
+
+def get_test_phone() -> str:
+    """Owner phone used for diagnostic / CLI --test sends."""
+    try:
+        configured = (current_app.config.get("WHATSAPP_TEST_PHONE") or "").strip()
+    except RuntimeError:
+        configured = ""
+    return configured or DEFAULT_TEST_PHONE
+
+
+def _test_redirect_enabled() -> bool:
+    if _force_test_recipient.get():
+        return True
+    try:
+        flag = str(current_app.config.get("WHATSAPP_FORCE_TEST_RECIPIENT") or "")
+    except RuntimeError:
+        flag = ""
+    return flag.strip().lower() in ("1", "true", "yes", "on")
 
 # Grace period (seconds) before sending signup confirmation to allow consolidation
 SIGNUP_GRACE_PERIOD_SECONDS = 90
@@ -177,7 +216,18 @@ def send_whatsapp_message(
     if not api_url:
         current_app.logger.warning("WHATSAPP_API_URL not configured; skipping WhatsApp message")
         return True, None
-    
+
+    # Diagnostic / CLI --test: never message real volunteers by mistake
+    if _test_redirect_enabled():
+        test_phone = get_test_phone()
+        intended = chat_id or phone or "(unknown)"
+        current_app.logger.warning(
+            "WHATSAPP TEST REDIRECT: intended=%s → %s", intended, test_phone
+        )
+        message = f"[TEST — oryginalnie dla: {intended}]\n\n{message}"
+        phone = test_phone
+        chat_id = None
+
     # Use provided chat_id (e.g. @lid) or build one from phone
     if not chat_id:
         normalized_phone = normalize_phone_number(phone)
