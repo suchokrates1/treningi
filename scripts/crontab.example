@@ -1,0 +1,20 @@
+# Crontab entries for treningi (user: suchokrates1 on minipc)
+# IMPORTANT: Unix LF only — never save with CRLF or a literal "\r" after 2>&1
+# (that breaks bash redirects: "niejednoznaczne przekierowanie").
+#
+# Install/update:
+#   crontab -l > /tmp/cron.bak
+#   # merge these lines into the crontab, then:
+#   crontab /path/to/merged-file
+
+# Reminders to volunteers (day before, 18:00 Warsaw server time ≈ UTC depending on host TZ)
+0 18 * * * cd /home/suchokrates1/treningi && docker compose exec -T web flask send-reminders >> /tmp/tenis-reminders.log 2>&1
+
+# Coach WhatsApp summary ~1h before first training of the day (window 45–75 min)
+*/30 8-18 * * * cd /home/suchokrates1/treningi && docker compose exec -T web flask send-coach-summary >> /tmp/tenis-coach-summary.log 2>&1
+
+# WAHA session healthcheck
+*/1 * * * * /home/suchokrates1/treningi/scripts/waha_healthcheck.sh >> /tmp/waha-healthcheck.log 2>&1
+
+# Monthly coach Excel summaries on last day of month (coordinator: mappel@op.pl)
+0 21 28-31 * * [ "$(date -d tomorrow +\%d)" = "01" ] && cd /home/suchokrates1/treningi && docker compose exec -T web flask send-monthly-summary --coordinator-email mappel@op.pl >> /tmp/tenis-monthly-summary.log 2>&1
