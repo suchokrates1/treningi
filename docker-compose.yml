@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   web:
     build: .
@@ -11,8 +9,9 @@ services:
       - "8083:8000"
     environment:
       - FLASK_APP=run.py
-      - FLASK_ENV=development
+      - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
+      - TZ=Europe/Warsaw
       - WHATSAPP_API_URL=http://waha:3000
       - WHATSAPP_SESSION=default
       - WHATSAPP_API_KEY=${WAHA_API_KEY}
@@ -20,7 +19,17 @@ services:
       - "8000"
     env_file:
       - .env
-    command: python run.py
+    command:
+      [
+        "gunicorn",
+        "--bind",
+        "0.0.0.0:8000",
+        "--workers",
+        "2",
+        "--threads",
+        "2",
+        "run:app",
+      ]
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tenis-rezerwacje.rule=Host(`treningi.widzimyinaczej.org.pl`)"
@@ -31,6 +40,34 @@ services:
       - default
       - proxy
     depends_on:
+      - waha
+
+  # Portable scheduled jobs (reminders, coach summary, WAHA health, monthly).
+  # No host crontab required — deploy this compose anywhere identically.
+  scheduler:
+    build: .
+    container_name: tenis_scheduler
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Warsaw
+      - WHATSAPP_API_URL=http://waha:3000
+      - WAHA_URL=http://waha:3000
+      - WHATSAPP_SESSION=default
+      - WHATSAPP_API_KEY=${WAHA_API_KEY}
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - COORDINATOR_EMAIL=${COORDINATOR_EMAIL:-mappel@op.pl}
+    env_file:
+      - .env
+    command: ["supercronic", "-passthrough-logs", "/app/scripts/crontab"]
+    networks:
+      - default
+    depends_on:
+      - web
       - waha
 
   waha:

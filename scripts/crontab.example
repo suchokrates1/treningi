@@ -1,26 +1,16 @@
-# Crontab entries for treningi (user: suchokrates1 on minipc)
-# IMPORTANT:
-# - Unix LF only — never save with CRLF or a literal "\r" after 2>&1
-#   (that breaks bash redirects: "niejednoznaczne przekierowanie").
-# - minipc timezone is UTC. Do NOT set CRON_TZ=Europe/Warsaw globally
-#   (it would shift backup/maintenance jobs). Express treningi hours in UTC
-#   for CEST (UTC+2): Warsaw 08–18 → UTC 06–16, 18:00 → 16:00, 21:00 → 19:00.
-#   In winter (CET UTC+1) shift these by +1 hour UTC.
+# DEPRECATED for production.
+# Scheduled jobs now run inside Docker Compose (service: `scheduler`,
+# file: scripts/crontab, TZ=Europe/Warsaw). Deploying this repo on any
+# host with `docker compose up -d` is enough — no host crontab needed.
 #
-# Install/update:
-#   crontab -l > /tmp/cron.bak
-#   # merge these lines into the crontab, then:
-#   crontab /path/to/merged-file
+# Keep this file only as a reference / emergency fallback.
+# If you must use host cron, use Unix LF only (never CRLF / literal \r
+# after 2>&1) and account for the host timezone.
 
-# Reminders to volunteers (18:00 Warsaw = 16:00 UTC in CEST)
-0 16 * * * cd /home/suchokrates1/treningi && docker compose exec -T web flask send-reminders >> /tmp/tenis-reminders.log 2>&1
+# Volunteer reminders (adjust hours if host is UTC)
+# 0 16 * * * cd /path/to/treningi && docker compose exec -T web flask send-reminders
 
-# Coach WhatsApp summary ~1h before first training (window 45–75 min)
-# Hours UTC 06–16 ≈ Warsaw 08–18 in CEST
-*/30 6-16 * * * cd /home/suchokrates1/treningi && docker compose exec -T web flask send-coach-summary >> /tmp/tenis-coach-summary.log 2>&1
+# Coach summary
+# */30 6-16 * * * cd /path/to/treningi && docker compose exec -T web flask send-coach-summary
 
-# WAHA session healthcheck
-*/1 * * * * /home/suchokrates1/treningi/scripts/waha_healthcheck.sh >> /tmp/waha-healthcheck.log 2>&1
-
-# Monthly coach Excel summaries on last day of month (21:00 Warsaw = 19:00 UTC CEST)
-0 19 28-31 * * [ "$(date -d tomorrow +\%d)" = "01" ] && cd /home/suchokrates1/treningi && docker compose exec -T web flask send-monthly-summary --coordinator-email mappel@op.pl >> /tmp/tenis-monthly-summary.log 2>&1
+# Prefer: docker compose up -d scheduler

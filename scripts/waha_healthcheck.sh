@@ -1,14 +1,17 @@
 #!/bin/bash
-# WAHA session health check & auto-restart script
-# Checks if the WhatsApp session is WORKING. If STOPPED, tries to restart it.
-# Run via cron every minute: */1 * * * * /home/suchokrates1/treningi/scripts/waha_healthcheck.sh >> /tmp/waha-healthcheck.log 2>&1
+# WAHA session health check & auto-restart.
+# Designed to run inside Docker Compose (scheduler service).
+# Env:
+#   WAHA_URL          default http://waha:3000
+#   WHATSAPP_SESSION  default default
+#   WAHA_API_KEY      required (from compose env_file)
 
 set -u
 
-WAHA_URL="http://localhost:3001"
-SESSION="default"
-ENV_FILE="/home/suchokrates1/treningi/.env"
-LOCK_FILE="/tmp/waha-healthcheck.lock"
+WAHA_URL="${WAHA_URL:-http://waha:3000}"
+SESSION="${WHATSAPP_SESSION:-default}"
+API_KEY="${WAHA_API_KEY:-}"
+LOCK_FILE="${WAHA_HEALTHCHECK_LOCK:-/tmp/waha-healthcheck.lock}"
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')]"
 
 exec 9>"$LOCK_FILE"
@@ -20,25 +23,17 @@ log() {
     echo "$LOG_PREFIX $1"
 }
 
-if [ -f "$ENV_FILE" ]; then
-    API_KEY=$(grep -E '^WAHA_API_KEY=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
-else
-    API_KEY=""
-fi
-
 if [ -z "$API_KEY" ]; then
-    log "ERROR: WAHA_API_KEY not found in $ENV_FILE"
+    log "ERROR: WAHA_API_KEY not set"
     exit 1
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -qx tenis_waha; then
-    log "WAHA container not running"
-    exit 1
-fi
-
-if ! docker exec tenis_waha sh -lc "getent hosts web.whatsapp.com >/dev/null 2>&1"; then
-    log "External DNS not ready inside tenis_waha; skipping session recovery"
-    exit 0
+# Optional DNS readiness check (skip if getent missing)
+if command -v getent >/dev/null 2>&1; then
+    if ! getent hosts web.whatsapp.com >/dev/null 2>&1; then
+        log "External DNS not ready; skipping session recovery"
+        exit 0
+    fi
 fi
 
 STATUS=$(curl -sf --max-time 10 \

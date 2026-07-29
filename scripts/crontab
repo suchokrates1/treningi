@@ -1,0 +1,15 @@
+# In-container crontab for supercronic (service: scheduler).
+# Times are Europe/Warsaw via TZ=Europe/Warsaw on the scheduler container.
+# Paths are inside the container (/app) — portable across any host.
+
+# Volunteer reminders (day before, 18:00 Warsaw)
+0 18 * * * cd /app && flask send-reminders
+
+# Coach WhatsApp summary ~1h before first training (window 45–75 min)
+*/30 8-18 * * * cd /app && flask send-coach-summary
+
+# WAHA session healthcheck / auto-restart
+*/1 * * * * /app/scripts/waha_healthcheck.sh
+
+# Monthly coach Excel summaries on last day of month (21:00 Warsaw)
+0 21 28-31 * * [ "$(date -d tomorrow +\%d)" = "01" ] && cd /app && flask send-monthly-summary --coordinator-email ${COORDINATOR_EMAIL:-mappel@op.pl}
