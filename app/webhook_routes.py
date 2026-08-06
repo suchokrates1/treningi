@@ -371,14 +371,14 @@ def send_unknown_response(
     if coach and not volunteer:
         fallback = (
             "Cześć! Ten bot służy głównie wolontariuszom do potwierdzania treningów.\n\n"
-            "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
+            "Jeśli potrzebujesz pomocy, napisz do nas: treningi@widzimyinaczej.org.pl"
         )
     else:
         fallback = (
             "Dostępne komendy:\n"
             "✅ POTWIERDZAM - potwierdź udział w treningu\n"
             "❌ REZYGNUJĘ - zrezygnuj z treningu\n\n"
-            "Jeśli potrzebujesz pomocy, napisz do nas: biuro@widzimyinaczej.org.pl"
+            "Jeśli potrzebujesz pomocy, napisz do nas: treningi@widzimyinaczej.org.pl"
         )
     send_whatsapp_message('', fallback, chat_id=chat_id)
 
@@ -523,7 +523,7 @@ def whatsapp_webhook():
                     '',
                     "Ten bot służy wolontariuszom do potwierdzania udziału w treningach "
                     "(POTWIERDZAM / REZYGNUJĘ).\n\n"
-                    "Jeśli potrzebujesz pomocy, napisz: biuro@widzimyinaczej.org.pl",
+                    "Jeśli potrzebujesz pomocy, napisz: treningi@widzimyinaczej.org.pl",
                     chat_id=chat_id,
                 )
                 return jsonify({'status': 'ok', 'action': 'coach_command_hint'}), 200
