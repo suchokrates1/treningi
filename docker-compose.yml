@@ -61,7 +61,7 @@ services:
       - WHATSAPP_SESSION=default
       - WHATSAPP_API_KEY=${WAHA_API_KEY}
       - WAHA_API_KEY=${WAHA_API_KEY}
-      - COORDINATOR_EMAIL=${COORDINATOR_EMAIL:-mappel@op.pl}
+      - COORDINATOR_EMAIL=${COORDINATOR_EMAIL:-treningi@widzimyinaczej.org.pl}
     env_file:
       - .env
     command: ["supercronic", "-passthrough-logs", "/app/scripts/crontab"]

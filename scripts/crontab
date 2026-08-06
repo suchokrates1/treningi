@@ -12,4 +12,4 @@
 */1 * * * * /app/scripts/waha_healthcheck.sh
 
 # Monthly coach Excel summaries on last day of month (21:00 Warsaw)
-0 21 28-31 * * [ "$(date -d tomorrow +\%d)" = "01" ] && cd /app && flask send-monthly-summary --coordinator-email ${COORDINATOR_EMAIL:-mappel@op.pl}
+0 21 28-31 * * [ "$(date -d tomorrow +\%d)" = "01" ] && cd /app && flask send-monthly-summary --coordinator-email ${COORDINATOR_EMAIL:-treningi@widzimyinaczej.org.pl}
