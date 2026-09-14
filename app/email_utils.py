@@ -3,6 +3,7 @@ from .models import EmailSettings
 from . import db
 import smtplib
 from email.message import EmailMessage
+from email.utils import formatdate
 import re
 from collections.abc import Iterable
 
@@ -93,6 +94,7 @@ def send_email(
     msg["Subject"] = subject
     msg["From"] = sender_header
     msg["To"] = ", ".join(recipients)
+    msg["Date"] = formatdate(localtime=True)
 
     if not body and html_body:
         body = re.sub(r"<[^>]+>", "", html_body)
