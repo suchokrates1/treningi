@@ -39,6 +39,19 @@ def _find_person_by_name(name: str) -> tuple[Volunteer | None, Coach | None]:
     return None, None
 
 
+
+def _is_ignored_phone(raw: str | None) -> bool:
+    """True when the digits match IGNORED_PHONES (last 9 digits)."""
+    if not raw:
+        return False
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 9:
+        return False
+    ignored_raw = current_app.config.get("IGNORED_PHONES") or ""
+    ignored = {re.sub(r"\D", "", p) for p in ignored_raw.split(",") if p.strip()}
+    return any(len(p) >= 9 and digits.endswith(p[-9:]) for p in ignored)
+
+
 def _extract_phone_from_lid(lid_id: str) -> str | None:
     """Resolve @lid chat ID to phone number via WAHA chat endpoint.
 
@@ -49,6 +62,21 @@ def _extract_phone_from_lid(lid_id: str) -> str | None:
     waha_url = current_app.config.get('WHATSAPP_API_URL') or 'http://waha:3000'
     waha_key = current_app.config.get('WHATSAPP_API_KEY') or ''
     session = current_app.config.get('WHATSAPP_SESSION') or 'default'
+
+    lid_token = lid_id.split('@')[0]
+    try:
+        req = urllib.request.Request(
+            f'{waha_url}/api/{session}/lids/{urllib.parse.quote(lid_token, safe="")}',
+            headers={'X-Api-Key': waha_key},
+        )
+        data = json.loads(urllib.request.urlopen(req, timeout=5).read())
+        pn = str(data.get('pn') or '').split('@')[0]
+        digits = re.sub(r'\D', '', pn)
+        if len(digits) >= 9:
+            current_app.logger.info(f'Resolved @lid {lid_id} via lids endpoint')
+            return digits
+    except Exception:
+        pass
 
     # Try single-chat endpoint first (much faster than listing all chats)
     try:
@@ -455,13 +483,11 @@ def whatsapp_webhook():
             print(f"[WEBHOOK] Skipping own message", flush=True)
             return jsonify({'status': 'ignored', 'reason': 'own message'}), 200
 
-        ignored_raw = current_app.config.get('IGNORED_PHONES') or ''
-        ignored_phones = set(re.sub(r'\D', '', p) for p in ignored_raw.split(',') if p.strip())
-        from_digits = re.sub(r'\D', '', from_field.split('@')[0])
-        if ignored_phones and from_digits and any(
-            from_digits.endswith(p[-9:]) for p in ignored_phones if len(p) >= 9
-        ):
+        if _is_ignored_phone(from_field.split('@')[0]):
             print(f"[WEBHOOK] Ignoring message from ignored phone: {from_field}", flush=True)
+            return jsonify({'status': 'ignored', 'reason': 'ignored phone'}), 200
+        if '@lid' in from_field and _is_ignored_phone(_extract_phone_from_lid(from_field)):
+            print(f"[WEBHOOK] Ignoring message from ignored lid: {from_field}", flush=True)
             return jsonify({'status': 'ignored', 'reason': 'ignored phone'}), 200
 
         # Skip empty messages (e.g. user just opened the chat)

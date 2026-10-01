@@ -121,3 +121,40 @@ def test_ask_gemini_rejects_unknown_sender(app_instance):
         from app.ai_assistant import ask_gemini
 
         assert ask_gemini("hello") is None
+
+
+def test_ignored_phone_is_not_answered_when_whatsapp_uses_lid(client, app_instance, monkeypatch):
+    from app import db
+    from app.models import Volunteer
+
+    with app_instance.app_context():
+        db.session.add(Volunteer(
+            first_name="Dawid",
+            last_name="Suchodolski",
+            email="dawid@example.com",
+            phone_number="",
+            is_adult=True,
+        ))
+        db.session.commit()
+    app_instance.config["IGNORED_PHONES"] = "48697495755"
+    sent = []
+    monkeypatch.setattr(
+        "app.webhook_routes.send_whatsapp_message",
+        lambda *a, **k: sent.append((a, k)),
+    )
+    monkeypatch.setattr(
+        "app.webhook_routes._extract_phone_from_lid",
+        lambda lid: "48697495755",
+    )
+    payload = _webhook_payload("205866389221398@lid", "Ok")
+    payload["payload"]["_data"] = {"notifyName": "Dawid Suchodolski"}
+
+    resp = client.post(
+        "/webhook/whatsapp",
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["reason"] == "ignored phone"
+    assert sent == []
